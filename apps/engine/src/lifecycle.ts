@@ -378,7 +378,13 @@ export async function processTasks(
         await store.saveExecutionRecord(record);
 
         logger.info(
-          `[Execution Monitor] Task ${task.id} successfully completed! Deleting task.`
+          `[Execution Monitor] 🎉 SUCCESS: RebalanceTask ${task.id} has successfully completed!`
+        );
+        logger.info(
+          `[Execution Monitor] Transmitted transaction signature(s): ${record.txSignatures.join(', ')}`
+        );
+        logger.info(
+          `[Execution Monitor] The next on-chain position discovery cycle will automatically register and track the newly created position.`
         );
         await tasksStore.deleteTask(task.id);
         for (const orch of orchestrators) {
