@@ -13,11 +13,11 @@ export enum StrategyAction {
   SKIP = 'skip',
   CLOSE = 'close',
   OPEN = 'open',
-  CLOSE_OPEN = 'close+open'
+  CLOSE_OPEN = 'close+open',
 }
 
 export enum DecisionAction {
   CLOSE = 'close',
   OPEN = 'open',
-  CLOSE_OPEN = 'close+open'
+  CLOSE_OPEN = 'close+open',
 }
