@@ -23,6 +23,15 @@ docker compose -f docker-compose.dev.yml up --build --force-recreate
 
 # run production container build
 docker compose -f docker-compose.prod.yml up -d --build --force-recreate
+
+# run tests across all packages
+pnpm test
+
+# run tests with coverage
+pnpm test:coverage
+
+# run tests in watch mode
+pnpm test:watch
 ```
 
 ## Structure
