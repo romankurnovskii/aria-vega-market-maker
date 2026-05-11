@@ -1,8 +1,32 @@
+/**
+ * @file solana-executor.ts
+ * @description Solana transaction executor for CLMM position operations (open/close/rebalance).
+ *
+ * @features
+ * - Executes close, open, and compound close+open operations via RPC
+ * - Supports priority fee configuration for transaction confirmation speed
+ * - Injects re evaluation callback for close+open compound actions
+ * - Mock transaction simulation for development (returns fake signatures)
+ *
+ * @dependencies IRpcProvider (for RPC calls), IExecutor interface, Decision types
+ * @sideEffects Produces ExecutionRecord with transaction signatures (mock or real)
+ */
 import { IExecutor, Decision, MarketSnapshot, ExecutionRecord, StrategyResult, IRpcProvider } from '@lp-system/core';
 
+/**
+ * Solana executor using RPC pool for transaction submission.
+ * Currently uses mockTransaction() — replace with real transaction building/signing in production.
+ */
 export class SolanaExecutor implements IExecutor {
   private reEvaluateCallback?: (positionId: string) => Promise<StrategyResult>;
 
+  /**
+   * Constructs the executor with RPC pool, wallet address, and optional priority fee.
+   *
+   * @param {IRpcProvider} rpcPool - Pool of RPC endpoints for resilience.
+   * @param {string} walletAddress - Solana wallet public key for transaction signing.
+   * @param {{ priorityFeeMicroLamports?: number }} options - Priority fee configuration.
+   */
   constructor(
     private rpcPool: IRpcProvider,
     private walletAddress: string,
@@ -11,10 +35,24 @@ export class SolanaExecutor implements IExecutor {
     console.log(`[SolanaExecutor] Initialized for wallet ${this.walletAddress} with RPC pool [${this.rpcPool.constructor.name}] and priority fee ${this.options.priorityFeeMicroLamports || 0} micro-lamports`);
   }
 
+  /**
+   * Sets the re evaluation callback used for close+open compound operations.
+   *
+   * @param {(positionId: string) => Promise<StrategyResult>} reEvaluate - Async callback returning fresh strategy signal.
+   */
   public setReEvaluate(reEvaluate: (positionId: string) => Promise<StrategyResult>): void {
     this.reEvaluateCallback = reEvaluate;
   }
 
+  /**
+   * Applies a decision to on-chain transactions.
+   * Handles three action types: close, open, and close+open (rebalance).
+   *
+   * @param {Decision} decision - The action to execute (close/open/close+open).
+   * @param {MarketSnapshot} market - Current market data for pool context.
+   * @param {(positionId: string) => Promise<StrategyResult>} [reEvaluate] - Optional per-call re-evaluation callback.
+   * @returns {Promise<ExecutionRecord>} Immutable record of execution outcome (success/fail, tx sigs, error).
+   */
   public async apply(
     decision: Decision,
     market: MarketSnapshot,
@@ -82,6 +120,14 @@ export class SolanaExecutor implements IExecutor {
     }
   }
 
+  /**
+   * Simulates a transaction with brief network latency.
+   * Replace this with real on-chain transaction building and submission in production.
+   *
+   * @private
+   * @param {string} actionType - Type of action (close_position or open_position).
+   * @returns {Promise<string>} Mock transaction signature.
+   */
   private async mockTransaction(actionType: string): Promise<string> {
     // Simulate brief network latency for RPC transaction confirmation
     await new Promise((resolve) => setTimeout(resolve, 150));
