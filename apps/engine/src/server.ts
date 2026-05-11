@@ -14,7 +14,13 @@
  */
 import express from 'express';
 import cors from 'cors';
-import { IStore, IOrchestratorRegistry, IExecutor, Assignment, IPositionProvider } from '@lp-system/core';
+import {
+  IStore,
+  IOrchestratorRegistry,
+  IExecutor,
+  Assignment,
+  IPositionProvider,
+} from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
 
@@ -59,7 +65,9 @@ export function startHttpServer(
       const { id, strategyId, positionId, mode } = req.body;
 
       if (!id || !strategyId || !positionId || !mode) {
-        res.status(400).json({ error: 'Missing required parameters: id, strategyId, positionId, mode' });
+        res
+          .status(400)
+          .json({ error: 'Missing required parameters: id, strategyId, positionId, mode' });
         return;
       }
 
@@ -68,7 +76,7 @@ export function startHttpServer(
         strategyId,
         positionId,
         mode: mode as 'active' | 'monitoring',
-        createdAt: Date.now()
+        createdAt: Date.now(),
       };
 
       // 1. Persist to store
@@ -113,16 +121,20 @@ export function startHttpServer(
         return;
       }
 
-      logger.info(`[HTTP Server] Triggering manual ad-hoc strategy evaluation for ${strategyId} on position ${positionId}`);
-      
+      logger.info(
+        `[HTTP Server] Triggering manual ad-hoc strategy evaluation for ${strategyId} on position ${positionId}`
+      );
+
       const position = await positionProvider.getPosition(positionId);
       const market = await positionProvider.getMarketSnapshot(position.poolAddress);
-      
+
       const orchestrators = registry.getForPosition(positionId);
       const targetOrch = orchestrators.find((o) => o.strategyId === strategyId);
 
       if (!targetOrch) {
-        res.status(404).json({ error: `No active orchestrator for strategy ${strategyId} and position ${positionId} exists in registry` });
+        res.status(404).json({
+          error: `No active orchestrator for strategy ${strategyId} and position ${positionId} exists in registry`,
+        });
         return;
       }
 
@@ -138,7 +150,9 @@ export function startHttpServer(
   });
 
   app.listen(PORT, () => {
-    logger.info(`[HTTP Server] Operational and listening on port ${PORT} (loaded: ${executor.constructor.name})`);
+    logger.info(
+      `[HTTP Server] Operational and listening on port ${PORT} (loaded: ${executor.constructor.name})`
+    );
   });
 
   return app;
