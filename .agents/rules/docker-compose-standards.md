@@ -1,45 +1,49 @@
 ---
-description: Expert Docker Compose standards for monorepo (Python 3.14 + Node 24, dev/prod, env files, volume mounts)
-globs: ['docker-compose*.yml', 'docker-compose*.yml', 'Dockerfile*', '.env*']
-version: 1.0.0
+description: Expert Docker Compose standards for pnpm monorepos (Node 24, dev/prod, env files, persistent volumes)
+globs: ['docker-compose*.yml', 'docker-compose*.yaml', 'Dockerfile*', '.env*']
+version: 2.0.0
 alwaysApply: false
 trigger: always_on
 ---
 
 # Docker Compose Architecture & Style Standards
 
-This rule enforces production-grade Docker Compose patterns for a monorepo containing
-a Python backend and a Node/React frontend, with clean dev/prod separation, correct
-env file handling, and safe volume mount strategy.
+This rule enforces production-grade Docker Compose patterns for a `pnpm` workspace monorepo containing Node applications (`engine`, `frontend`) and shared `packages`. It enforces clean dev/prod separation, correct env file handling, and safe volume mount strategies for stateful trading bots.
 
 ---
 
 ## 1. Response Constraints (Strict)
 
 - **Preservation**: Do NOT remove existing services, volumes, or networks unless explicitly asked.
-- **Images**: Always use `python:3.14-slim` for Python services and `node:24-slim` for
-  Node services. Never suggest alpine or other variants unless the user asks.
+- **Images**: Always use `node:24-slim` (or current project Node version) for Node services.
+- **Package Manager**: Always use `pnpm`. Never use `npm` or `yarn` in Dockerfiles or commands.
 - **Formatting**: 2-space indent. No trailing spaces. One blank line between top-level keys.
 
 ---
 
 ## 2. Monorepo Directory Layout
 
-```
+```text
 repo-root/
-├── backend/
-│   ├── Dockerfile
-│   ├── src/
-│   └── pyproject.toml
-├── frontend/
-│   ├── Dockerfile
-│   ├── src/
-│   └── package.json
-├── docker-compose.dev.yml      ← development (hot reload, volume mounts)
-├── docker-compose.prod.yml     ← production (built images, no mounts)
-├── .env                         ← local dev secrets (gitignored)
-├── .env.example                 ← committed template with all keys, no values
-└── .env.prod                    ← copy from remote prod server (gitignored, never edited locally)
+├── apps/
+│   ├── engine/          ← Backend daemon loop / REST API
+│   │   ├── Dockerfile
+│   │   └── package.json
+│   └── frontend/        ← Frontend UI
+│       ├── Dockerfile
+│       └── package.json
+├── packages/            ← Shared domain logic, steps, providers
+│   ├── core/
+│   ├── orchestration/
+│   └── ...
+├── data/                ← Critical persistence directory (logs, JSON state)
+├── docker-compose.dev.yml
+├── docker-compose.prod.yml
+├── pnpm-workspace.yaml
+├── package.json
+├── .env                 ← Local dev secrets
+├── .env.example         ← Committed template
+└── .env.prod            ← Production secrets
 ```
 
 ---
@@ -48,92 +52,53 @@ repo-root/
 
 ### Rules
 
-- **`.env`**: local development values. Always gitignored. Referenced in `docker-compose.dev.yml`.
-- **`.env.prod`**: production values. Always gitignored. Never generated or edited locally —
-  treat it as a read-only copy pulled from the remote server. Referenced in `docker-compose.prod.yml`.
-- **`.env.example`**: committed to git. Contains every key with blank or placeholder values.
-  This is the canonical record of what variables are required. Keep it in sync manually.
-- Never hardcode secrets or URLs in any Compose file. All values come from env files.
-- Never commit `.env` or `.env.prod`. Add both to `.gitignore`.
-
-### `.gitignore` entries (required)
-
-```gitignore
-.env
-.env.prod
-```
-
-### `.env.example` format
-
-```dotenv
-# Backend
-MONGODB_URL=
-MONGODB_DB_NAME=
-POSTGRES_URL=
-SECRET_KEY=
-DEBUG=
-
-# Frontend
-VITE_API_URL=
-VITE_APP_NAME=
-
-# Shared
-ALLOWED_ORIGINS=
-```
+- **`.env`**: Local development values. Always gitignored. Referenced in `docker-compose.dev.yml`.
+- **`.env.prod`**: Production values. Always gitignored. Never generated locally. Referenced in `docker-compose.prod.yml`.
+- **`.env.example`**: Committed to git. Contains all required keys with blank values.
+- Never hardcode secrets in Compose files. All values come from env files.
 
 ---
 
-## 4. Dockerfile Standards
+## 4. Dockerfile Standards (pnpm Workspace)
 
-### Backend (`backend/Dockerfile`)
+Because this is a monorepo, Docker builds require workspace context.
+
+### App Dockerfile (e.g., `apps/engine/Dockerfile`)
+
+_Note: Context must be passed from the repo root in docker-compose._
 
 ```dockerfile
-FROM python:3.14-slim
+FROM node:24-slim AS base
+
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
 
 WORKDIR /app
 
-# Install system deps in one layer; clean apt cache in the same RUN
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-  && rm -rf /var/lib/apt/lists/*
+# Copy workspace configuration and lockfile
+COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
+COPY apps/engine/package.json ./apps/engine/
+COPY packages/ ./packages/
 
-# Copy dependency manifest first for layer caching
-COPY pyproject.toml .
-RUN pip install --no-cache-dir -e .
+# Install dependencies
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
-# Copy source last (changes most often)
-COPY src/ ./src/
+# Copy source code
+COPY apps/engine/ ./apps/engine/
 
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
-```
+WORKDIR /app/apps/engine
 
-### Frontend (`frontend/Dockerfile`)
+CMD ["pnpm", "start"]
 
-```dockerfile
-FROM node:24-slim
-
-WORKDIR /app
-
-# Copy manifests first for layer caching
-COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts
-
-# Copy source last
-COPY . .
-
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 ```
 
 ### Dockerfile Rules
 
-- `COPY` manifests before source in every Dockerfile — this keeps the dependency
-  install layer cached when only source files change.
-- `--no-install-recommends` on all `apt-get install` calls.
-- Clean apt cache in the same `RUN` layer: `&& rm -rf /var/lib/apt/lists/*`.
-- `--no-cache-dir` on all `pip install` calls.
-- `npm ci` (not `npm install`) for reproducible installs.
-- Never install dev tools (curl, git, vim) in prod Dockerfiles.
-- Prod Dockerfiles use multi-stage builds when a build step produces static assets.
+- Use `corepack enable` to activate `pnpm`.
+- Use `--mount=type=cache` for the pnpm store to speed up builds.
+- Always install with `--frozen-lockfile`.
+- `--no-install-recommends` on all `apt-get install` calls if system dependencies are needed.
 
 ---
 
@@ -141,86 +106,43 @@ CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
 Key behaviours:
 
-- Mounts source directories for hot reload — changes on host reflect instantly in container.
-- **Never mounts `node_modules`** — the named volume `node_modules` shadows the host's
-  directory so the container keeps its own compiled native modules.
-- Uses `env_file: .env`.
-- Exposes ports directly to localhost for easy debugging.
-- Uses `watch` or `command` overrides to run dev servers, not prod servers.
+- Mounts source directories for hot reload.
+- **Critical Persistence**: Always mount `./data:/app/data` to ensure the LP bot retains execution history, assignments, and logs.
+- Prevents host `node_modules` from overwriting container modules using named volumes.
 
 ```yaml
 services:
-  backend:
+  engine:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
-    image: myapp-backend:dev
-    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+      context: .
+      dockerfile: apps/engine/Dockerfile
+    image: lp-engine:dev
+    command: pnpm --filter engine run dev
     env_file: .env
     ports:
       - '8000:8000'
     volumes:
-      # Mount source for hot reload
-      - ./backend/src:/app/src
-    depends_on:
-      mongo:
-        condition: service_healthy
+      - .:/app # Mount full workspace for hot reload
+      - ./data:/app/data # CRITICAL: Persist JSON state & logs
+      - node_modules:/app/node_modules # Shadow host node_modules
     restart: unless-stopped
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    image: myapp-frontend:dev
-    command: npm run dev -- --host 0.0.0.0
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    image: lp-frontend:dev
+    command: pnpm --filter frontend run dev --host 0.0.0.0
     env_file: .env
     ports:
       - '5173:5173'
     volumes:
-      # Mount source for hot reload
-      - ./frontend/src:/app/src
-      - ./frontend/public:/app/public
-      # Named volume shadows host node_modules — container keeps its own
+      - .:/app
       - node_modules:/app/node_modules
     restart: unless-stopped
 
-  mongo:
-    image: mongo:7
-    env_file: .env
-    ports:
-      - '27017:27017'
-    volumes:
-      - mongo_data:/data/db
-    healthcheck:
-      test: ['CMD', 'mongosh', '--eval', "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  # Uncomment if the project uses PostgreSQL
-  # postgres:
-  #   image: postgres:16-alpine
-  #   env_file: .env
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
-  #   restart: unless-stopped
-
 volumes:
-  mongo_data:
   node_modules:
-  # postgres_data:
-
-networks:
-  default:
-    name: myapp-dev
 ```
 
 ---
@@ -229,205 +151,53 @@ networks:
 
 Key behaviours:
 
-- No volume mounts for source code — image contains the built artifact.
-- Uses `env_file: .env.prod` — this file is never generated locally; it is a copy
-  from the remote prod server.
-- No ports exposed directly on the host except via the reverse proxy.
-- Healthchecks on every service.
-- `restart: always` (not `unless-stopped`) for prod resilience.
+- Uses `env_file: .env.prod`.
+- Maps a named volume to `/app/data` so the LP bot retains state across container rebuilds.
+- `restart: always` for resilience.
 
 ```yaml
 services:
-  backend:
+  engine:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
-    image: myapp-backend:latest
+      context: .
+      dockerfile: apps/engine/Dockerfile
+    image: lp-engine:latest
     env_file: .env.prod
     expose:
       - '8000'
-    depends_on:
-      mongo:
-        condition: service_healthy
+    volumes:
+      - engine_data:/app/data # CRITICAL: Persist production state
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 20s
     restart: always
 
   frontend:
     build:
-      context: ./frontend
-      dockerfile: Dockerfile.prod # multi-stage: build → nginx
-    image: myapp-frontend:latest
+      context: .
+      dockerfile: apps/frontend/Dockerfile.prod
+    image: lp-frontend:latest
     env_file: .env.prod
     expose:
       - '80'
     restart: always
 
-  nginx:
-    image: nginx:1.27-alpine
-    ports:
-      - '80:80'
-      - '443:443'
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/certs:/etc/nginx/certs:ro
-    depends_on:
-      - backend
-      - frontend
-    restart: always
-
-  mongo:
-    image: mongo:7
-    env_file: .env.prod
-    expose:
-      - '27017'
-    volumes:
-      - mongo_data:/data/db
-    healthcheck:
-      test: ['CMD', 'mongosh', '--eval', "db.adminCommand('ping')"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-    restart: always
-
-  # Uncomment if the project uses PostgreSQL
-  # postgres:
-  #   image: postgres:16-alpine
-  #   env_file: .env.prod
-  #   expose:
-  #     - "5432"
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 5
-  #   restart: always
-
 volumes:
-  mongo_data:
-  # postgres_data:
+  engine_data:
 
 networks:
   default:
-    name: myapp-prod
+    name: lp-system-prod
 ```
 
 ---
 
-## 7. Frontend Production Dockerfile (multi-stage)
+## 7. Security & Execution Rules
 
-The prod frontend build compiles the React app and serves it with nginx — no Node
-runtime in production.
-
-```dockerfile
-# frontend/Dockerfile.prod
-
-# ── Stage 1: build ──────────────────────────────────────────────────────────
-FROM node:24-slim AS builder
-
-WORKDIR /app
-
-COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts
-
-COPY . .
-RUN npm run build
-
-# ── Stage 2: serve ──────────────────────────────────────────────────────────
-FROM nginx:1.27-alpine AS runner
-
-COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx/app.conf /etc/nginx/conf.d/default.conf
-
-EXPOSE 80
-```
-
----
-
-## 8. Volume Mount Rules
-
-| Mount target      | Dev             | Prod                | Reason                                      |
-| ----------------- | --------------- | ------------------- | ------------------------------------------- |
-| `backend/src`     | ✅ bind mount   | ❌ no mount         | Hot reload; prod uses image copy            |
-| `frontend/src`    | ✅ bind mount   | ❌ no mount         | Hot reload; prod uses built artifact        |
-| `frontend/public` | ✅ bind mount   | ❌ no mount         | Static assets hot reload                    |
-| `node_modules`    | ✅ named volume | ❌ no mount         | Prevents host overwriting container modules |
-| DB data dir       | ✅ named volume | ✅ named volume     | Persist data across container restarts      |
-| nginx config      | ❌ not in dev   | ✅ bind mount `:ro` | Prod routing; read-only for safety          |
-| SSL certs         | ❌ not in dev   | ✅ bind mount `:ro` | Prod TLS; read-only for safety              |
-
-### The `node_modules` Rule
-
-Always declare `node_modules` as a named volume in the frontend dev service. Without
-this, Docker bind-mounts the host directory over the container's `node_modules`,
-destroying native binaries compiled for Linux. The named volume wins over the bind mount
-because it is declared later in the `volumes` list under the service.
-
-```yaml
-# CORRECT
-volumes:
-  - ./frontend/src:/app/src          # bind mount — host wins
-  - node_modules:/app/node_modules   # named volume — container wins
-
-# WRONG — host node_modules overwrites container's compiled modules
-volumes:
-  - ./frontend:/app
-```
-
----
-
-## 9. Healthcheck Standards
-
-Every stateful service (database, cache, queue) MUST have a healthcheck. Application
-services in prod MUST have a healthcheck. Dev healthchecks are optional but recommended.
-
-```yaml
-# MongoDB
-healthcheck:
-  test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-  interval: 10s      # dev
-  timeout: 5s
-  retries: 5
-
-# PostgreSQL
-healthcheck:
-  test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
-  interval: 10s
-  timeout: 5s
-  retries: 5
-
-# FastAPI backend
-healthcheck:
-  test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-  interval: 30s
-  timeout: 10s
-  retries: 3
-  start_period: 20s   # allow app startup before first check
-```
-
-Use `depends_on: condition: service_healthy` so app services wait for databases to be
-ready — not just started.
-
----
-
-## 10. Named Networks
-
-Always give the default network an explicit name. This makes `docker network ls` readable
-and prevents Compose from generating opaque names like `myapp_default`.
-
-```yaml
-networks:
-  default:
-    name: myapp-dev    # in docker-compose.dev.yml
-    name: myapp-prod   # in docker-compose.prod.yml
-```
+- **Data Safety**: Never run the engine without a persistent volume mapped to `/app/data`. The system relies on local JSON adapters (`@lp-system/persistence`) and will wipe positions/assignments if run purely ephemeral.
+- **Networking**: Never expose internal database or metric ports to the host in production. Use `expose` (internal Docker network) rather than `ports` (host bind).
 
 ---
 

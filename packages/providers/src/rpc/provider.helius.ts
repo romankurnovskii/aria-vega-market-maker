@@ -22,7 +22,6 @@ export class HeliusRpcProvider extends SolanaRpcProvider {
    * @param {string} rpcUrl - The Helius RPC endpoint URL.
    */
   constructor(rpcUrl: string) {
-    // Falls back to a default Helius mainnet URL if not provided.
     const url = rpcUrl || 'https://mainnet.helius-rpc.com/?api-key=mock-api-key';
     super(url);
   }

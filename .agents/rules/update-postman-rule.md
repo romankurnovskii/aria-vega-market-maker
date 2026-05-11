@@ -9,7 +9,7 @@ Every time you add, modify, or remove a REST API endpoint or change a request/re
 ## Collection Location
 
 The collection is stored as a set of YAML files at:
-`~/dev/github/privates/postman/postman/collections/Meteora LP Bot API`
+`~/dev/github/privates/postman/postman/collections/aria-vega-mm`
 
 ## Requirements
 
