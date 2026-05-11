@@ -1,8 +1,30 @@
+/**
+ * @file amount-calculator-step.ts
+ * @description Final step: determines token amounts for new position during rebalance.
+ *
+ * @features
+ * - Runs only when openParams already exist (after RangeCalculatorStep)
+ * - Fills tokenXAmount and tokenYAmount from strategy params (tokenXAmount, tokenYAmount) or defaults
+ * - Propagates existing openParams fields unchanged except amounts
+ *
+ * @dependencies IStep, StepContext (from @lp-system/core)
+ * @sideEffects None — pure calculation
+ */
 import { IStep, StepContext } from '@lp-system/core';
 
+/**
+ * AmountCalculatorStep: populates token amounts for rebalance/open operations.
+ * Only executes when context.openParams is defined (typically after RangeCalculatorStep).
+ */
 export class AmountCalculatorStep implements IStep {
   public name = 'AmountCalculatorStep';
 
+  /**
+   * Fills in the token allocation amounts in openParams.
+   *
+   * @param {StepContext} context - Pipeline context with openParams (lowerBinId, upperBinId, poolAddress).
+   * @returns {Promise<StepContext>} Updated context with tokenXAmount and tokenYAmount set.
+   */
   public async execute(context: StepContext): Promise<StepContext> {
     if (!context.openParams) {
       return context;
