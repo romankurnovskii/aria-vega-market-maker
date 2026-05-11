@@ -387,7 +387,9 @@ export async function processTasks(
       }
     } catch (err: unknown) {
       logger.error(
-        `[Execution Monitor] Error processing task ${task.id}: ${(err as Error).message || String(err)}`
+        `[Execution Monitor] Error processing task ${task.id}: ${
+          err instanceof Error ? err.stack || err.message : String(err)
+        }`
       );
     }
   });
