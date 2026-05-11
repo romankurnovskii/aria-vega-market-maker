@@ -11,11 +11,10 @@
  * @sideEffects None — pure calculation
  */
 import { IStep, StepContext } from '@lp-system/core';
+import { getLogger } from '@lp-system/logger';
 
-/**
- * RangeCalculatorStep: computes new lower/upper boundaries for rebalance open.
- * Only executes when context.signal === 'close+open'.
- */
+const logger = getLogger('range-calculator-step');
+
 export class RangeCalculatorStep implements IStep {
   public name = 'RangeCalculatorStep';
 
@@ -30,7 +29,9 @@ export class RangeCalculatorStep implements IStep {
       return context;
     }
 
-    console.log(`[${this.name}] Calculating optimal CLMM bin boundaries around active bound ${context.market.activeBound}`);
+    logger.info(
+      `[${this.name}] Calculating optimal CLMM bin boundaries around active bound ${context.market.activeBound}`
+    );
 
     const rangePercent = (context.params.rangePercent as number) || 20;
     // For CLMM, rangePercent maps to a set number of bins (e.g. 100 bins width)
@@ -43,7 +44,9 @@ export class RangeCalculatorStep implements IStep {
     const lowerBound = lowerBinId;
     const upperBound = upperBinId;
 
-    console.log(`[${this.name}] Calculated new range bounds: [${lowerBound}, ${upperBound}] (width: ${binCount} bins)`);
+    logger.info(
+      `[${this.name}] Calculated new range bounds: [${lowerBound}, ${upperBound}] (width: ${binCount} bins)`
+    );
 
     return {
       ...context,
@@ -54,8 +57,8 @@ export class RangeCalculatorStep implements IStep {
         lowerBinId,
         upperBinId,
         tokenXAmount: '0',
-        tokenYAmount: '0'
-      }
+        tokenYAmount: '0',
+      },
     };
   }
 }

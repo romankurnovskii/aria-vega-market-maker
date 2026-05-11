@@ -12,11 +12,10 @@
  * @sideEffects None — pure check, no mutations beyond signal/reason in context
  */
 import { IStep, StepContext } from '@lp-system/core';
+import { getLogger } from '@lp-system/logger';
 
-/**
- * TrailingRangeCheckStep: range-check step for trailing stop / rebalance logic.
- * Emits 'close+open' when active bound leaves position range.
- */
+const logger = getLogger('trailing-range-check-step');
+
 export class TrailingRangeCheckStep implements IStep {
   public name = 'TrailingRangeCheckStep';
 
@@ -27,7 +26,9 @@ export class TrailingRangeCheckStep implements IStep {
    * @returns {Promise<StepContext>} Updated context with signal and reason set if out of range.
    */
   public async execute(context: StepContext): Promise<StepContext> {
-    console.log(`[${this.name}] Checking range alignment. Position range: [${context.position.lowerBound}, ${context.position.upperBound}]. Active bound: ${context.market.activeBound}`);
+    logger.info(
+      `[${this.name}] Checking range alignment. Position range: [${context.position.lowerBound}, ${context.position.upperBound}]. Active bound: ${context.market.activeBound}`
+    );
 
     // If a previous step already set a signal, we respect it and skip.
     if (context.signal) {
@@ -39,19 +40,21 @@ export class TrailingRangeCheckStep implements IStep {
       context.market.activeBound <= context.position.upperBound;
 
     if (!isActiveBoundInRange) {
-      console.log(`[${this.name}] Active bound ${context.market.activeBound} is OUT of position range. Triggering close+open rebalance.`);
+      logger.warning(
+        `[${this.name}] Active bound ${context.market.activeBound} is OUT of position range. Triggering close+open rebalance.`
+      );
       return {
         ...context,
         signal: 'close+open',
-        reason: `Active bound ${context.market.activeBound} shifted out of range [${context.position.lowerBound}, ${context.position.upperBound}]`
+        reason: `Active bound ${context.market.activeBound} shifted out of range [${context.position.lowerBound}, ${context.position.upperBound}]`,
       };
     }
 
-    console.log(`[${this.name}] Active bound is healthy and within range boundaries.`);
+    logger.info(`[${this.name}] Active bound is healthy and within range boundaries.`);
     return {
       ...context,
       signal: 'skip',
-      reason: 'Active bound remains within range'
+      reason: 'Active bound remains within range',
     };
   }
 }

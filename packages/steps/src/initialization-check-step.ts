@@ -11,11 +11,10 @@
  * @sideEffects None — pure check with no state mutation
  */
 import { IStep, StepContext } from '@lp-system/core';
+import { getLogger } from '@lp-system/logger';
 
-/**
- * InitializationCheckStep: guards against processing empty/uninitialized positions.
- * Emits 'close' signal if both token amounts are zero.
- */
+const logger = getLogger('initialization-check-step');
+
 export class InitializationCheckStep implements IStep {
   public name = 'InitializationCheckStep';
 
@@ -26,21 +25,23 @@ export class InitializationCheckStep implements IStep {
    * @returns {Promise<StepContext>} Updated context with signal='close' if zero liquidity; else unchanged.
    */
   public async execute(context: StepContext): Promise<StepContext> {
-    console.log(`[${this.name}] Checking initialization status for position: ${context.position.id}`);
+    logger.info(
+      `[${this.name}] Checking initialization status for position: ${context.position.id}`
+    );
 
     const hasLiquidityX = BigInt(context.position.tokenX.amount) > 0n;
     const hasLiquidityY = BigInt(context.position.tokenY.amount) > 0n;
 
     if (!hasLiquidityX && !hasLiquidityY) {
-      console.log(`[${this.name}] Position has zero liquidity. Signalling CLOSE.`);
+      logger.info(`[${this.name}] Position has zero liquidity. Signalling CLOSE.`);
       return {
         ...context,
         signal: 'close',
-        reason: 'Position holds zero liquidity'
+        reason: 'Position holds zero liquidity',
       };
     }
 
-    console.log(`[${this.name}] Position is initialized and active.`);
+    logger.info(`[${this.name}] Position is initialized and active.`);
     return context;
   }
 }

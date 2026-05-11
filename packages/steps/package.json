@@ -5,7 +5,8 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "dependencies": {
-    "@lp-system/core": "workspace:*"
+    "@lp-system/core": "workspace:*",
+    "@lp-system/logger": "workspace:*"
   },
   "scripts": {
     "build": "tsc",
