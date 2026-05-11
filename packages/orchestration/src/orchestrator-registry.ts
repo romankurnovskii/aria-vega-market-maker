@@ -63,7 +63,9 @@ export class OrchestratorRegistry implements IOrchestratorRegistry {
         return;
       }
     }
-    logger.warn(`[OrchestratorRegistry] No registered orchestrator found for assignmentId ${assignmentId}`);
+    logger.warn(
+      `[OrchestratorRegistry] No registered orchestrator found for assignmentId ${assignmentId}`
+    );
   }
 
   /**

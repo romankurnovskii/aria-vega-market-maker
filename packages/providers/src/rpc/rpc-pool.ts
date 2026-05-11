@@ -49,7 +49,9 @@ export class RpcPool implements IRpcProvider {
         return result;
       } catch (error: any) {
         lastError = error;
-        logger.warn(`[RpcPool] Provider ${this.currentIndex} failed. Rotating to next... Error: ${error.message}`);
+        logger.warn(
+          `[RpcPool] Provider ${this.currentIndex} failed. Rotating to next... Error: ${error.message}`
+        );
         this.rotate();
       }
     }

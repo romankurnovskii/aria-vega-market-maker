@@ -1,0 +1,479 @@
+openapi: 3.1.0
+info:
+  title: Aria Vega Engine API
+  version: 1.0.0
+  description: >
+    The Control Plane for the Aria Vega Market Maker. 
+    Provides introspection into available strategies and manages active strategy-to-position assignments.
+servers:
+  - url: http://localhost:3000
+    description: Internal Docker Network
+  - url: http://localhost:8441
+    description: Host Development Mapping
+paths:
+  /health:
+    get:
+      summary: System Health Check
+      description: Returns the liveness and health status of the Aria Vega engine, including the current server timestamp.
+      responses:
+        '200':
+          description: The system is healthy.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                  - timestamp
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+                  timestamp:
+                    type: integer
+                    format: int64
+                    example: 1715456789000
+
+  /strategies:
+    get:
+      summary: List Available Strategies
+      description: Returns all registered trading strategies that can be assigned to a liquidity position.
+      responses:
+        '200':
+          description: A list of strategy identifiers and metadata.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - count
+                  - strategies
+                properties:
+                  count:
+                    type: integer
+                    example: 1
+                  strategies:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - id
+                        - description
+                      properties:
+                        id:
+                          type: string
+                          example: "trailing-usdc"
+                        description:
+                          type: string
+                          example: "Dynamic range trailing for USDC pairs using DLMM"
+
+  /steps:
+    get:
+      summary: List Available Pipeline Steps
+      description: Returns the atomic, stateless logical units currently available in the system's pipeline.
+      responses:
+        '200':
+          description: A list of available steps.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - availableSteps
+                  - documentation
+                properties:
+                  availableSteps:
+                    type: array
+                    items:
+                      type: string
+                    example: 
+                      - "InitializationCheckStep"
+                      - "TrailingRangeCheckStep"
+                      - "RangeCalculatorStep"
+                      - "AmountCalculatorStep"
+                  documentation:
+                    type: string
+                    example: "Steps are atomic logical units combined to form strategy workflows."
+
+  /positions:
+    get:
+      summary: List Active Positions
+      description: Fetches all live, on-chain Meteora DLMM positions associated with the configured wallet. Use this to find a valid positionId for assignments.
+      responses:
+        '200':
+          description: Successfully retrieved positions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - wallet
+                  - count
+                  - positions
+                properties:
+                  wallet:
+                    type: string
+                    example: "HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTYUQh"
+                  count:
+                    type: integer
+                    example: 2
+                  positions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Position"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
+
+  /assignments:
+    get:
+      summary: List Persistent Assignments
+      description: Returns all persistent position-to-strategy assignments currently registered in the system.
+      responses:
+        '200':
+          description: A list of assignments.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Assignment"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      summary: Create Position Assignment
+      description: Assigns a specific trading strategy to an active on-chain liquidity position. This triggers the orchestrator to begin actively managing the position.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - id
+                - positionId
+                - strategyId
+                - mode
+              properties:
+                id:
+                  type: string
+                  description: A unique assignment identifier.
+                  example: "asg_12345abcde"
+                positionId:
+                  type: string
+                  description: The public key of the Meteora DLMM position.
+                  example: "9tA6m91FvP35G9A7eS982Yhd6pE35Z678WjLmoB67Pqr"
+                strategyId:
+                  type: string
+                  description: The ID of the strategy to apply.
+                  example: "trailing-usdc"
+                mode:
+                  type: string
+                  enum: [active, monitoring]
+                  description: Whether the bot should execute trades or just log intended decisions.
+                  example: "active"
+      responses:
+        '201':
+          description: Assignment successfully created and persisted.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                  - assignment
+                properties:
+                  message:
+                    type: string
+                    example: "Assignment registered successfully"
+                  assignment:
+                    $ref: "#/components/schemas/Assignment"
+        '400':
+          description: Invalid request payload or missing required parameters.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
+
+  /assignments/{id}:
+    delete:
+      summary: Delete Position Assignment
+      description: Deletes a persistent assignment and deregisters its corresponding active orchestrator from the running loop.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the assignment to remove.
+          example: "asg_12345abcde"
+      responses:
+        '200':
+          description: Assignment successfully deleted and orchestrator deregistered.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - message
+                properties:
+                  message:
+                    type: string
+                    example: "Assignment asg_12345abcde removed successfully"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
+
+  /strategies/{id}/evaluate:
+    post:
+      summary: Evaluate Strategy Ad-hoc
+      description: Triggers a manual ad-hoc strategy evaluation tick for a given position and returns the resulting strategy recommendation.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The ID of the strategy to evaluate.
+          example: "trailing-usdc"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - positionId
+              properties:
+                positionId:
+                  type: string
+                  description: The on-chain identifier/pubkey of the position to evaluate.
+                  example: "9tA6m91FvP35G9A7eS982Yhd6pE35Z678WjLmoB67Pqr"
+                poolAddress:
+                  type: string
+                  description: Optional pool address if required by the provider.
+                  example: "5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6"
+      responses:
+        '200':
+          description: Ad-hoc strategy evaluation executed successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                  - result
+                properties:
+                  status:
+                    type: string
+                    example: "success"
+                  result:
+                    $ref: "#/components/schemas/StrategyResult"
+        '400':
+          description: Missing or invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        '404':
+          description: No active orchestrator for the specified strategy and position was found in the registry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        '500':
+          $ref: "#/components/responses/InternalServerError"
+
+components:
+  schemas:
+    Assignment:
+      type: object
+      required:
+        - id
+        - strategyId
+        - positionId
+        - mode
+        - createdAt
+      properties:
+        id:
+          type: string
+          example: "asg_12345abcde"
+        strategyId:
+          type: string
+          example: "trailing-usdc"
+        positionId:
+          type: string
+          example: "9tA6m91FvP35G9A7eS982Yhd6pE35Z678WjLmoB67Pqr"
+        mode:
+          type: string
+          enum: [active, monitoring]
+          example: "active"
+        createdAt:
+          type: integer
+          format: int64
+          description: Epoch timestamp in milliseconds when the assignment was created.
+          example: 1715456789000
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          example: "An error occurred during processing."
+
+    StrategyResult:
+      type: object
+      description: Discriminated union representing the outcome/recommendation of strategy execution.
+      oneOf:
+        - type: object
+          required:
+            - action
+          properties:
+            action:
+              type: string
+              enum: [skip, close]
+              example: "skip"
+        - type: object
+          required:
+            - action
+            - params
+          properties:
+            action:
+              type: string
+              enum: [open]
+              example: "open"
+            params:
+              $ref: "#/components/schemas/OpenParams"
+        - type: object
+          required:
+            - action
+            - openParams
+          properties:
+            action:
+              type: string
+              enum: [close+open]
+              example: "close+open"
+            openParams:
+              $ref: "#/components/schemas/OpenParams"
+
+    OpenParams:
+      type: object
+      required:
+        - poolAddress
+        - lowerBound
+        - upperBound
+        - tokenXAmount
+        - tokenYAmount
+      properties:
+        poolAddress:
+          type: string
+          example: "5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6"
+        lowerBound:
+          type: number
+          description: Agnostic boundary (lowerBinId on Solana/Meteora, lowerTick on EVM)
+          example: 837500
+        upperBound:
+          type: number
+          description: Agnostic boundary (upperBinId on Solana/Meteora, upperTick on EVM)
+          example: 837600
+        tokenXAmount:
+          type: string
+          description: Raw token X amount to deposit
+          example: "15000000"
+        tokenYAmount:
+          type: string
+          description: Raw token Y amount to deposit
+          example: "12000000"
+        metadata:
+          type: object
+          additionalProperties: true
+
+    Position:
+      type: object
+      required:
+        - id
+        - poolAddress
+        - chain
+        - protocol
+        - lowerBound
+        - upperBound
+        - tokenX
+        - tokenY
+        - isInRange
+        - openedAt
+        - metadata
+      properties:
+        id:
+          type: string
+          description: "Unique on-chain identifier (e.g., Solana account public key or EVM NFT ID)."
+          example: "77aEZeqjbhYG784TB2foz8rv58bPsqLVCB2mGhNFBGfj"
+        poolAddress:
+          type: string
+          description: "On-chain contract/mint address of the associated CLMM pool."
+          example: "5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6"
+        chain:
+          type: string
+          enum: [solana, arbitrum]
+          example: "solana"
+        protocol:
+          type: string
+          enum: [meteora_dlmm, uniswap_v3]
+          example: "meteora_dlmm"
+        lowerBound:
+          type: number
+          description: "Agnostic boundary representing the lower limit (lowerBinId on Meteora, lowerTick on Uniswap)."
+          example: 837500
+        upperBound:
+          type: number
+          description: "Agnostic boundary representing the upper limit (upperBinId on Meteora, upperTick on Uniswap)."
+          example: 837600
+        tokenX:
+          $ref: "#/components/schemas/TokenAmount"
+        tokenY:
+          $ref: "#/components/schemas/TokenAmount"
+        isInRange:
+          type: boolean
+          description: "Indicates whether the current price falls within the lower and upper bounds of this position."
+          example: true
+        openedAt:
+          type: integer
+          format: int64
+          description: "Epoch timestamp in milliseconds when this position was opened."
+          example: 1715456789000
+        metadata:
+          type: object
+          additionalProperties: true
+          example:
+            strategy: "trailing-usdc"
+            leverage: 10
+
+    TokenAmount:
+      type: object
+      required:
+        - amount
+        - decimals
+        - tokenAddress
+      properties:
+        amount:
+          type: string
+          description: "Raw integer token amount as a string to preserve high precision."
+          example: "15000000"
+        decimals:
+          type: integer
+          description: "Decimals precision of the underlying token."
+          example: 6
+        tokenAddress:
+          type: string
+          description: "Agnostic address or mint address of the token."
+          example: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+
+  responses:
+    InternalServerError:
+      description: Internal Server Error.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"

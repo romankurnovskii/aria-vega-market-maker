@@ -33,5 +33,8 @@
     "**/*.{json,md,html,css}": [
       "prettier --write"
     ]
+  },
+  "dependencies": {
+    "bs58": "^6.0.0"
   }
 }

@@ -10,7 +10,14 @@
  * @dependencies IOrchestrator, IStrategy, Position, MarketSnapshot, StrategyResult (from @lp-system/core)
  * @sideEffects None — pure delegation, state held externally in registry
  */
-import { IOrchestrator, IStrategy, Position, MarketSnapshot, StrategyResult } from '@lp-system/core';
+import {
+  IOrchestrator,
+  IStrategy,
+  Position,
+  MarketSnapshot,
+  StrategyResult,
+  AssignmentMode,
+} from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
 const logger = getLogger('strategy-orchestrator');
 
@@ -34,7 +41,7 @@ export class StrategyOrchestrator implements IOrchestrator {
     public assignmentId: string,
     public positionId: string,
     public strategyId: string,
-    public mode: 'active' | 'monitoring',
+    public mode: AssignmentMode,
     private strategy: IStrategy,
     private params: Record<string, unknown> = {}
   ) {

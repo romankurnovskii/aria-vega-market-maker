@@ -121,7 +121,10 @@ export function startTickLoop(
         logger.info(`[Tick Loop] Evaluating position ${position.id} on chain [${chain}]`);
 
         // Fetch fresh status and snapshot
-        const freshPosition = await positionProvider.getPosition(position.id, position.poolAddress);
+        const freshPosition = await positionProvider.getPosition(
+          position.id,
+          position.poolAddress
+        );
         const market = await positionProvider.getMarketSnapshot(freshPosition.poolAddress);
 
         if (chain !== 'solana') {
@@ -159,7 +162,10 @@ export function startTickLoop(
           // SolanaExecutor uses RpcPool for Connection. We pass our global executor apply.
           const record = await executor.apply(decision, market, async (posId: string) => {
             logger.info(`[Re-Evaluation Callback] Initiated for position: ${posId}`);
-            const updatedPos = await positionProvider.getPosition(posId, freshPosition.poolAddress);
+            const updatedPos = await positionProvider.getPosition(
+              posId,
+              freshPosition.poolAddress
+            );
             const updatedMarket = await positionProvider.getMarketSnapshot(
               updatedPos.poolAddress
             );

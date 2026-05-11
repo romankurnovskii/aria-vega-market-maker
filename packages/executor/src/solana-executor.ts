@@ -24,9 +24,6 @@ import {
   Keypair,
   PublicKey,
   Transaction,
-  ComputeBudgetProgram,
-  SendTransactionError,
-  VersionedTransaction,
 } from '@solana/web3.js';
 import { MeteoraOnChainProvider } from '@lp-system/providers';
 import { getLogger } from '@lp-system/logger';
@@ -349,57 +346,18 @@ export class SolanaExecutor implements IExecutor {
       tx.recentBlockhash = blockhash;
       tx.feePayer = this.keypair.publicKey;
 
-      // 2. Simulate to get exact Compute Units (Saves money and prevents overpaying)
-      logger.info(
-        `[SolanaExecutor] Simulating transaction to calculate exact Compute Units...`
-      );
+      // NOTE: We are skipping custom CU simulation and relying entirely 
+      // on the Meteora SDK's default Compute Budget instructions for now.
 
-      const simTx = new Transaction();
-      simTx.add(...tx.instructions);
-      simTx.recentBlockhash = blockhash;
-      simTx.feePayer = this.keypair.publicKey;
-
-      // Compile to VersionedTransaction to allow simulation configuration options
-      const message = simTx.compileMessage();
-      const versionedTx = new VersionedTransaction(message);
-
-      const simulation = await connection.simulateTransaction(versionedTx, {
-        replaceRecentBlockhash: true,
-        sigVerify: false,
-      });
-
-      if (simulation.value.err) {
-        throw new Error(
-          `Transaction simulation failed: ${JSON.stringify(simulation.value.err)} \nLogs: ${simulation.value.logs?.join('\n')}`
-        );
-      }
-
-      const consumedUnits = simulation.value.unitsConsumed || 200000;
-      const computeUnitLimit = Math.ceil(consumedUnits * 1.15); // Add a 15% safety buffer
-
-      // 3. Inject Compute Budget Instructions
-      const computeBudgetInstructions = [
-        ComputeBudgetProgram.setComputeUnitLimit({ units: computeUnitLimit }),
-      ];
-
-      if (this.options.priorityFeeMicroLamports && this.options.priorityFeeMicroLamports > 0) {
-        computeBudgetInstructions.push(
-          ComputeBudgetProgram.setComputeUnitPrice({
-            microLamports: this.options.priorityFeeMicroLamports,
-          })
-        );
-      }
-
-      tx.instructions.unshift(...computeBudgetInstructions);
-
-      // 4. Sign and serialize the finalized transaction
+      // 2. Sign and serialize the transaction
       tx.sign(this.keypair);
       const rawTx = tx.serialize();
 
-      // 5. The Active Rebroadcast "Spam Loop" (UDP Delivery Assurance)
+      // 3. The Active Rebroadcast "Spam Loop" (UDP Delivery Assurance)
       logger.info(
-        `[SolanaExecutor] Broadcasting transaction with ${computeUnitLimit} CU limit (buffered)...`
+        `[SolanaExecutor] Broadcasting transaction using Meteora SDK defaults...`
       );
+
       let signature = '';
       let confirmed = false;
       const startTime = Date.now();
@@ -407,10 +365,10 @@ export class SolanaExecutor implements IExecutor {
 
       while (!confirmed && Date.now() - startTime < timeoutMs) {
         try {
-          // Send with skipPreflight: true since we already simulated it manually
+          // Send with skipPreflight: true to bypass local node simulation bottlenecks
           signature = await connection.sendRawTransaction(rawTx, {
             skipPreflight: true,
-            maxRetries: 0, // We handle our own active retry/spam loops
+            maxRetries: 0,
           });
 
           // Check if transaction has hit the block status index
@@ -425,22 +383,21 @@ export class SolanaExecutor implements IExecutor {
               );
             }
 
-            // Only consider confirmed or finalized consensus status as complete (supermajority consensus)
             const confStatus = status.value.confirmationStatus;
             if (confStatus === 'confirmed' || confStatus === 'finalized') {
               confirmed = true;
               break;
             }
           }
-        } catch (err) {
-          if (err instanceof SendTransactionError) {
+        } catch (err: any) {
+          if (err.name === 'SendTransactionError' || err.message?.includes('Transaction simulation failed')) {
             logger.warn(`[SolanaExecutor] RPC Send Error (will retry): ${err.message}`);
           } else {
             throw err; // Propagate hard failures
           }
         }
 
-        // Wait 2 seconds before rebroadcasting the raw bytes to leader node
+        // Wait 2 seconds before rebroadcasting
         await new Promise((resolve) => setTimeout(resolve, 2000));
       }
 
