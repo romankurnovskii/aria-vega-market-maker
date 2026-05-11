@@ -1,13 +1,15 @@
 {
-  "name": "@lp-system/executor",
+  "name": "@lp-system/config",
   "version": "1.0.0",
   "private": true,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "type": "module",
   "dependencies": {
-    "@lp-system/core": "workspace:*",
-    "@lp-system/providers": "workspace:*",
-    "@solana/web3.js": "^1.98.4"
+    "dotenv": "^17.4.2"
+  },
+  "devDependencies": {
+    "@types/dotenv": "^8.2.3"
   },
   "scripts": {
     "build": "tsc",

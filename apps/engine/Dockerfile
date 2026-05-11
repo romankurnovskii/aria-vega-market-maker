@@ -9,6 +9,8 @@ RUN npm install -g pnpm
 COPY package.json pnpm-workspace.yaml tsconfig.base.json tsconfig.json pnpm-lock.yaml ./
 
 # Copy package manifests for each package to optimize layer caching
+COPY packages/config/package.json ./packages/config/
+COPY packages/logger/package.json ./packages/logger/
 COPY packages/core/package.json ./packages/core/
 COPY packages/persistence/package.json ./packages/persistence/
 COPY packages/providers/package.json ./packages/providers/

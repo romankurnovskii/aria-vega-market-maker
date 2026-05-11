@@ -1,15 +1,17 @@
 {
-  "name": "@lp-system/persistence",
+  "name": "@lp-system/logger",
   "version": "1.0.0",
   "private": true,
-  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "type": "module",
   "dependencies": {
-    "@lp-system/core": "workspace:*"
+    "@lp-system/config": "workspace:*",
+    "dotenv": "^17.4.2",
+    "winston": "^3.19.0"
   },
   "devDependencies": {
-    "@types/node": "^20.12.7"
+    "@types/dotenv": "^8.2.3"
   },
   "scripts": {
     "build": "tsc",

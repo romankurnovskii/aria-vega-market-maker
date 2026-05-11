@@ -11,8 +11,8 @@
  * @dependencies IStore, Assignment, ExecutionRecord (from @lp-system/core), fs/promises, path
  * @sideEffects Writes to ./data/assignments.json and ./data/executions.json
  */
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { IStore, Assignment, ExecutionRecord } from '@lp-system/core';
 
 /**

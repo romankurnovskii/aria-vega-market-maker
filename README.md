@@ -19,10 +19,10 @@ pnpm build
 pnpm start
 
 # run local development stack with hot reloading
-docker compose -f docker-compose.dev.yml up --build
+docker compose -f docker-compose.dev.yml up --build --force-recreate
 
 # run production container build
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml up -d --build --force-recreate
 ```
 
 ## Structure

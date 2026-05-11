@@ -20,6 +20,9 @@ import {
   Decision
 } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
+import { getLogger } from '@lp-system/logger';
+
+const logger = getLogger('lifecycle');
 
 /**
  * Starts the one-time position discovery cycle.
@@ -40,7 +43,7 @@ export async function startDiscovery(
   store: IStore,
   registry: IOrchestratorRegistry
 ): Promise<void> {
-  console.log('[Discovery] Triggering position discovery cycle...');
+  logger.info('[Discovery] Triggering position discovery cycle...');
 
   // 1. Fetch live positions and known persisted positions
   const livePositions = await positionProvider.getPositions(walletAddress);
@@ -53,7 +56,7 @@ export async function startDiscovery(
   // 2. Identify new positions
   for (const livePos of livePositions) {
     if (!knownIds.has(livePos.id)) {
-      console.log(`[Discovery] Discovered new live position: ${livePos.id}`);
+      logger.info(`[Discovery] Discovered new live position: ${livePos.id}`);
       
       // Match with stored assignments
       const matchingAssignments = assignments.filter((a) => a.positionId === livePos.id);
@@ -67,7 +70,7 @@ export async function startDiscovery(
   // 3. Identify closed/removed positions
   for (const knownPos of knownPositions) {
     if (!liveIds.has(knownPos.id)) {
-      console.log(`[Discovery] Known position ${knownPos.id} is no longer on-chain. Pruning.`);
+      logger.info(`[Discovery] Known position ${knownPos.id} is no longer on-chain. Pruning.`);
       
       const activeOrchestrators = registry.getForPosition(knownPos.id);
       for (const orch of activeOrchestrators) {
@@ -78,7 +81,7 @@ export async function startDiscovery(
 
   // 4. Update local tracking store
   await positionStore.saveKnown(livePositions);
-  console.log('[Discovery] Discovery cycle finalized successfully.');
+  logger.info('[Discovery] Discovery cycle finalized successfully.');
 }
 
 /**
@@ -104,23 +107,23 @@ export function startTickLoop(
   executor: IExecutor,
   store: IStore
 ): NodeJS.Timeout {
-  console.log(`[Tick Loop] Launching continuous evaluation tick loop for wallet ${walletAddress}. Interval: ${intervalMs}ms`);
+  logger.info(`[Tick Loop] Launching continuous evaluation tick loop for wallet ${walletAddress}. Interval: ${intervalMs}ms`);
 
   const loop = setInterval(async () => {
     try {
-      console.log('\n[Tick Loop] Starting tick execution cycle...');
+      logger.info('[Tick Loop] Starting tick execution cycle...');
       const knownPositions = await positionStore.getKnown();
 
       for (const position of knownPositions) {
         const chain = position.chain || 'solana';
-        console.log(`[Tick Loop] Evaluating position ${position.id} on chain [${chain}]`);
+        logger.info(`[Tick Loop] Evaluating position ${position.id} on chain [${chain}]`);
 
         // Fetch fresh status and snapshot
         const freshPosition = await positionProvider.getPosition(position.id);
         const market = await positionProvider.getMarketSnapshot(freshPosition.poolAddress);
 
         if (chain !== 'solana') {
-          console.log(`[Tick Loop] Position ${position.id} is on chain ${chain} (EVM/Uniswap execution is pending Phase B). Skipping evaluation.`);
+          logger.info(`[Tick Loop] Position ${position.id} is on chain ${chain} (EVM/Uniswap execution is pending Phase B). Skipping evaluation.`);
           continue;
         }
 
@@ -135,7 +138,7 @@ export function startTickLoop(
               activeResults.push({ assignmentId: orch.assignmentId, result });
             }
           } catch (orchError: any) {
-            console.error(`[Tick Loop] Orchestrator ${orch.id} failed tick: ${orchError.message || orchError}`);
+            logger.error(`[Tick Loop] Orchestrator ${orch.id} failed tick: ${orchError.message || orchError}`);
           }
         }
 
@@ -143,10 +146,10 @@ export function startTickLoop(
         const decision: Decision | null = executionGate.consider(activeResults, freshPosition.id);
 
         if (decision) {
-          console.log(`[Tick Loop] Executable decision gated. Dispatched to executor...`);
+          logger.info(`[Tick Loop] Executable decision gated. Dispatched to executor...`);
           // SolanaExecutor uses RpcPool for Connection. We pass our global executor apply.
           const record = await executor.apply(decision, market, async (posId: string) => {
-            console.log(`[Re-Evaluation Callback] Initiated for position: ${posId}`);
+            logger.info(`[Re-Evaluation Callback] Initiated for position: ${posId}`);
             const updatedPos = await positionProvider.getPosition(posId);
             const updatedMarket = await positionProvider.getMarketSnapshot(updatedPos.poolAddress);
             const activeOrchs = registry.getForPosition(posId);
@@ -162,11 +165,11 @@ export function startTickLoop(
 
           await store.saveExecutionRecord(record);
         } else {
-          console.log(`[Tick Loop] No execution required for position ${position.id}`);
+          logger.info(`[Tick Loop] No execution required for position ${position.id}`);
         }
       }
     } catch (error: any) {
-      console.error(`[Tick Loop] Fatal error during tick execution cycle: ${error.message || error}`);
+      logger.error(`[Tick Loop] Fatal error during tick execution cycle: ${error.message || error}`);
     }
   }, intervalMs);
 

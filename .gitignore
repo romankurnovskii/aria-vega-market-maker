@@ -20,4 +20,4 @@ data/
 .DS_Store
 .idea/
 .vscode/
-.dev/data/
+.dev
