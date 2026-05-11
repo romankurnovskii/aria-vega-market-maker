@@ -100,9 +100,19 @@ async function main() {
     }
   }
 
-  const walletAddress = process.env.WALLET_PUBKEY || keypair.publicKey.toBase58();
+  // 1. Derivation as Source of Truth
+  // We prioritize the derived public key from the loaded keypair to
+  // ensure it is valid and perfectly matches the signer.
+  const walletAddress = keypair.publicKey.toBase58();
 
-  logger.info(`[Config] Target Wallet: ${walletAddress}`);
+  // 2. Logging and Validation
+  if (process.env.WALLET_PUBKEY && process.env.WALLET_PUBKEY.trim() !== walletAddress) {
+    logger.warn(
+      `[Config] WALLET_PUBKEY env var (${process.env.WALLET_PUBKEY.trim()}) differs from Private Key derivation (${walletAddress}). Using derived address for safety.`
+    );
+  }
+
+  logger.info(`[Config] Operational Wallet: ${walletAddress}`);
   logger.info(`[Config] Tick Interval: ${TICK_INTERVAL_MS / 1000}s`);
 
   // 1. Providers initialization
@@ -112,7 +122,7 @@ async function main() {
   if (HELIUS_URL_2) rpcProviders.push(new HeliusRpcProvider(HELIUS_URL_2));
   const rpcPool = new RpcPool(rpcProviders);
 
-  const positionProvider = new MeteoraApiProvider(METEORA_API_URL);
+  const positionProvider = new MeteoraApiProvider(METEORA_API_URL, walletAddress);
   const onChainProvider = new MeteoraOnChainProvider(rpcPool);
 
   // 2. Persistence Layer initialization
