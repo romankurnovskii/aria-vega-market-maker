@@ -10,7 +10,8 @@
  * @dependencies IOrchestrator, IStrategy, Position, MarketSnapshot, StrategyResult (from @lp-system/core)
  * @sideEffects None — pure delegation, state held externally in registry
  */
-import { IOrchestrator, IStrategy, Position, MarketSnapshot, StrategyResult } from '@lp-system/core';
+import { getLogger } from '@lp-system/logger';
+const logger = getLogger('strategy-orchestrator');
 
 /**
  * StrategyOrchestrator: per-assignment runtime that ticks a strategy against a position.

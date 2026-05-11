@@ -10,6 +10,9 @@
   },
   "scripts": {
     "build": "tsc",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "node --test src/**/*.test.ts",
+    "test:coverage": "node --experimental-test-coverage --test src/**/*.test.ts",
+    "test:watch": "nodemon --exec \"npm test\" --watch src"
   }
 }

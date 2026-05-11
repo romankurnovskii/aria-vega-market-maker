@@ -8,6 +8,8 @@
     "clean": "pnpm --recursive run clean",
     "start": "pnpm --filter @lp-system/engine run start",
     "test": "pnpm --recursive run test",
+    "test:coverage": "pnpm --recursive run test:coverage",
+    "test:watch": "pnpm --recursive run test:watch",
     "format": "prettier --write .",
     "prepare": "husky",
     "repomix": "npm run repomix:md",
@@ -21,6 +23,15 @@
     "onlyBuiltDependencies": [
       "bufferutil",
       "utf-8-validate"
+    ]
+  },
+  "lint-staged": {
+    "**/*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "**/*.{json,md,html,css}": [
+      "prettier --write"
     ]
   }
 }

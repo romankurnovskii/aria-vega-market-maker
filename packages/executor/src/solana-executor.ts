@@ -69,17 +69,14 @@ export class SolanaExecutor implements IExecutor {
 
     try {
       if (decision.action === 'close') {
-        // 1. Close Position
         logger.info(`[SolanaExecutor] Creating CLOSE transaction for position ${decision.positionId}`);
         const closeSig = await this.mockTransaction('close_position');
         txSignatures.push(closeSig);
       } else if (decision.action === 'open') {
-        // 2. Open Position
         logger.info(`[SolanaExecutor] Creating OPEN transaction on pool ${market.poolAddress} with lower/upper bins [${decision.openParams?.lowerBinId}, ${decision.openParams?.upperBinId}]`);
         const openSig = await this.mockTransaction('open_position');
         txSignatures.push(openSig);
       } else if (decision.action === 'close+open') {
-        // 3. Close + Re-evaluate + Open Position
         logger.info(`[SolanaExecutor] Step 1/3: Closing old position ${decision.positionId}`);
         const closeSig = await this.mockTransaction('close_position');
         txSignatures.push(closeSig);
@@ -112,7 +109,7 @@ export class SolanaExecutor implements IExecutor {
       };
     } catch (error: any) {
       logger.error(`[SolanaExecutor] Execution sequence failed: ${error.message || error}`);
-return {
+      return {
         id: executionId,
         decision,
         txSignatures,
@@ -132,33 +129,10 @@ return {
    * @returns {Promise<string>} Mock transaction signature.
    */
   private async mockTransaction(actionType: string): Promise<string> {
-    // Simulate brief network latency for RPC transaction confirmation
     await new Promise((resolve) => setTimeout(resolve, 150));
     const randomHex = Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
     const signature = `mock_tx_${actionType}_${randomHex}`;
     logger.info(`[SolanaExecutor] Transaction confirmed on-chain: ${signature}`);
-    return signature;
-  }
-}
-
-// Update the logger call in the mockTransaction method
-logger.info(`[SolanaExecutor] Transaction confirmed on-chain: ${signature}`);
-  }
-
-  /**
-   * Simulates a transaction with brief network latency.
-   * Replace this with real on-chain transaction building and submission in production.
-   *
-   * @private
-   * @param {string} actionType - Type of action (close_position or open_position).
-   * @returns {Promise<string>} Mock transaction signature.
-   */
-  private async mockTransaction(actionType: string): Promise<string> {
-    // Simulate brief network latency for RPC transaction confirmation
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    const randomHex = Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
-    const signature = `mock_tx_${actionType}_${randomHex}`;
-    console.log(`[SolanaExecutor] Transaction confirmed on-chain: ${signature}`);
     return signature;
   }
 }
