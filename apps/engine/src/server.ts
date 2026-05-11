@@ -1,8 +1,32 @@
+/**
+ * @file server.ts
+ * @description Express HTTP server: exposes REST endpoints for monitoring and control.
+ *
+ * @features
+ * - GET /assignments — list all persistent assignments
+ * - POST /assignments — create and register a new assignment (persists + registers orchestrator)
+ * - DELETE /assignments/:id — delete assignment and deregister orchestrator
+ * - POST /strategies/:id/evaluate — ad-hoc strategy evaluation for a given position
+ * - GET /health — liveness probe returning timestamp
+ *
+ * @dependencies express, cors, IStore, IOrchestratorRegistry, IExecutor, OrchestratorFactory, IPositionProvider (from @lp-system/core)
+ * @sideEffects Mutates persistent store (assignments.json) and in-memory registry on POST/DELETE
+ */
 import express from 'express';
 import cors from 'cors';
 import { IStore, IOrchestratorRegistry, IExecutor, Assignment, IPositionProvider } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 
+/**
+ * Starts the HTTP control plane server.
+ *
+ * @param {IStore} store - Persistent assignment and execution record store.
+ * @param {IOrchestratorRegistry} registry - In-memory orchestrator registry (mutated on POST/DELETE).
+ * @param {IExecutor} executor - Transaction executor.
+ * @param {OrchestratorFactory} factory - Creates orchestrators for new assignments.
+ * @param {IPositionProvider} positionProvider - On-chain data source for ad-hoc evaluation.
+ * @returns {express.Application} Configured Express app instance (also starts listening).
+ */
 export function startHttpServer(
   store: IStore,
   registry: IOrchestratorRegistry,
