@@ -27,8 +27,10 @@ import {
   Assignment,
   AssignmentMode,
   StepContext,
+  RebalanceTask,
 } from './types';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ConnectionPlaceholder = any;
 
 export interface IStep {
@@ -52,6 +54,7 @@ export interface IOrchestrator {
   positionId: string;
   strategyId: string;
   mode: AssignmentMode;
+  isExecuting: boolean;
   tick(position: Position, market: MarketSnapshot): Promise<StrategyResult>;
 }
 
@@ -86,6 +89,9 @@ export interface IStore {
   deleteAssignment(id: string): Promise<void>;
   getExecutionRecords(): Promise<ExecutionRecord[]>;
   saveExecutionRecord(record: ExecutionRecord): Promise<void>;
+  getTasks(): Promise<RebalanceTask[]>;
+  saveTask(task: RebalanceTask): Promise<void>;
+  deleteTask(id: string): Promise<void>;
 }
 
 export interface IPositionStore {

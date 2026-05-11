@@ -1,73 +1,169 @@
-# Aria Vega Market Maker: System Architecture
+# Aria Vega Market Maker: Stateful Rebalance & Intent Architecture
 
-## 1. System Overview
+This document defines the **Task-Intent (Write-Ahead Intent)** architecture designed to ensure atomic integrity during position rebalancing. This architecture prevents "Ghost Position" errors and manages signal decay during network congestion.
 
-The Aria Vega Market Maker is an institutional-grade, highly decoupled Node.js/TypeScript monorepo designed for high-frequency liquidity provision on the Solana blockchain. It utilizes a "Dual-Truth" architecture, combining REST-based market intelligence with absolute on-chain state verification to manage Concentrated Liquidity Market Maker (CLMM) positions on Meteora.
+---
 
-## 2. Core Design Principles
+## 1. The Core Problem: Partial Execution
 
-- **Lean Code Discipline:** Zero speculative architecture. Packages are strictly scoped to their immediate responsibilities.
-- **Vertical Dependency Flow:** Lower-level packages (`core`, `persistence`) have zero dependencies on higher-level execution or orchestration logic.
-- **Fail-Fast Execution:** Silent fallbacks are prohibited. Missing private keys or invalid execution states trigger immediate process termination (`process.exit(1)`) to protect capital.
-- **Stateless Pipelines:** Trading logic is divided into atomic, stateless "Steps" that mutate a single `StepContext`, enabling pure functional testing without blockchain mocks.
+In a high-frequency CLMM environment, a rebalance consists of two distinct on-chain events: **Closing** an old position and **Opening** a new one.
 
-## 3. Monorepo Package Structure
+- **State Blindness**: If the system relies solely on the blockchain for state, it "forgets" its intent the moment the `close` transaction succeeds because the position PDA is deleted.
+- **Signal Decay**: RPC delays (e.g., HTTP 429) can stall execution, making the original strategy decision stale by the time the system is ready to open the second leg.
 
-The system is organized into a strict hierarchy of independent packages:
+---
 
-### Level 1: Foundations
+## 2. High-Level Domain Architecture
 
-- **`@lp-system/core`**: The absolute source of truth. Contains domain models, interfaces (`IStep`, `IStrategy`, `IExecutor`), and shared types. Contains **zero runtime dependencies**.
-- **`@lp-system/persistence`**: Handles atomic local state management via JSON file stores (e.g., `JsonFileStore`). Mounted via Docker volumes for persistence across container lifecycles.
+The system is organized into a vertical hierarchy where the **Task Store** acts as the persistent "glue" between strategy logic and on-chain execution.
 
-### Level 2: Infrastructure & Data
+![High-Level Domain Architecture](assets/package_dependency_architecture.svg)
 
-- **`@lp-system/providers`**: The bridging layer to external data.
-  - `RpcPool`: Provides high-availability round-robin routing and failover for Solana RPC nodes (e.g., Helius, Mainnet-Beta).
-  - `MeteoraApiProvider`: Ingests historical market metrics and OHLCV data for strategy calculations.
-  - `MeteoraOnChainProvider`: Interfaces directly with the ledger to build transaction instructions and verify exact bin states, bypassing API indexing delays.
+<details>
+<summary>Show Mermaid Source</summary>
 
-### Level 3: Business Logic (The Pipeline)
+```mermaid
+graph TD
+    subgraph Application_Layer [Application Layer]
+        TL[Tick Loop] --> |"1. Signals close+open"| OR[Orchestrator]
+    end
 
-- **`@lp-system/steps`**: Atomic, functional logic units (e.g., `InitializationCheckStep`, `RangeCalculatorStep`, `AmountCalculatorStep`) that process market data.
-- **`@lp-system/strategy`**: Workflows (e.g., `TrailingUsdcStrategy`) that chain `Steps` together into a cohesive `Decision` generator.
+    subgraph Orchestration_Layer [Orchestration Layer]
+        OR --> |"2. Writes RebalanceTask"| TS[(Task Store)]
+        TS --> |"3. Monitors Intent"| EX[Solana Executor]
+    end
 
-### Level 4: Control & Execution
+    subgraph Persistence_Layer [Persistence Layer]
+        TS --- JF[data/tasks.json]
+    end
 
-- **`@lp-system/orchestration`**: The command center.
-  - `CircuitBreaker`: Halts execution upon consecutive failure thresholds.
-  - `ExecutionGate`: Prioritizes conflict resolution (e.g., prioritizing `close+open` over `open`).
-  - `OrchestratorRegistry`: Maintains the active in-memory mapping of strategies to on-chain positions.
-- **`@lp-system/executor`**: The hardened transaction dispatcher (`SolanaExecutor`). Features dynamic Compute Unit (CU) simulation with a 15% safety buffer, UDP "Spam Loops" for delivery assurance during network congestion, and strict `confirmed`/`finalized` consensus requirements.
+    subgraph Execution_Layer [Execution Layer]
+        EX --> |"4. JIT Evaluation"| ST[Strategy]
+        EX --> |"5. Signed Tx"| RPC[Solana Mainnet]
+    end
+```
 
-### Level 5: Application Root
+</details>
 
-- **`apps/engine`**: The execution daemon. Bootstraps the environment, initializes the `RpcPool`, runs the background `TickLoop`, and exposes the REST HTTP Control Plane.
+---
 
-## 4. Critical Lifecycles
+## 3. Architectural Pillar: The Rebalance Task Store
 
-### The Discovery Loop
+To resolve state blindness, the system moves from a "Reactive" model to an **Intent-First** model.
 
-Executes on startup and periodically to sync local state with the blockchain:
+### A. Data Model: `RebalanceTask`
 
-1. Fetches all live DLMM positions for the configured wallet.
-2. Cross-references live positions against assigned strategies in local storage.
-3. Spins up or spins down `Orchestrator` instances to match the true on-chain state.
+A persistent record stored in `data/tasks.json` that tracks the lifecycle of a rebalance.
 
-### The Tick Loop & Execution Gate
+| Field                | Type       | Description                                                    |
+| :------------------- | :--------- | :------------------------------------------------------------- |
+| `id`                 | `string`   | Unique UUID for the rebalance operation.                       |
+| `assignmentId`       | `string`   | Link to the strategy configuration.                            |
+| `status`             | `string`   | `pending_close` → `awaiting_settlement` → `pending_open`.      |
+| `originalPositionId` | `string`   | The ID of the position being closed.                           |
+| `intent`             | `Decision` | The full `Decision` object, including range and metadata.      |
+| `evaluatedAt`        | `number`   | Timestamp of the strategy evaluation for JIT staleness checks. |
 
-Executes every `TICK_INTERVAL_MS` for active assignments:
+### B. Stateful Rebalance Flow (Atomic Integrity)
 
-1. Fetches a fresh `MarketSnapshot`.
-2. Pipes data through the assigned Strategy Workflow.
-3. Evaluates the resulting `Decision` against the `ExecutionGate` and `CircuitBreaker`.
-4. Dispatches approved transactions to the `SolanaExecutor`.
+This flow ensures that if the system crashes after closing a position, it knows exactly how to resume the "open" leg using the tokens now sitting in the wallet.
 
-### Mitigating the "Balance Race Condition"
+![Stateful Rebalance Flow](assets/tick_cycle_rebalance_flow.svg)
 
-During compound `close+open` rebalancing events, the system explicitly enforces a sequential lock:
+<details>
+<summary>Show Mermaid Source</summary>
 
-1. The `close` transaction is spammed and confirmed.
-2. The Executor verifies the PDA is deleted on-chain.
-3. The system applies a hard buffer (e.g., 2000ms) to allow RPC token account indexers to synchronize.
-4. A `reEvaluate` callback fires, calculating the new `open` amounts based on the guaranteed, settled ATA balances.
+```mermaid
+sequenceDiagram
+    participant OR as Orchestrator
+    participant TS as Task Store
+    participant EX as Solana Executor
+    participant WAL as Wallet ATAs
+    participant RPC as Solana RPC
+
+    Note over OR, RPC: Intent Stage
+    OR->>TS: SaveTask (Status: pending_close)
+
+    Note over OR, RPC: Close Leg
+    EX->>RPC: Send close transaction
+    RPC-->>EX: Confirmed (PDA Deleted)
+    EX->>TS: UpdateTask (Status: awaiting_settlement)
+
+    Note over OR, RPC: Settlement & JIT Evaluation
+    loop Polling
+        EX->>WAL: Query balances (USDC/SOL)
+    end
+    WAL-->>EX: Funds Settled ($1.80 USDC)
+
+    EX->>OR: Trigger JIT Re-evaluation
+    OR->>EX: Fresh OpenParams (Staleness Checked)
+
+    Note over OR, RPC: Open Leg
+    EX->>RPC: Send open transaction
+    RPC-->>EX: Confirmed (New PDA Created)
+    EX->>TS: DeleteTask (Cleanup)
+```
+
+</details>
+
+### C. The Write-Ahead Workflow
+
+1. **Intent Phase**: Before any transaction is signed, the `Tick Loop` writes a `RebalanceTask` to the `Task Store`.
+2. **Execution Phase**: The `SolanaExecutor` processes the task. Upon confirming the `close` transaction, it updates the task status to `awaiting_settlement`.
+3. **Recovery Phase**: If the bot restarts, the `Discovery Loop` reads the `Task Store`. If a task is `awaiting_settlement`, it skips the search for the missing position and resumes the `open` leg.
+
+---
+
+## 4. Recovery Flow (Agnostic Discovery)
+
+Upon startup, the engine synchronizes live blockchain data with local persistent intents to ensure no capital is left stranded in the wallet.
+
+![Recovery Flow](assets/recovery_flow_startup.svg)
+
+<details>
+<summary>Show Mermaid Source</summary>
+
+```mermaid
+flowchart LR
+    Start([Engine Start]) --> LoadTasks[Load data/tasks.json]
+    LoadTasks --> LoadChain[Fetch Live Positions from Chain]
+
+    subgraph Discovery_Logic [Agnostic Discovery]
+        LoadChain --> Match{Task Exists?}
+        Match -- Yes (awaiting_settlement) --> Synth[Build Synthetic Position from Wallet]
+        Match -- No --> Active[Standard Orchestration]
+    end
+
+    Synth --> Resume[Resume 'Open' Leg]
+    Active --> Loop[Start Tick Loop]
+```
+
+</details>
+
+---
+
+## 5. Just-In-Time (JIT) Re-Evaluation
+
+To mitigate signal decay, the system enforces a **Staleness Check** before the final `open` transaction.
+
+- **TTL Validation**: The executor compares `Date.now() - task.evaluatedAt` against a `MAX_SIGNAL_AGE_MS` threshold (default: `10000ms`).
+- **JIT Trigger**: If the signal is stale, the executor transitions the task back to `awaiting_settlement` to trigger a re-tick and get fresh boundaries/rates.
+
+---
+
+## 6. The Synthetic Position Factory
+
+When a position is closed, the system cannot fetch its state from the chain. The **Synthetic Position Factory** bridges this gap during the `awaiting_settlement` phase.
+
+1. **Wallet Polling**: The bot queries the wallet's Associated Token Accounts (ATAs) to verify funds have settled.
+2. **Synthesis**: It builds a `Position` object in memory using live wallet balances.
+3. **Injection**: This synthetic object is passed to the `TrailingUsdcStrategy`, allowing the `AmountCalculatorStep` to roll over the exact tokens currently held in the wallet.
+
+---
+
+## 7. Key Engineering Guardrails
+
+- **Execution Lock**: The `Orchestrator` uses a public `isExecuting` flag to ignore new `Tick Loop` signals while a `RebalanceTask` is in progress.
+- **Write-Ahead Intent**: The `RebalanceTask` is written to disk _before_ the first transaction is signed, ensuring crash-recovery is possible.
+- **Signal TTL**: Decisions are timestamped with `evaluatedAt`. If the delay exceeds `MAX_SIGNAL_AGE_MS`, the Executor forces a re-evaluation to account for price drift.
+- **Fail-Safe**: If a `RebalanceTask` remains in the store for more than 5 minutes without completion, it triggers an emergency error alert as wallet capital is idle.

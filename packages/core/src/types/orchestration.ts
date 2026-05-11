@@ -39,3 +39,14 @@ export interface ExecutionRecord {
   error?: string;
   executedAt: number;
 }
+
+export type RebalanceTaskStatus = 'pending_close' | 'awaiting_settlement' | 'pending_open';
+
+export interface RebalanceTask {
+  id: string;
+  assignmentId: string;
+  status: RebalanceTaskStatus;
+  originalPositionId: string;
+  intent: Decision;
+  evaluatedAt: number;
+}

@@ -19,12 +19,7 @@ import {
   StrategyResult,
   IRpcProvider,
 } from '@lp-system/core';
-import {
-  Connection,
-  Keypair,
-  PublicKey,
-  Transaction,
-} from '@solana/web3.js';
+import { Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js';
 import { MeteoraOnChainProvider } from '@lp-system/providers';
 import { getLogger } from '@lp-system/logger';
 import BN from 'bn.js';
@@ -319,14 +314,17 @@ export class SolanaExecutor implements IExecutor {
         status: 'success',
         executedAt: Date.now(),
       };
-    } catch (error: any) {
-      logger.error(`[SolanaExecutor] Execution sequence failed: ${error.message || error}`);
+    } catch (error: unknown) {
+      const err = error as Error;
+      logger.error(
+        `[SolanaExecutor] Execution sequence failed: ${err.message || String(error)}`
+      );
       return {
         id: executionId,
         decision,
         txSignatures,
         status: 'failed',
-        error: error.message || String(error),
+        error: err.message || String(error),
         executedAt: Date.now(),
       };
     }
@@ -346,7 +344,7 @@ export class SolanaExecutor implements IExecutor {
       tx.recentBlockhash = blockhash;
       tx.feePayer = this.keypair.publicKey;
 
-      // NOTE: We are skipping custom CU simulation and relying entirely 
+      // NOTE: We are skipping custom CU simulation and relying entirely
       // on the Meteora SDK's default Compute Budget instructions for now.
 
       // 2. Sign and serialize the transaction
@@ -354,22 +352,31 @@ export class SolanaExecutor implements IExecutor {
       const rawTx = tx.serialize();
 
       // 3. The Active Rebroadcast "Spam Loop" (UDP Delivery Assurance)
-      logger.info(
-        `[SolanaExecutor] Broadcasting transaction using Meteora SDK defaults...`
-      );
+      logger.info(`[SolanaExecutor] Broadcasting transaction using Meteora SDK defaults...`);
 
       let signature = '';
       let confirmed = false;
       const startTime = Date.now();
       const timeoutMs = 60000; // 60-second execution timeout
+      let attempt = 0;
 
       while (!confirmed && Date.now() - startTime < timeoutMs) {
+        attempt++;
+        const elapsed = Date.now() - startTime;
+        logger.info(
+          `[SolanaExecutor] executeTx attempt #${attempt}. Elapsed: ${elapsed}ms. Timeout limit: ${timeoutMs}ms.`
+        );
+
         try {
           // Send with skipPreflight: true to bypass local node simulation bottlenecks
           signature = await connection.sendRawTransaction(rawTx, {
             skipPreflight: true,
             maxRetries: 0,
           });
+
+          logger.info(
+            `[SolanaExecutor] Broadcasted transaction raw payload. Signature: ${signature || 'pending'}. Awaiting signature status...`
+          );
 
           // Check if transaction has hit the block status index
           const status = await connection.getSignatureStatus(signature, {
@@ -384,15 +391,42 @@ export class SolanaExecutor implements IExecutor {
             }
 
             const confStatus = status.value.confirmationStatus;
+            logger.info(
+              `[SolanaExecutor] Signature ${signature} status: ${confStatus || 'unknown'}`
+            );
             if (confStatus === 'confirmed' || confStatus === 'finalized') {
               confirmed = true;
               break;
             }
-          }
-        } catch (err: any) {
-          if (err.name === 'SendTransactionError' || err.message?.includes('Transaction simulation failed')) {
-            logger.warn(`[SolanaExecutor] RPC Send Error (will retry): ${err.message}`);
           } else {
+            logger.info(
+              `[SolanaExecutor] Signature status not found yet for signature ${signature}`
+            );
+          }
+        } catch (err: unknown) {
+          const errMsg = (err as Error).message || String(err);
+          const isRateLimit =
+            errMsg.includes('429') ||
+            errMsg.toLowerCase().includes('too many requests') ||
+            errMsg.toLowerCase().includes('rate limit');
+          const isSendError =
+            (err as { name?: string }).name === 'SendTransactionError' ||
+            errMsg.includes('Transaction simulation failed');
+
+          if (
+            isSendError ||
+            isRateLimit ||
+            errMsg.includes('fetch') ||
+            errMsg.includes('socket') ||
+            errMsg.includes('timeout')
+          ) {
+            logger.warn(
+              `[SolanaExecutor] RPC Send/Rate-limit warning on attempt #${attempt}. Error: ${errMsg}. Elapsed: ${elapsed}ms. Retrying...`
+            );
+          } else {
+            logger.error(
+              `[SolanaExecutor] Hard error encountered during sendRawTransaction on attempt #${attempt}: ${errMsg}`
+            );
             throw err; // Propagate hard failures
           }
         }
@@ -403,7 +437,7 @@ export class SolanaExecutor implements IExecutor {
 
       if (!confirmed) {
         throw new Error(
-          `Transaction ${signature} timed out after ${timeoutMs}ms without confirmation.`
+          `Transaction ${signature || '(not sent)'} timed out after ${timeoutMs}ms without confirmation.`
         );
       }
 
@@ -412,5 +446,88 @@ export class SolanaExecutor implements IExecutor {
       );
       return signature;
     });
+  }
+
+  /**
+   * Polls the wallet's token balances until at least one of them increases, indicating settlement.
+   *
+   * @param {string} tokenXAddress - Token X mint pubkey.
+   * @param {string} tokenYAddress - Token Y mint pubkey.
+   * @param {string} walletAddress - Owner wallet address.
+   * @param {bigint} initialX - Initial token X amount as bigint.
+   * @param {bigint} initialY - Initial token Y amount as bigint.
+   * @param {number} [timeoutMs=60000] - Total polling timeout.
+   */
+  public async pollBalances(
+    tokenXAddress: string,
+    tokenYAddress: string,
+    walletAddress: string,
+    initialX: bigint,
+    initialY: bigint,
+    timeoutMs = 60000
+  ): Promise<void> {
+    const startTime = Date.now();
+    logger.info(`[SolanaExecutor] Starting balance polling loop for settlement...`);
+
+    while (Date.now() - startTime < timeoutMs) {
+      try {
+        const balances = await this.rpcPool.execute(async (connection: Connection) => {
+          let amountX = '0';
+          let amountY = '0';
+
+          const tokenProgramId = new PublicKey('TokenkegQfeZyiNWxFb9eeB2m3tFhGE5IBgxYvhFr1i');
+          const token2022ProgramId = new PublicKey(
+            'TokenzQhb8NsH26e8m1Yg9UP9Kaj15saWJ361v27m1'
+          );
+
+          const fetchForProgram = async (programId: PublicKey) => {
+            const response = await connection.getParsedTokenAccountsByOwner(
+              new PublicKey(walletAddress),
+              { programId }
+            );
+            for (const account of response.value) {
+              const info = account.account.data.parsed.info;
+              const mint = info.mint;
+              const amount = info.tokenAmount.amount;
+
+              if (mint === tokenXAddress) {
+                amountX = amount;
+              } else if (mint === tokenYAddress) {
+                amountY = amount;
+              }
+            }
+          };
+
+          await fetchForProgram(tokenProgramId);
+          await fetchForProgram(token2022ProgramId);
+
+          return { amountX, amountY };
+        });
+
+        const currentX = BigInt(balances.amountX);
+        const currentY = BigInt(balances.amountY);
+
+        if (currentX > initialX || currentY > initialY) {
+          logger.info(
+            `[SolanaExecutor] Balance increase detected! Token X: ${initialX} -> ${currentX}, Token Y: ${initialY} -> ${currentY}`
+          );
+          return;
+        }
+
+        logger.info(
+          `[SolanaExecutor] No balance increase yet. X: ${currentX} (init: ${initialX}), Y: ${currentY} (init: ${initialY}). Waiting 2s...`
+        );
+      } catch (err: unknown) {
+        logger.warn(
+          `[SolanaExecutor] Error polling balances: ${(err as Error).message || String(err)}`
+        );
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+
+    logger.warn(
+      `[SolanaExecutor] Balance polling timed out after ${timeoutMs}ms without increase. Proceeding anyway.`
+    );
   }
 }
