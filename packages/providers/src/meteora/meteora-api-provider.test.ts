@@ -63,7 +63,7 @@ test('getPosition throws an error when position is not found (no mock fallback)'
   }
 });
 
-test('getPositions dynamically fetches pool decimals and maps position tokens correctly', async () => {
+test('getPositions dynamically fetches pool token metadata and maps position tokens correctly', async () => {
   const originalFetch = global.fetch;
 
   try {
@@ -72,8 +72,8 @@ test('getPositions dynamically fetches pool decimals and maps position tokens co
         return {
           ok: true,
           json: async () => ({
-            token_x: { decimals: 6 },
-            token_y: { decimals: 6 }
+            token_x: { decimals: 6, address: 'onChainTokenXMint' },
+            token_y: { decimals: 6, address: 'onChainTokenYMint' }
           })
         } as any;
       }
@@ -81,8 +81,6 @@ test('getPositions dynamically fetches pool decimals and maps position tokens co
         return {
           ok: true,
           json: async () => ({
-            tokenX: 'tokenXAddress',
-            tokenY: 'tokenYAddress',
             positions: [
               {
                 address: 'pos-addr-1',
@@ -111,8 +109,8 @@ test('getPositions dynamically fetches pool decimals and maps position tokens co
     assert.strictEqual(pos.tokenY.decimals, 6);
     assert.strictEqual(pos.tokenX.amount, '1000');
     assert.strictEqual(pos.tokenY.amount, '2000');
-    assert.strictEqual(pos.tokenX.mint, 'tokenXAddress');
-    assert.strictEqual(pos.tokenY.mint, 'tokenYAddress');
+    assert.strictEqual(pos.tokenX.mint, 'onChainTokenXMint');
+    assert.strictEqual(pos.tokenY.mint, 'onChainTokenYMint');
   } finally {
     global.fetch = originalFetch;
   }

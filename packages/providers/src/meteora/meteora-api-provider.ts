@@ -19,7 +19,7 @@ import { getBinIdFromPrice } from './meteora.utils';
  * Currently uses mock data; replace with real API calls in production.
  */
 export class MeteoraApiProvider implements IPositionProvider {
-  private poolDecimalsCache = new Map<string, { decimalsX: number; decimalsY: number }>();
+  private poolTokenMetadataCache = new Map<string, { decimalsX: number; decimalsY: number; tokenXMint: string; tokenYMint: string }>();
 
   /**
    * Constructs the provider with the Meteora API base URL.
@@ -31,11 +31,11 @@ export class MeteoraApiProvider implements IPositionProvider {
   }
 
   /**
-   * Fetches the token decimals for a given pool address dynamically.
+   * Fetches full token metadata (decimals and addresses) for a given pool address dynamically.
    * Caches results to prevent redundant API queries.
    */
-  private async getPoolDecimals(poolAddress: string): Promise<{ decimalsX: number; decimalsY: number }> {
-    const cached = this.poolDecimalsCache.get(poolAddress);
+  private async getPoolTokenMetadata(poolAddress: string): Promise<{ decimalsX: number; decimalsY: number; tokenXMint: string; tokenYMint: string }> {
+    const cached = this.poolTokenMetadataCache.get(poolAddress);
     if (cached) return cached;
 
     try {
@@ -47,18 +47,20 @@ export class MeteoraApiProvider implements IPositionProvider {
       });
       if (response.ok) {
         const data = (await response.json()) as PoolResponse;
-        const decimals = {
+        const metadata = {
           decimalsX: data.token_x.decimals,
           decimalsY: data.token_y.decimals,
+          tokenXMint: data.token_x.address,
+          tokenYMint: data.token_y.address,
         };
-        this.poolDecimalsCache.set(poolAddress, decimals);
-        return decimals;
+        this.poolTokenMetadataCache.set(poolAddress, metadata);
+        return metadata;
       }
     } catch (err) {
-      console.warn(`[MeteoraApiProvider] Failed to fetch decimals for pool ${poolAddress}:`, err);
+      console.warn(`[MeteoraApiProvider] Failed to fetch token metadata for pool ${poolAddress}:`, err);
     }
 
-    return { decimalsX: 9, decimalsY: 6 }; // safe default fallback decimals
+    throw new Error(`Failed to retrieve token metadata for pool ${poolAddress}`);
   }
 
   /**
@@ -112,7 +114,7 @@ export class MeteoraApiProvider implements IPositionProvider {
 
     for (const pool of poolsToQuery) {
       try {
-        const decimalsPromise = this.getPoolDecimals(pool);
+        const metadataPromise = this.getPoolTokenMetadata(pool);
         const url = `${this.apiUrl}/positions/${pool}/pnl?user=${walletAddress}&status=open&pageSize=200&page=1`;
         console.log(`[MeteoraApiProvider] Fetching positions PnL from Datapi for pool ${pool}`);
 
@@ -129,7 +131,7 @@ export class MeteoraApiProvider implements IPositionProvider {
         }
 
         const result = (await response.json()) as PositionsPnlResponse;
-        const { decimalsX, decimalsY } = await decimalsPromise;
+        const { decimalsX, decimalsY, tokenXMint, tokenYMint } = await metadataPromise;
 
         if (result && Array.isArray(result.positions)) {
           for (const pos of result.positions) {
@@ -150,14 +152,14 @@ export class MeteoraApiProvider implements IPositionProvider {
               tokenX: {
                 amount: pos.amount_x || pos.amountX || '0',
                 decimals: decimalsX,
-                mint: result.tokenX || 'So11111111111111111111111111111111111111112',
-                tokenAddress: result.tokenX || 'So11111111111111111111111111111111111111112',
+                mint: tokenXMint,
+                tokenAddress: tokenXMint,
               },
               tokenY: {
                 amount: pos.amount_y || pos.amountY || '0',
                 decimals: decimalsY,
-                mint: result.tokenY || 'EPjFW3dpdG7t3WY5ja1DN6qV7mN4H65A5Lxh63m3Ugo',
-                tokenAddress: result.tokenY || 'EPjFW3dpdG7t3WY5ja1DN6qV7mN4H65A5Lxh63m3Ugo',
+                mint: tokenYMint,
+                tokenAddress: tokenYMint,
               },
               isInRange,
               openedAt,
