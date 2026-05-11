@@ -11,7 +11,14 @@
  * @dependencies IRpcProvider (for RPC calls), IExecutor interface, Decision types
  * @sideEffects Produces ExecutionRecord with transaction signatures (mock or real)
  */
-import { IExecutor, Decision, MarketSnapshot, ExecutionRecord, StrategyResult, IRpcProvider } from '@lp-system/core';
+import {
+  IExecutor,
+  Decision,
+  MarketSnapshot,
+  ExecutionRecord,
+  StrategyResult,
+  IRpcProvider,
+} from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
 
 const logger = getLogger('solana-executor');
@@ -35,7 +42,9 @@ export class SolanaExecutor implements IExecutor {
     private walletAddress: string,
     private options: { priorityFeeMicroLamports?: number } = {}
   ) {
-    logger.info(`[SolanaExecutor] Initialized for wallet ${this.walletAddress} with RPC pool [${this.rpcPool.constructor.name}] and priority fee ${this.options.priorityFeeMicroLamports || 0} micro-lamports`);
+    logger.info(
+      `[SolanaExecutor] Initialized for wallet ${this.walletAddress} with RPC pool [${this.rpcPool.constructor.name}] and priority fee ${this.options.priorityFeeMicroLamports || 0} micro-lamports`
+    );
   }
 
   /**
@@ -62,18 +71,24 @@ export class SolanaExecutor implements IExecutor {
     reEvaluate?: (positionId: string) => Promise<StrategyResult>
   ): Promise<ExecutionRecord> {
     const callback = reEvaluate || this.reEvaluateCallback;
-    logger.info(`[SolanaExecutor] Applying decision '${decision.action}' on position ${decision.positionId}`);
+    logger.info(
+      `[SolanaExecutor] Applying decision '${decision.action}' on position ${decision.positionId}`
+    );
 
     const txSignatures: string[] = [];
     const executionId = `exec_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
     try {
       if (decision.action === 'close') {
-        logger.info(`[SolanaExecutor] Creating CLOSE transaction for position ${decision.positionId}`);
+        logger.info(
+          `[SolanaExecutor] Creating CLOSE transaction for position ${decision.positionId}`
+        );
         const closeSig = await this.mockTransaction('close_position');
         txSignatures.push(closeSig);
       } else if (decision.action === 'open') {
-        logger.info(`[SolanaExecutor] Creating OPEN transaction on pool ${market.poolAddress} with lower/upper bins [${decision.openParams?.lowerBinId}, ${decision.openParams?.upperBinId}]`);
+        logger.info(
+          `[SolanaExecutor] Creating OPEN transaction on pool ${market.poolAddress} with lower/upper bins [${decision.openParams?.lowerBinId}, ${decision.openParams?.upperBinId}]`
+        );
         const openSig = await this.mockTransaction('open_position');
         txSignatures.push(openSig);
       } else if (decision.action === 'close+open') {
@@ -82,30 +97,43 @@ export class SolanaExecutor implements IExecutor {
         txSignatures.push(closeSig);
 
         if (!callback) {
-          throw new Error('Cannot execute compound close+open rebalance without an injected re-evaluation callback');
+          throw new Error(
+            'Cannot execute compound close+open rebalance without an injected re-evaluation callback'
+          );
         }
 
-        logger.info(`[SolanaExecutor] Step 2/3: Invoking re-evaluation callback for position ${decision.positionId}`);
+        logger.info(
+          `[SolanaExecutor] Step 2/3: Invoking re-evaluation callback for position ${decision.positionId}`
+        );
         const reEvalResult = await callback(decision.positionId);
 
         if (reEvalResult.action === 'open' || reEvalResult.action === 'close+open') {
-          const openParams = reEvalResult.action === 'close+open' ? reEvalResult.openParams : reEvalResult.params;
-          logger.info(`[SolanaExecutor] Step 3/3: Re-evaluation returned OPEN action. Executing new position open in bin range [${openParams.lowerBinId}, ${openParams.upperBinId}]`);
+          const openParams =
+            reEvalResult.action === 'close+open'
+              ? reEvalResult.openParams
+              : reEvalResult.params;
+          logger.info(
+            `[SolanaExecutor] Step 3/3: Re-evaluation returned OPEN action. Executing new position open in bin range [${openParams.lowerBinId}, ${openParams.upperBinId}]`
+          );
           const openSig = await this.mockTransaction('open_position');
           txSignatures.push(openSig);
         } else {
-          logger.info(`[SolanaExecutor] Step 3/3: Re-evaluation returned '${reEvalResult.action}' action. Skipping subsequent open.`);
+          logger.info(
+            `[SolanaExecutor] Step 3/3: Re-evaluation returned '${reEvalResult.action}' action. Skipping subsequent open.`
+          );
         }
       }
 
-      logger.info(`[SolanaExecutor] Execution sequence succeeded. Transactions: ${txSignatures.join(', ')}`);
+      logger.info(
+        `[SolanaExecutor] Execution sequence succeeded. Transactions: ${txSignatures.join(', ')}`
+      );
 
       return {
         id: executionId,
         decision,
         txSignatures,
         status: 'success',
-        executedAt: Date.now()
+        executedAt: Date.now(),
       };
     } catch (error: any) {
       logger.error(`[SolanaExecutor] Execution sequence failed: ${error.message || error}`);
@@ -115,7 +143,7 @@ export class SolanaExecutor implements IExecutor {
         txSignatures,
         status: 'failed',
         error: error.message || String(error),
-        executedAt: Date.now()
+        executedAt: Date.now(),
       };
     }
   }
@@ -130,7 +158,9 @@ export class SolanaExecutor implements IExecutor {
    */
   private async mockTransaction(actionType: string): Promise<string> {
     await new Promise((resolve) => setTimeout(resolve, 150));
-    const randomHex = Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+    const randomHex = Array.from({ length: 32 }, () =>
+      Math.floor(Math.random() * 16).toString(16)
+    ).join('');
     const signature = `mock_tx_${actionType}_${randomHex}`;
     logger.info(`[SolanaExecutor] Transaction confirmed on-chain: ${signature}`);
     return signature;
