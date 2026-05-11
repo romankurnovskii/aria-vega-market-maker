@@ -22,7 +22,11 @@ import {
 } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
-import { createAssignmentsRouter, createStrategiesRouter } from './routes/index.js';
+import {
+  createAssignmentsRouter,
+  createStrategiesRouter,
+  createIntrospectionRouter,
+} from './routes/index.js';
 
 const logger = getLogger('server');
 
@@ -51,6 +55,7 @@ export function startHttpServer(
 
   app.use('/assignments', createAssignmentsRouter(store, registry, factory));
   app.use('/strategies', createStrategiesRouter(registry, positionProvider));
+  app.use('/', createIntrospectionRouter(factory));
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'healthy', timestamp: Date.now() });

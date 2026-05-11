@@ -8,5 +8,8 @@
  * @dependencies None
  * @sideEffects None
  */
+import { getLogger } from '@lp-system/logger';
+const logger = getLogger('strategy');
+logger.info('Strategy package loaded');
 export { Workflow } from './workflow.js';
 export { TrailingUsdcStrategy } from './trailing-usdc-strategy.js';

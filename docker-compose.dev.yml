@@ -7,7 +7,7 @@ services:
     command: sh -c "npx tsc -b && (npx tsc -b --watch & node --watch --enable-source-maps apps/engine/dist/main.js)"
     env_file: .env
     ports:
-      - '3000:3000'
+      - '8441:3000'
     volumes:
       # Bind mounts for hot reload
       - ./apps/engine/src:/app/apps/engine/src
