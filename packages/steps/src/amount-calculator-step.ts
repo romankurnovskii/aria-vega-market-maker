@@ -4,7 +4,7 @@
  *
  * @features
  * - Runs only when openParams already exist (after RangeCalculatorStep)
- * - Fills tokenXAmount and tokenYAmount from strategy params (tokenXAmount, tokenYAmount) or defaults
+ * - Dynamically rolls over the exact token amounts currently held in the position
  * - Propagates existing openParams fields unchanged except amounts
  *
  * @dependencies IStep, StepContext (from @lp-system/core)
@@ -33,12 +33,14 @@ export class AmountCalculatorStep implements IStep {
       `[${this.name}] Calculating optimal capital allocation for range: [${context.openParams.lowerBinId}, ${context.openParams.upperBinId}]`
     );
 
-    // Fetch allocation params from strategy config or fallback to defaults
-    const tokenXAmount = (context.params.tokenXAmount as string) || '1000000000'; // e.g., 1.0 SOL
-    const tokenYAmount = (context.params.tokenYAmount as string) || '150000000'; // e.g., 150 USDC
+    // Read directly from the live position state instead of hardcoding.
+    // If you pass manual overrides in the strategy params, it uses those. 
+    // Otherwise, it perfectly rolls over the exact amounts currently in the position.
+    const tokenXAmount = (context.params.tokenXAmount as string) || context.position.tokenX.amount;
+    const tokenYAmount = (context.params.tokenYAmount as string) || context.position.tokenY.amount;
 
     logger.info(
-      `[${this.name}] Allocating ${tokenXAmount} base token and ${tokenYAmount} quote token to the new position.`
+      `[${this.name}] Allocating ${tokenXAmount} base token and ${tokenYAmount} quote token (rollover).`
     );
 
     return {

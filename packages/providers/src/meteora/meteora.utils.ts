@@ -43,4 +43,3 @@ export function parseDecimalToRaw(decimalStr: string, decimals: number): string 
   const combined = `${integerPart}${fractionalPart}`.replace(/^0+/, '');
   return combined === '' ? '0' : combined;
 }
-

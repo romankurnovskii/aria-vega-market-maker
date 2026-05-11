@@ -25,6 +25,7 @@ import {
   ExecutionRecord,
   StrategyResult,
   Assignment,
+  AssignmentMode,
   StepContext,
 } from './types';
 
@@ -50,7 +51,7 @@ export interface IOrchestrator {
   assignmentId: string;
   positionId: string;
   strategyId: string;
-  mode: 'active' | 'monitoring';
+  mode: AssignmentMode;
   tick(position: Position, market: MarketSnapshot): Promise<StrategyResult>;
 }
 

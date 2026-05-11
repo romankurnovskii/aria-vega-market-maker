@@ -58,7 +58,8 @@ export class JsonPositionStore implements IPositionStore {
     if (options?.env) {
       parts.push(options.env);
     }
-    const filename = parts.length > 0 ? `${parts.join('_')}_positions.json` : 'known_positions.json';
+    const filename =
+      parts.length > 0 ? `${parts.join('_')}_positions.json` : 'known_positions.json';
     this.knownPositionsPath = path.join(directoryPath, filename);
   }
 

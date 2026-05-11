@@ -15,11 +15,15 @@
     "@lp-system/strategy": "workspace:*",
     "@solana/web3.js": "^1.98.4",
     "cors": "^2.8.6",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "swagger-ui-express": "^5.0.1",
+    "yamljs": "^0.3.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6"
+    "@types/express": "^5.0.6",
+    "@types/swagger-ui-express": "^4.1.8",
+    "@types/yamljs": "^0.2.34"
   },
   "scripts": {
     "build": "tsc",

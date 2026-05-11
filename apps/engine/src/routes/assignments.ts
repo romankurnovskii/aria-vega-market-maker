@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { IStore, IOrchestratorRegistry, Assignment } from '@lp-system/core';
+import { IStore, IOrchestratorRegistry, Assignment, AssignmentMode } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 
 export function createAssignmentsRouter(
@@ -33,7 +33,7 @@ export function createAssignmentsRouter(
         id,
         strategyId,
         positionId,
-        mode: mode as 'active' | 'monitoring',
+        mode: mode as AssignmentMode,
         createdAt: Date.now(),
       };
 

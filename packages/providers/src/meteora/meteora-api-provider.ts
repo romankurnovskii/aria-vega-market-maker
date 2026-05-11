@@ -55,21 +55,20 @@ export class MeteoraApiProvider implements IPositionProvider {
         Accept: 'application/json',
         'User-Agent': 'MeteoraLPBot/1.0',
       },
-    })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(
-            `[MeteoraApiProvider] Failed to fetch token metadata for pool ${poolAddress}: HTTP ${response.status} ${response.statusText}`
-          );
-        }
-        const data = (await response.json()) as PoolResponse;
-        return {
-          decimalsX: data.token_x.decimals,
-          decimalsY: data.token_y.decimals,
-          tokenXMint: data.token_x.address,
-          tokenYMint: data.token_y.address,
-        };
-      });
+    }).then(async (response) => {
+      if (!response.ok) {
+        throw new Error(
+          `[MeteoraApiProvider] Failed to fetch token metadata for pool ${poolAddress}: HTTP ${response.status} ${response.statusText}`
+        );
+      }
+      const data = (await response.json()) as PoolResponse;
+      return {
+        decimalsX: data.token_x.decimals,
+        decimalsY: data.token_y.decimals,
+        tokenXMint: data.token_x.address,
+        tokenYMint: data.token_y.address,
+      };
+    });
 
     this.poolTokenMetadataCache.set(poolAddress, metadataPromise);
     return metadataPromise;
@@ -115,8 +114,7 @@ export class MeteoraApiProvider implements IPositionProvider {
         : portfolioData.data || portfolioData.pools || [];
 
       for (const p of pools) {
-        const addr =
-          typeof p === 'string' ? p : p.address || p.pool_address || p.poolAddress;
+        const addr = typeof p === 'string' ? p : p.address || p.pool_address || p.poolAddress;
         if (addr) {
           poolsToQuery.push(addr);
         }
@@ -143,7 +141,8 @@ export class MeteoraApiProvider implements IPositionProvider {
       }
 
       const result = (await response.json()) as PositionsPnlResponse;
-      const { decimalsX, decimalsY, tokenXMint, tokenYMint } = await this.getPoolTokenMetadata(pool);
+      const { decimalsX, decimalsY, tokenXMint, tokenYMint } =
+        await this.getPoolTokenMetadata(pool);
 
       if (result && Array.isArray(result.positions)) {
         for (const pos of result.positions) {

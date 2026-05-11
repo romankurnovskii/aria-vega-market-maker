@@ -32,13 +32,10 @@ import { startHttpServer } from './server.js';
 import { IRpcProvider } from '@lp-system/core';
 
 const TICK_INTERVAL_MS = Number(process.env.TICK_INTERVAL_MS) || 10000;
-const METEORA_API_URL = process.env.METEORA_API_URL || 'https://dlmm.datapi.meteora.ag';
-const HELIUS_URL =
-  process.env.HELIUS_URL ||
-  process.env.HELIUS_URL ||
-  'https://mainnet.helius-rpc.com/?api-key=xxx';
+const METEORA_API_URL = process.env.METEORA_API_URL || 'https://dlmm.datapi.meteora.ag'
+const HELIUS_URL = process.env.HELIUS_URL
 const SOLANA_URL = process.env.SOLANA_URL || 'https://api.mainnet-beta.solana.com';
-const SHYFT_URL = process.env.SOLANA_URL
+const SHYFT_URL = process.env.SHYFT_URL;
 
 const logger = getLogger('engine');
 
@@ -59,15 +56,21 @@ async function main() {
 
   if (isProduction) {
     if (!privateKeyBase64) {
-      logger.error(`[Keypair] FATAL: PRIVATE_KEY_BASE64 is missing in production. Crashing to prevent silent failures.`);
+      logger.error(
+        `[Keypair] FATAL: PRIVATE_KEY_BASE64 is missing in production. Crashing to prevent silent failures.`
+      );
       process.exit(1);
     }
     try {
       const secretKey = Buffer.from(privateKeyBase64, 'base64');
       keypair = Keypair.fromSecretKey(secretKey);
-      logger.info(`[Keypair] Successfully loaded signing wallet keypair. PublicKey: ${keypair.publicKey.toBase58()}`);
+      logger.info(
+        `[Keypair] Successfully loaded signing wallet keypair. PublicKey: ${keypair.publicKey.toBase58()}`
+      );
     } catch (error: any) {
-      logger.error(`[Keypair] FATAL: Invalid private key configured in production. Crashing to prevent silent failures. Error: ${error.message}`);
+      logger.error(
+        `[Keypair] FATAL: Invalid private key configured in production. Crashing to prevent silent failures. Error: ${error.message}`
+      );
       process.exit(1);
     }
   } else {
@@ -75,14 +78,18 @@ async function main() {
       try {
         const secretKey = Buffer.from(privateKeyBase64, 'base64');
         keypair = Keypair.fromSecretKey(secretKey);
-        logger.info(`[Keypair] Successfully loaded signing wallet keypair. PublicKey: ${keypair.publicKey.toBase58()}`);
+        logger.info(
+          `[Keypair] Successfully loaded signing wallet keypair. PublicKey: ${keypair.publicKey.toBase58()}`
+        );
       } catch (error: any) {
         logger.error(`[Keypair] Failed to parse private key from Base64: ${error.message}`);
         logger.info(`[Keypair] Falling back to a random keypair for simulation/development.`);
         keypair = Keypair.generate();
       }
     } else {
-      logger.warn(`[Keypair] PRIVATE_KEY_BASE64 is empty. Generating a random keypair for simulation/development.`);
+      logger.warn(
+        `[Keypair] PRIVATE_KEY_BASE64 is empty. Generating a random keypair for simulation/development.`
+      );
       keypair = Keypair.generate();
     }
   }
@@ -94,9 +101,9 @@ async function main() {
 
   // 1. Providers initialization
   const rpcProviders: IRpcProvider[] = [];
-  if (HELIUS_URL) rpcProviders.push(new HeliusRpcProvider(HELIUS_URL));
-  if (SOLANA_URL) rpcProviders.push(new SolanaRpcProvider(SOLANA_URL));
   if (SHYFT_URL) rpcProviders.push(new SolanaRpcProvider(SHYFT_URL));
+  if (SOLANA_URL) rpcProviders.push(new SolanaRpcProvider(SOLANA_URL));
+  if (HELIUS_URL) rpcProviders.push(new HeliusRpcProvider(HELIUS_URL));
   const rpcPool = new RpcPool(rpcProviders);
 
   const positionProvider = new MeteoraApiProvider(METEORA_API_URL);
@@ -105,7 +112,10 @@ async function main() {
   // 2. Persistence Layer initialization
   // Saving persistence database in ./data directory inside root workspace
   const store = new JsonFileStore('./data', { wallet: walletAddress, env: APP_ENV });
-  const positionStore = new JsonPositionStore('./data', { wallet: walletAddress, env: APP_ENV });
+  const positionStore = new JsonPositionStore('./data', {
+    wallet: walletAddress,
+    env: APP_ENV,
+  });
 
   // 3. Strategy initialization
   const trailingUsdcStrategy = new TrailingUsdcStrategy({ rangePercent: 20 });
@@ -119,10 +129,19 @@ async function main() {
   const executionGate = new ExecutionGate();
 
   // 5. Executor initialization
-  const executor = new SolanaExecutor(rpcPool, keypair, onChainProvider, { priorityFeeMicroLamports: 1000 });
+  const executor = new SolanaExecutor(rpcPool, keypair, onChainProvider, {
+    priorityFeeMicroLamports: 1000,
+  });
 
   // 6. Core Loops & Web Control Plane Activation
-  await startDiscovery(walletAddress, positionProvider, positionStore, factory, store, registry);
+  await startDiscovery(
+    walletAddress,
+    positionProvider,
+    positionStore,
+    factory,
+    store,
+    registry
+  );
 
   startTickLoop(
     TICK_INTERVAL_MS,
@@ -135,7 +154,7 @@ async function main() {
     store
   );
 
-  startHttpServer(store, registry, executor, factory, positionProvider);
+  startHttpServer(store, registry, executor, factory, positionProvider, walletAddress);
 
   // 7. Graceful Shutdown handlers
   process.on('SIGINT', () => {

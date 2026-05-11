@@ -13,11 +13,13 @@
 import { DecisionAction } from './enums';
 import { OpenParams } from './position';
 
+export type AssignmentMode = 'active' | 'monitoring';
+
 export interface Assignment {
   id: string;
   strategyId: string; // e.g., 'trailing-usdc'
   positionId: string;
-  mode: 'active' | 'monitoring';
+  mode: AssignmentMode;
   createdAt: number;
 }
 

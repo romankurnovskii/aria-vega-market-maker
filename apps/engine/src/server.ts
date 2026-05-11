@@ -14,12 +14,12 @@
  */
 import express from 'express';
 import cors from 'cors';
-import {
-  IStore,
-  IOrchestratorRegistry,
-  IExecutor,
-  IPositionProvider,
-} from '@lp-system/core';
+import swaggerUi from 'swagger-ui-express';
+import YAML from 'yamljs';
+import { fileURLToPath } from 'url';
+import path, { dirname } from 'path';
+
+import { IStore, IOrchestratorRegistry, IExecutor, IPositionProvider } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
 import {
@@ -29,6 +29,9 @@ import {
 } from './routes/index.js';
 
 const logger = getLogger('server');
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 /**
  * Starts the HTTP control plane server.
@@ -45,7 +48,8 @@ export function startHttpServer(
   registry: IOrchestratorRegistry,
   executor: IExecutor,
   factory: OrchestratorFactory,
-  positionProvider: IPositionProvider
+  positionProvider: IPositionProvider,
+  walletAddress: string
 ): express.Application {
   const app = express();
   app.use(cors());
@@ -53,9 +57,26 @@ export function startHttpServer(
 
   const PORT = process.env.PORT || 3000;
 
+
   app.use('/assignments', createAssignmentsRouter(store, registry, factory));
   app.use('/strategies', createStrategiesRouter(registry, positionProvider));
   app.use('/', createIntrospectionRouter(factory));
+
+  app.get('/positions', async (_req, res) => {
+    try {
+      const positions = await positionProvider.getPositions(walletAddress);
+      res.json({
+        wallet: walletAddress,
+        count: positions.length,
+        positions,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || String(error) });
+    }
+  });
+
+  const swaggerDocument = YAML.load(path.join(__dirname, '../src/openapi.yaml'));
+  app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'healthy', timestamp: Date.now() });

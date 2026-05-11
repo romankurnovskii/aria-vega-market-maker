@@ -155,14 +155,14 @@ test('getPositions maps positions with unrealizedPnl, isOutOfRange, and position
                   balanceTokenX: {
                     amount: '0',
                     usd: '0',
-                    amountSol: '0'
+                    amountSol: '0',
                   },
                   balanceTokenY: {
                     amount: '2.978076',
                     usd: '2.9773754983893865',
-                    amountSol: '0.03101105313408857'
+                    amountSol: '0.03101105313408857',
                   },
-                }
+                },
               },
             ],
           }),
