@@ -48,6 +48,8 @@ export class StrategyOrchestrator implements IOrchestrator {
     this.id = `orch_${assignmentId}`;
   }
 
+  private isBusy = false;
+
   /**
    * Tick callback: delegates to strategy.execute() and returns the StrategyResult.
    *
@@ -56,9 +58,21 @@ export class StrategyOrchestrator implements IOrchestrator {
    * @returns {Promise<StrategyResult>} Strategy's recommendation (skip/close/open/close+open).
    */
   public async tick(position: Position, market: MarketSnapshot): Promise<StrategyResult> {
-    logger.info(
-      `[StrategyOrchestrator] Ticking orchestrator ${this.id} for position ${this.positionId}. Mode: ${this.mode}`
-    );
-    return await this.strategy.execute(position, market, this.params);
+    if (this.isBusy) {
+      logger.info(
+        `[StrategyOrchestrator] Execution in flight for position ${this.positionId}. Skipping tick.`
+      );
+      return { action: 'skip' };
+    }
+
+    try {
+      this.isBusy = true;
+      logger.info(
+        `[StrategyOrchestrator] Ticking orchestrator ${this.id} for position ${this.positionId}. Mode: ${this.mode}`
+      );
+      return await this.strategy.execute(position, market, this.params);
+    } finally {
+      this.isBusy = false;
+    }
   }
 }
