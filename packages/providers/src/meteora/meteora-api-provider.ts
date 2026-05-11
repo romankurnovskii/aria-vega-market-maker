@@ -31,8 +31,12 @@ export class MeteoraApiProvider implements IPositionProvider {
    * Constructs the provider with the Meteora API base URL.
    *
    * @param {string} apiUrl - Meteora API endpoint (defaults to dlmm.datapi.meteora.ag).
+   * @param {string} [walletAddress] - Optional cached operational wallet address.
    */
-  constructor(private apiUrl: string) {
+  constructor(
+    private apiUrl: string,
+    private walletAddress?: string
+  ) {
     this.apiUrl = apiUrl || 'https://dlmm.datapi.meteora.ag';
   }
 
@@ -108,6 +112,7 @@ export class MeteoraApiProvider implements IPositionProvider {
         );
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const portfolioData = (await portfolioResponse.json()) as any;
       const pools = Array.isArray(portfolioData)
         ? portfolioData
@@ -230,11 +235,9 @@ export class MeteoraApiProvider implements IPositionProvider {
   public async getPosition(positionId: string, poolAddress?: string): Promise<Position> {
     logger.info(`[MeteoraApiProvider] Fetching position details for ${positionId}`);
 
-    const walletAddress = process.env.WALLET_PUBKEY;
+    const walletAddress = this.walletAddress || process.env.WALLET_PUBKEY;
     if (!walletAddress) {
-      throw new Error(
-        'Cannot fetch position: WALLET_PUBKEY is not configured in process environment'
-      );
+      throw new Error('Cannot fetch position: walletAddress is not configured');
     }
 
     const positions = await this.getPositions(walletAddress, poolAddress);
