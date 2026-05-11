@@ -9,6 +9,9 @@
  * @dependencies All I* interfaces from @lp-system/core, OrchestratorFactory
  * @sideEffects startDiscovery modifies JsonPositionStore; startTickLoop spawns interval that mutates persistent store and calls executor
  */
+
+import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
+
 import {
   IPositionProvider,
   IPositionStore,
@@ -39,14 +42,11 @@ async function getWalletBalances(
   mintX: string,
   mintY: string
 ): Promise<{ amountX: string; amountY: string }> {
-  logger.info(
-    `[getWalletBalances] Entry args - walletAddress: "${walletAddress}", mintX: "${mintX}", mintY: "${mintY}"`
-  );
   let amountX = '0';
   let amountY = '0';
 
-  const tokenProgramId = new PublicKey('TokenkegQfeZyiNWxFb9eeB2m3tFhGE5LBgxYvhFr1i');
-  const token2022ProgramId = new PublicKey('TokenzQhb8NsH26e8m1Yg9UP9Kaj15saWJ361v27m1');
+  const tokenProgramId = TOKEN_PROGRAM_ID;
+  const token2022ProgramId = TOKEN_2022_PROGRAM_ID;
 
   const fetchForProgram = async (programId: PublicKey) => {
     try {
@@ -54,10 +54,11 @@ async function getWalletBalances(
         new PublicKey(walletAddress),
         { programId }
       );
+
       for (const account of response.value) {
         const info = account.account.data.parsed.info;
         const mint = info.mint;
-        const amount = info.tokenAmount.amount; // raw string format
+        const amount = info.tokenAmount.amount;
 
         if (mint === mintX) {
           amountX = amount;
@@ -65,11 +66,10 @@ async function getWalletBalances(
           amountY = amount;
         }
       }
-    } catch (err: unknown) {
+    } catch (err) {
+      const logger = getLogger('lifecycle');
       logger.warn(
-        `[getWalletBalances] Failed to fetch token accounts for program ${programId.toBase58()}: ${
-          err instanceof Error ? err.message : String(err)
-        }`
+        `Failed to fetch token accounts for program ${programId.toBase58()}: ${err}`
       );
     }
   };
@@ -79,7 +79,6 @@ async function getWalletBalances(
 
   return { amountX, amountY };
 }
-
 /**
  * Starts the one-time position discovery cycle.
  * Fetches live on-chain positions, identifies new vs closed, and registers new orchestrators.
@@ -219,6 +218,14 @@ export async function processTasks(
 
         // Fetch initial balances to detect changes/increases later
         const initialBalances = await rpcPool.execute(async (connection: Connection) => {
+          logger.info(
+            'Wallet: ' +
+              walletAddress +
+              ' ' +
+              poolInfo.tokenXAddress +
+              ' ' +
+              poolInfo.tokenYAddress
+          );
           return await getWalletBalances(
             connection,
             walletAddress,
@@ -233,15 +240,39 @@ export async function processTasks(
           action: 'close' as const,
         };
 
-        const record = await executor.apply(closeDecision, market, async () => {
-          return { action: 'skip' };
-        });
-        if (record.status === 'failed') {
-          throw new Error(`Close transaction failed: ${record.error}`);
+        let record;
+        try {
+          record = await executor.apply(closeDecision, market, async () => {
+            return { action: 'skip' };
+          });
+          if (record.status === 'failed') {
+            if (
+              record.error &&
+              (record.error.includes('not found on-chain') ||
+                record.error.includes('Cannot close position'))
+            ) {
+              logger.warn(
+                `[Execution Monitor] Position ${task.originalPositionId} was not found on-chain (already closed). Proceeding with rebalance flow.`
+              );
+              record = { status: 'success' as const, txSignatures: [] };
+            } else {
+              throw new Error(`Close transaction failed: ${record.error}`);
+            }
+          }
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg.includes('not found on-chain') || msg.includes('Cannot close position')) {
+            logger.warn(
+              `[Execution Monitor] Position ${task.originalPositionId} was not found on-chain (already closed). Proceeding with rebalance flow.`
+            );
+            record = { status: 'success' as const, txSignatures: [] };
+          } else {
+            throw err;
+          }
         }
 
         logger.info(
-          `[Execution Monitor] Close transaction succeeded. Polling balances for settlement...`
+          `[Execution Monitor] Close transaction completed. Polling balances for settlement...`
         );
         const solanaExecutor = executor as unknown as {
           pollBalances?: (
