@@ -3,6 +3,8 @@
   "files": [],
   "references": [
     { "path": "./packages/core" },
+    { "path": "./packages/config" },
+    { "path": "./packages/logger" },
     { "path": "./packages/persistence" },
     { "path": "./packages/providers" },
     { "path": "./packages/steps" },

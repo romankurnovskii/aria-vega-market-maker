@@ -22,6 +22,8 @@ Start here. Every doc in this directory is listed below.
 ## Packages
 
 - [@lp-system/core docs](../packages/core/docs/START_HERE.md) — Core Domain Model Documentation
+- [@lp-system/config docs](../packages/config/docs/START_HERE.md) — Central configuration and dynamic workspace path resolution.
+- [@lp-system/logger docs](../packages/logger/docs/START_HERE.md) — Multi-transport Structured Winston Logging Documentation
 - [@lp-system/persistence docs](../packages/persistence/docs/START_HERE.md) — File-based JSON Persistence Documentation
 - [@lp-system/providers docs](../packages/providers/docs/START_HERE.md) — Load balanced RPC & API Providers Documentation
 - [@lp-system/steps docs](../packages/steps/docs/START_HERE.md) — Reusable stateless step components Documentation

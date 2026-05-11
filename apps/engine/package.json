@@ -6,18 +6,19 @@
   "type": "module",
   "dependencies": {
     "@lp-system/core": "workspace:*",
+    "@lp-system/executor": "workspace:*",
+    "@lp-system/logger": "workspace:*",
+    "@lp-system/orchestration": "workspace:*",
+    "@lp-system/persistence": "workspace:*",
     "@lp-system/providers": "workspace:*",
     "@lp-system/steps": "workspace:*",
     "@lp-system/strategy": "workspace:*",
-    "@lp-system/orchestration": "workspace:*",
-    "@lp-system/executor": "workspace:*",
-    "@lp-system/persistence": "workspace:*",
-    "express": "^4.19.2",
-    "cors": "^2.8.5"
+    "cors": "^2.8.6",
+    "express": "^5.2.1"
   },
   "devDependencies": {
-    "@types/express": "^4.17.21",
-    "@types/cors": "^2.8.17"
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6"
   },
   "scripts": {
     "build": "tsc",

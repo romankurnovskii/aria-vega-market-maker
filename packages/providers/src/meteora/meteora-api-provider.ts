@@ -11,14 +11,16 @@
  * @sideEffects None — all methods are pure data fetchers with no local state mutation
  */
 import { IPositionProvider, Position, PoolInfo, MarketSnapshot } from '@lp-system/core';
-import { PoolResponse, OhlcvResponse } from './types';
-
+import { PoolResponse, OhlcvResponse, PositionsPnlResponse } from './types';
+import { getBinIdFromPrice } from './meteora.utils';
 
 /**
  * Meteora API provider for position and market data.
  * Currently uses mock data; replace with real API calls in production.
  */
 export class MeteoraApiProvider implements IPositionProvider {
+  private poolDecimalsCache = new Map<string, { decimalsX: number; decimalsY: number }>();
+
   /**
    * Constructs the provider with the Meteora API base URL.
    *
@@ -29,106 +31,174 @@ export class MeteoraApiProvider implements IPositionProvider {
   }
 
   /**
+   * Fetches the token decimals for a given pool address dynamically.
+   * Caches results to prevent redundant API queries.
+   */
+  private async getPoolDecimals(poolAddress: string): Promise<{ decimalsX: number; decimalsY: number }> {
+    const cached = this.poolDecimalsCache.get(poolAddress);
+    if (cached) return cached;
+
+    try {
+      const response = await fetch(`${this.apiUrl}/pools/${poolAddress}`, {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'MeteoraLPBot/1.0',
+        },
+      });
+      if (response.ok) {
+        const data = (await response.json()) as PoolResponse;
+        const decimals = {
+          decimalsX: data.token_x.decimals,
+          decimalsY: data.token_y.decimals,
+        };
+        this.poolDecimalsCache.set(poolAddress, decimals);
+        return decimals;
+      }
+    } catch (err) {
+      console.warn(`[MeteoraApiProvider] Failed to fetch decimals for pool ${poolAddress}:`, err);
+    }
+
+    return { decimalsX: 9, decimalsY: 6 }; // safe default fallback decimals
+  }
+
+  /**
    * Fetches all positions for a given wallet address.
-   * Currently returns a single mock SOL-USDC CLMM position.
+   * Can accept an optional poolAddress parameter. If not provided, it attempts
+   * to fetch open portfolio information to discover the pools.
    *
    * @param {string} walletAddress - Solana wallet public key.
+   * @param {string} [poolAddress] - Optional specific pool address to query.
    * @returns {Promise<Position[]>} Array of position objects.
    */
-  public async getPositions(walletAddress: string): Promise<Position[]> {
-    console.log(`[MeteoraApiProvider] Querying positions for wallet ${walletAddress} from API: ${this.apiUrl}`);
+  public async getPositions(walletAddress: string, poolAddress?: string): Promise<Position[]> {
+    console.log(
+      `[MeteoraApiProvider] Querying positions for wallet ${walletAddress} from API: ${this.apiUrl}`
+    );
 
-    // Return mock SOL-USDC position
-    return [
-      {
-        id: '9tA6m91FvP35G9A7eS982Yhd6pE35Z678WjLmoB67Pqr',
-        poolAddress: 'ArU2v79K6E489A7eS982Yhd6pE35Z678WjLmoB67USDC',
-        chain: 'solana',
-        protocol: 'meteora_dlmm',
-        lowerBinId: 212000,
-        upperBinId: 212200,
-        lowerBound: 212000,
-        upperBound: 212200,
-        tokenX: {
-          amount: '1500000000', // 1.5 SOL
-          decimals: 9,
-          mint: 'So11111111111111111111111111111111111111112',
-          tokenAddress: 'So11111111111111111111111111111111111111112'
-        },
-        tokenY: {
-          amount: '200000000', // 200 USDC
-          decimals: 6,
-          mint: 'EPjFW3dpdG7t3WY5ja1DN6qV7mN4H65A5Lxh63m3Ugo',
-          tokenAddress: 'EPjFW3dpdG7t3WY5ja1DN6qV7mN4H65A5Lxh63m3Ugo'
-        },
-        isInRange: true,
-        openedAt: Date.now() - 3600000, // 1 hour ago
-        metadata: {
-          strategy: 'trailing-usdc',
-          leverage: 10
+    const poolsToQuery: string[] = [];
+
+    if (poolAddress) {
+      poolsToQuery.push(poolAddress);
+    } else {
+      // Try to discover active pools via the /portfolio/open endpoint
+      try {
+        const portfolioUrl = `${this.apiUrl}/portfolio/open?user=${walletAddress}`;
+        const portfolioResponse = await fetch(portfolioUrl, {
+          headers: {
+            Accept: 'application/json',
+            'User-Agent': 'MeteoraLPBot/1.0',
+          },
+        });
+
+        if (portfolioResponse.ok) {
+          const portfolioData = await portfolioResponse.json() as any;
+          const pools = Array.isArray(portfolioData)
+            ? portfolioData
+            : (portfolioData.data || portfolioData.pools || []);
+
+          for (const p of pools) {
+            const addr = typeof p === 'string' ? p : (p.address || p.pool_address || p.poolAddress);
+            if (addr) {
+              poolsToQuery.push(addr);
+            }
+          }
         }
+      } catch (err) {
+        console.warn(`[MeteoraApiProvider] Failed to fetch open portfolio for ${walletAddress}:`, err);
       }
-    ];
+    }
+
+    const allPositions: Position[] = [];
+
+    for (const pool of poolsToQuery) {
+      try {
+        const decimalsPromise = this.getPoolDecimals(pool);
+        const url = `${this.apiUrl}/positions/${pool}/pnl?user=${walletAddress}&status=open&pageSize=200&page=1`;
+        console.log(`[MeteoraApiProvider] Fetching positions PnL from Datapi for pool ${pool}`);
+
+        const response = await fetch(url, {
+          headers: {
+            Accept: 'application/json',
+            'User-Agent': 'MeteoraLPBot/1.0',
+          },
+        });
+
+        if (!response.ok) {
+          console.warn(`[MeteoraApiProvider] Failed to fetch positions PnL from Datapi: ${response.status} ${response.statusText}`);
+          continue;
+        }
+
+        const result = (await response.json()) as PositionsPnlResponse;
+        const { decimalsX, decimalsY } = await decimalsPromise;
+
+        if (result && Array.isArray(result.positions)) {
+          for (const pos of result.positions) {
+            const lowerBinId = pos.lower_bin_id !== undefined ? pos.lower_bin_id : (pos.lowerBinId ?? 0);
+            const upperBinId = pos.upper_bin_id !== undefined ? pos.upper_bin_id : (pos.upperBinId ?? 0);
+            const isInRange = pos.is_in_range !== undefined ? pos.is_in_range : (pos.isInRange ?? true);
+            const openedAt = pos.opened_at || Date.now() - 3600000;
+
+            allPositions.push({
+              id: pos.address,
+              poolAddress: pos.pool_address || pool,
+              chain: 'solana',
+              protocol: 'meteora_dlmm',
+              lowerBound: lowerBinId,
+              upperBound: upperBinId,
+              lowerBinId,
+              upperBinId,
+              tokenX: {
+                amount: pos.amount_x || pos.amountX || '0',
+                decimals: decimalsX,
+                mint: result.tokenX || 'So11111111111111111111111111111111111111112',
+                tokenAddress: result.tokenX || 'So11111111111111111111111111111111111111112',
+              },
+              tokenY: {
+                amount: pos.amount_y || pos.amountY || '0',
+                decimals: decimalsY,
+                mint: result.tokenY || 'EPjFW3dpdG7t3WY5ja1DN6qV7mN4H65A5Lxh63m3Ugo',
+                tokenAddress: result.tokenY || 'EPjFW3dpdG7t3WY5ja1DN6qV7mN4H65A5Lxh63m3Ugo',
+              },
+              isInRange,
+              openedAt,
+              metadata: {
+                strategy: 'trailing-usdc',
+                leverage: 10,
+              },
+            });
+          }
+        }
+      } catch (err) {
+        console.warn(`[MeteoraApiProvider] Failed to fetch positions for pool ${pool}:`, err);
+      }
+    }
+
+    return allPositions;
   }
 
   /**
    * Fetches a single position by its on-chain identifier.
+   * Reuses getPositions under the hood.
    *
    * @param {string} positionId - Unique position ID (pubkey on Solana).
    * @returns {Promise<Position>} The position object.
    */
   public async getPosition(positionId: string): Promise<Position> {
     console.log(`[MeteoraApiProvider] Fetching position details for ${positionId}`);
-    return {
-      id: positionId,
-      poolAddress: 'ArU2v79K6E489A7eS982Yhd6pE35Z678WjLmoB67USDC',
-      chain: 'solana',
-      protocol: 'meteora_dlmm',
-      lowerBinId: 212000,
-      upperBinId: 212200,
-      lowerBound: 212000,
-      upperBound: 212200,
-      tokenX: {
-        amount: '1500000000',
-        decimals: 9,
-        mint: 'So11111111111111111111111111111111111111112',
-        tokenAddress: 'So11111111111111111111111111111111111111112'
-      },
-      tokenY: {
-        amount: '200000000',
-        decimals: 6,
-        mint: 'EPjFW3dpdG7t3WY5ja1DN6qV7mN4H65A5Lxh63m3Ugo',
-        tokenAddress: 'EPjFW3dpdG7t3WY5ja1DN6qV7mN4H65A5Lxh63m3Ugo'
-      },
-      isInRange: true,
-      openedAt: Date.now() - 3600000,
-      metadata: {
-        strategy: 'trailing-usdc',
-        leverage: 10
-      }
-    };
-  }
 
-  /**
-   * Calculates the active bin ID (boundary) from the current price.
-   * Formula: Price = (1 + binStep / 10000) ^ (binId - 8388608) * 10 ^ (decimalsY - decimalsX)
-   * Solving for binId:
-   * binId = 8388608 + ln(Price / 10 ^ (decimalsY - decimalsX)) / ln(1 + binStep / 10000)
-   */
-  private getBinIdFromPrice(
-    price: number,
-    binStep: number,
-    decimalsX: number,
-    decimalsY: number
-  ): number {
-    if (!price || price <= 0) {
-      return 8388608; // default neutral bin ID
+    const walletAddress = process.env.WALLET_PUBKEY;
+    if (!walletAddress) {
+      throw new Error('Cannot fetch position: WALLET_PUBKEY is not configured in process environment');
     }
-    const decimalFactor = Math.pow(10, decimalsY - decimalsX);
-    const ratio = price / decimalFactor;
-    const binStepFactor = 1 + binStep / 10000;
-    const binOffset = Math.log(ratio) / Math.log(binStepFactor);
-    return Math.round(8388608 + binOffset);
+
+    const positions = await this.getPositions(walletAddress);
+
+    const position = positions.find((p) => p.id === positionId);
+    if (position) {
+      return position;
+    }
+
+    throw new Error(`Position ${positionId} not found on-chain for wallet ${walletAddress}`);
   }
 
   /**
@@ -155,16 +225,15 @@ export class MeteoraApiProvider implements IPositionProvider {
 
     const data = (await response.json()) as PoolResponse;
 
-    const activeBinId = this.getBinIdFromPrice(
+    const activeBinId = getBinIdFromPrice(
       data.current_price,
       data.pool_config.bin_step,
       data.token_x.decimals,
       data.token_y.decimals
     );
 
-    const feeRate = data.dynamic_fee_pct > 0
-      ? data.dynamic_fee_pct
-      : data.pool_config.base_fee_pct / 100;
+    const feeRate =
+      data.dynamic_fee_pct > 0 ? data.dynamic_fee_pct : data.pool_config.base_fee_pct / 100;
 
     return {
       poolAddress: data.address,
@@ -199,21 +268,24 @@ export class MeteoraApiProvider implements IPositionProvider {
     });
 
     if (!poolResponse.ok) {
-      throw new Error(`Failed to fetch pool info for market snapshot: ${poolResponse.status} ${poolResponse.statusText}`);
+      throw new Error(
+        `Failed to fetch pool info for market snapshot: ${poolResponse.status} ${poolResponse.statusText}`
+      );
     }
 
     const poolData = (await poolResponse.json()) as PoolResponse;
 
-    const activeBinId = this.getBinIdFromPrice(
+    const activeBinId = getBinIdFromPrice(
       poolData.current_price,
       poolData.pool_config.bin_step,
       poolData.token_x.decimals,
       poolData.token_y.decimals
     );
 
-    const feeRate = poolData.dynamic_fee_pct > 0
-      ? poolData.dynamic_fee_pct
-      : poolData.pool_config.base_fee_pct / 100;
+    const feeRate =
+      poolData.dynamic_fee_pct > 0
+        ? poolData.dynamic_fee_pct
+        : poolData.pool_config.base_fee_pct / 100;
 
     const ohlcvUrl = `${this.apiUrl}/pools/${poolAddress}/ohlcv?timeframe=1h`;
     const ohlcvResponse = await fetch(ohlcvUrl, {
@@ -229,22 +301,27 @@ export class MeteoraApiProvider implements IPositionProvider {
       try {
         const ohlcvData = (await ohlcvResponse.json()) as OhlcvResponse;
         if (ohlcvData && Array.isArray(ohlcvData.data)) {
-          priceHistory = ohlcvData.data.map((candle) => ({
-            price: candle.close,
-            timestamp: candle.timestamp * 1000,
-          })).slice(-24);
+          priceHistory = ohlcvData.data
+            .map((candle) => ({
+              price: candle.close,
+              timestamp: candle.timestamp * 1000,
+            }))
+            .slice(-24);
         }
       } catch (err) {
-        console.warn(`[MeteoraApiProvider] Failed to parse OHLCV data for pool ${poolAddress}:`, err);
+        console.warn(
+          `[MeteoraApiProvider] Failed to parse OHLCV data for pool ${poolAddress}:`,
+          err
+        );
       }
     } else {
-      console.warn(`[MeteoraApiProvider] Failed to fetch OHLCV data: ${ohlcvResponse.status} ${ohlcvResponse.statusText}`);
+      console.warn(
+        `[MeteoraApiProvider] Failed to fetch OHLCV data: ${ohlcvResponse.status} ${ohlcvResponse.statusText}`
+      );
     }
 
     if (priceHistory.length === 0) {
-      priceHistory = [
-        { price: poolData.current_price, timestamp: Date.now() }
-      ];
+      priceHistory = [{ price: poolData.current_price, timestamp: Date.now() }];
     }
 
     return {
@@ -260,5 +337,3 @@ export class MeteoraApiProvider implements IPositionProvider {
     };
   }
 }
-
-

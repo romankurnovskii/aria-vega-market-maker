@@ -12,6 +12,9 @@
  * @sideEffects Produces ExecutionRecord with transaction signatures (mock or real)
  */
 import { IExecutor, Decision, MarketSnapshot, ExecutionRecord, StrategyResult, IRpcProvider } from '@lp-system/core';
+import { getLogger } from '@lp-system/logger';
+
+const logger = getLogger('solana-executor');
 
 /**
  * Solana executor using RPC pool for transaction submission.
@@ -32,7 +35,7 @@ export class SolanaExecutor implements IExecutor {
     private walletAddress: string,
     private options: { priorityFeeMicroLamports?: number } = {}
   ) {
-    console.log(`[SolanaExecutor] Initialized for wallet ${this.walletAddress} with RPC pool [${this.rpcPool.constructor.name}] and priority fee ${this.options.priorityFeeMicroLamports || 0} micro-lamports`);
+    logger.info(`[SolanaExecutor] Initialized for wallet ${this.walletAddress} with RPC pool [${this.rpcPool.constructor.name}] and priority fee ${this.options.priorityFeeMicroLamports || 0} micro-lamports`);
   }
 
   /**
@@ -59,7 +62,7 @@ export class SolanaExecutor implements IExecutor {
     reEvaluate?: (positionId: string) => Promise<StrategyResult>
   ): Promise<ExecutionRecord> {
     const callback = reEvaluate || this.reEvaluateCallback;
-    console.log(`[SolanaExecutor] Applying decision '${decision.action}' on position ${decision.positionId}`);
+    logger.info(`[SolanaExecutor] Applying decision '${decision.action}' on position ${decision.positionId}`);
 
     const txSignatures: string[] = [];
     const executionId = `exec_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
@@ -67,17 +70,17 @@ export class SolanaExecutor implements IExecutor {
     try {
       if (decision.action === 'close') {
         // 1. Close Position
-        console.log(`[SolanaExecutor] Creating CLOSE transaction for position ${decision.positionId}`);
+        logger.info(`[SolanaExecutor] Creating CLOSE transaction for position ${decision.positionId}`);
         const closeSig = await this.mockTransaction('close_position');
         txSignatures.push(closeSig);
       } else if (decision.action === 'open') {
         // 2. Open Position
-        console.log(`[SolanaExecutor] Creating OPEN transaction on pool ${market.poolAddress} with lower/upper bins [${decision.openParams?.lowerBinId}, ${decision.openParams?.upperBinId}]`);
+        logger.info(`[SolanaExecutor] Creating OPEN transaction on pool ${market.poolAddress} with lower/upper bins [${decision.openParams?.lowerBinId}, ${decision.openParams?.upperBinId}]`);
         const openSig = await this.mockTransaction('open_position');
         txSignatures.push(openSig);
       } else if (decision.action === 'close+open') {
         // 3. Close + Re-evaluate + Open Position
-        console.log(`[SolanaExecutor] Step 1/3: Closing old position ${decision.positionId}`);
+        logger.info(`[SolanaExecutor] Step 1/3: Closing old position ${decision.positionId}`);
         const closeSig = await this.mockTransaction('close_position');
         txSignatures.push(closeSig);
 
@@ -85,20 +88,20 @@ export class SolanaExecutor implements IExecutor {
           throw new Error('Cannot execute compound close+open rebalance without an injected re-evaluation callback');
         }
 
-        console.log(`[SolanaExecutor] Step 2/3: Invoking re-evaluation callback for position ${decision.positionId}`);
+        logger.info(`[SolanaExecutor] Step 2/3: Invoking re-evaluation callback for position ${decision.positionId}`);
         const reEvalResult = await callback(decision.positionId);
 
         if (reEvalResult.action === 'open' || reEvalResult.action === 'close+open') {
           const openParams = reEvalResult.action === 'close+open' ? reEvalResult.openParams : reEvalResult.params;
-          console.log(`[SolanaExecutor] Step 3/3: Re-evaluation returned OPEN action. Executing new position open in bin range [${openParams.lowerBinId}, ${openParams.upperBinId}]`);
+          logger.info(`[SolanaExecutor] Step 3/3: Re-evaluation returned OPEN action. Executing new position open in bin range [${openParams.lowerBinId}, ${openParams.upperBinId}]`);
           const openSig = await this.mockTransaction('open_position');
           txSignatures.push(openSig);
         } else {
-          console.log(`[SolanaExecutor] Step 3/3: Re-evaluation returned '${reEvalResult.action}' action. Skipping subsequent open.`);
+          logger.info(`[SolanaExecutor] Step 3/3: Re-evaluation returned '${reEvalResult.action}' action. Skipping subsequent open.`);
         }
       }
 
-      console.log(`[SolanaExecutor] Execution sequence succeeded. Transactions: ${txSignatures.join(', ')}`);
+      logger.info(`[SolanaExecutor] Execution sequence succeeded. Transactions: ${txSignatures.join(', ')}`);
 
       return {
         id: executionId,
@@ -108,8 +111,8 @@ export class SolanaExecutor implements IExecutor {
         executedAt: Date.now()
       };
     } catch (error: any) {
-      console.error(`[SolanaExecutor] Execution sequence failed: ${error.message || error}`);
-      return {
+      logger.error(`[SolanaExecutor] Execution sequence failed: ${error.message || error}`);
+return {
         id: executionId,
         decision,
         txSignatures,
@@ -118,6 +121,28 @@ export class SolanaExecutor implements IExecutor {
         executedAt: Date.now()
       };
     }
+  }
+
+  /**
+   * Simulates a transaction with brief network latency.
+   * Replace this with real on-chain transaction building and submission in production.
+   *
+   * @private
+   * @param {string} actionType - Type of action (close_position or open_position).
+   * @returns {Promise<string>} Mock transaction signature.
+   */
+  private async mockTransaction(actionType: string): Promise<string> {
+    // Simulate brief network latency for RPC transaction confirmation
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const randomHex = Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join('');
+    const signature = `mock_tx_${actionType}_${randomHex}`;
+    logger.info(`[SolanaExecutor] Transaction confirmed on-chain: ${signature}`);
+    return signature;
+  }
+}
+
+// Update the logger call in the mockTransaction method
+logger.info(`[SolanaExecutor] Transaction confirmed on-chain: ${signature}`);
   }
 
   /**

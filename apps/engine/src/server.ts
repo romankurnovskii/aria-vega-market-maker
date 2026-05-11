@@ -16,6 +16,9 @@ import express from 'express';
 import cors from 'cors';
 import { IStore, IOrchestratorRegistry, IExecutor, Assignment, IPositionProvider } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
+import { getLogger } from '@lp-system/logger';
+
+const logger = getLogger('server');
 
 /**
  * Starts the HTTP control plane server.
@@ -110,7 +113,7 @@ export function startHttpServer(
         return;
       }
 
-      console.log(`[HTTP Server] Triggering manual ad-hoc strategy evaluation for ${strategyId} on position ${positionId}`);
+      logger.info(`[HTTP Server] Triggering manual ad-hoc strategy evaluation for ${strategyId} on position ${positionId}`);
       
       const position = await positionProvider.getPosition(positionId);
       const market = await positionProvider.getMarketSnapshot(position.poolAddress);
@@ -135,7 +138,7 @@ export function startHttpServer(
   });
 
   app.listen(PORT, () => {
-    console.log(`[HTTP Server] Operational and listening on port ${PORT} (loaded: ${executor.constructor.name})`);
+    logger.info(`[HTTP Server] Operational and listening on port ${PORT} (loaded: ${executor.constructor.name})`);
   });
 
   return app;

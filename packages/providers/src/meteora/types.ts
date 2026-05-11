@@ -115,3 +115,44 @@ export interface OhlcvResponse {
   timeframe: string | null;
   data: OhlcvCandle[];
 }
+
+// ---------------------------------------------------------------------------
+// Position and PnL response types
+// ---------------------------------------------------------------------------
+
+export interface DatapiPosition {
+  address: string;
+  pool_address: string;
+  lower_bin_id: number;
+  upper_bin_id: number;
+  amount_x: string;
+  amount_y: string;
+  is_in_range: boolean;
+  opened_at: number;
+  fee_x?: string;
+  fee_y?: string;
+  pnl_x?: string;
+  pnl_y?: string;
+  lowerBinId?: number;
+  upperBinId?: number;
+  amountX?: string;
+  amountY?: string;
+  isInRange?: boolean;
+}
+
+export interface PositionsPnlResponse {
+  tokenX: string;
+  tokenY: string;
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  hasNext: boolean;
+  positions: DatapiPosition[];
+  tokenXPrice: string;
+  tokenYPrice: string;
+  rewardTokenX: string;
+  rewardTokenY: string;
+  rewardTokenXPrice: string;
+  rewardTokenYPrice: string;
+  solPrice: string;
+}

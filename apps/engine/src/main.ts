@@ -9,7 +9,7 @@
  * - Registers SIGINT/SIGTERM handlers for graceful shutdown
  *
  * @dependencies All @lp-system packages: providers, core, persistence, strategy, orchestration, executor
- * @sideEffects Console logging, writes initial demo assignment to disk, starts HTTP server on PORT, spawns intervals
+ * @sideEffects Winston logging to console/files, writes initial demo assignment to disk, starts HTTP server on PORT, spawns intervals
  */
 import {
   MeteoraApiProvider,
@@ -25,6 +25,7 @@ import {
   ExecutionGate
 } from '@lp-system/orchestration';
 import { SolanaExecutor } from '@lp-system/executor';
+import { getLogger } from '@lp-system/logger';
 import { startDiscovery, startTickLoop } from './lifecycle.js';
 import { startHttpServer } from './server.js';
 
@@ -34,15 +35,17 @@ const METEORA_API_URL = process.env.METEORA_API_URL || 'https://dlmm.datapi.mete
 const HELIUS_URL = process.env.HELIUS_URL || process.env.HELIO_URL || 'https://mainnet.helius-rpc.com/?api-key=xxx';
 const SOLANA_URL = process.env.SOLANA_URL || 'https://api.mainnet-beta.solana.com';
 
+const logger = getLogger('engine');
+
 /**
  * Main application bootstrap: wires all layers and starts event loops.
  */
 async function main() {
-  console.log('====================================================');
-  console.log('       SOLANA CLMM LP AUTOMATION SYSTEM             ');
-  console.log('====================================================');
-  console.log(`[Config] Target Wallet: ${WALLET}`);
-  console.log(`[Config] Tick Interval: ${TICK_INTERVAL_MS}ms`);
+  logger.info('====================================================');
+  logger.info('       SOLANA CLMM LP AUTOMATION SYSTEM             ');
+  logger.info('====================================================');
+  logger.info(`[Config] Target Wallet: ${WALLET}`);
+  logger.info(`[Config] Tick Interval: ${TICK_INTERVAL_MS}ms`);
 
   // 1. Providers initialization
   const helius = new HeliusRpcProvider(HELIUS_URL);
@@ -74,7 +77,7 @@ async function main() {
   // so the bot runs out-of-the-box on the first start!
   const currentAssignments = await store.getAssignments();
   if (currentAssignments.length === 0) {
-    console.log('[Bootstrap] Storing initial mock assignment for demonstration...');
+    logger.info('[Bootstrap] Storing initial mock assignment for demonstration...');
     await store.saveAssignment({
       id: 'assignment_demo_101',
       strategyId: 'trailing-usdc',
@@ -102,16 +105,16 @@ async function main() {
 
   // 8. Graceful Shutdown handlers
   process.on('SIGINT', () => {
-    console.log('\n[Engine] Received SIGINT shutdown request. Gracefully closing daemon...');
+    logger.info('[Engine] Received SIGINT shutdown request. Gracefully closing daemon...');
     process.exit(0);
   });
   process.on('SIGTERM', () => {
-    console.log('\n[Engine] Received SIGTERM shutdown request. Gracefully closing daemon...');
+    logger.info('[Engine] Received SIGTERM shutdown request. Gracefully closing daemon...');
     process.exit(0);
   });
 }
 
 main().catch((error) => {
-  console.error('[Engine] Fatal crash during startup execution:', error);
+  logger.error('[Engine] Fatal crash during startup execution:', error);
   process.exit(1);
 });

@@ -10,8 +10,8 @@
  * @dependencies IPositionStore, Position (from @lp-system/core), fs/promises, path
  * @sideEffects Writes to ./data/known_positions.json on saveKnown()
  */
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { IPositionStore, Position } from '@lp-system/core';
 
 /**
