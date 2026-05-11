@@ -4,157 +4,39 @@ This document lists the formal models and contracts shared across all packages i
 
 ## Type Definitions
 
-### TokenAmount
+All types are defined in `packages/core/src/types/`:
 
-```ts
-export interface TokenAmount {
-  amount: string; // BigInt or string representation
-  decimals: number;
-  mint: string;
-}
-```
-
-### OpenParams
-
-```ts
-export interface OpenParams {
-  poolAddress: string;
-  lowerBinId: number;
-  upperBinId: number;
-  tokenXAmount: string;
-  tokenYAmount: string;
-  metadata?: Record<string, unknown>;
-}
-```
-
-### PricePoint
-
-```ts
-export interface PricePoint {
-  price: number;
-  timestamp: number;
-}
-```
-
-### Position
-
-```ts
-export interface Position {
-  id: string; // on-chain pubkey
-  poolAddress: string;
-  lowerBinId: number;
-  upperBinId: number;
-  tokenX: TokenAmount;
-  tokenY: TokenAmount;
-  isInRange: boolean;
-  openedAt: number; // timestamp
-  metadata: Record<string, unknown>;
-}
-```
-
-### MarketSnapshot
-
-```ts
-export interface MarketSnapshot {
-  poolAddress: string;
-  activeBinId: number;
-  price: number;
-  priceHistory: PricePoint[];
-  feeRate: number;
-  capturedAt: number;
-}
-```
-
-### StepContext
-
-```ts
-export interface StepContext {
-  position: Position;
-  market: MarketSnapshot;
-  params: Record<string, unknown>; // strategy config
-  signal?: 'skip' | 'close' | 'open' | 'close+open';
-  openParams?: OpenParams;
-  reason?: string;
-}
-```
-
-### StrategyResult
-
-```ts
-export type StrategyResult =
-  | { action: 'skip' }
-  | { action: 'close' }
-  | { action: 'open'; params: OpenParams }
-  | { action: 'close+open'; openParams: OpenParams };
-```
-
----
+| Type | Source File |
+|------|-------------|
+| `TokenAmount` | [`types/token.ts`](../packages/core/src/types/token.ts) |
+| `OpenParams` | [`types/position.ts`](../packages/core/src/types/position.ts) |
+| `Position` | [`types/position.ts`](../packages/core/src/types/position.ts) |
+| `PricePoint` | [`types/market.ts`](../packages/core/src/types/market.ts) |
+| `MarketSnapshot` | [`types/market.ts`](../packages/core/src/types/market.ts) |
+| `PoolInfo` | [`types/market.ts`](../packages/core/src/types/market.ts) |
+| `StepContext` | [`types/strategy.ts`](../packages/core/src/types/strategy.ts) |
+| `StrategyResult` | [`types/strategy.ts`](../packages/core/src/types/strategy.ts) |
+| `Recommendation` | [`types/strategy.ts`](../packages/core/src/types/strategy.ts) |
+| `LPEvent` | [`types/strategy.ts`](../packages/core/src/types/strategy.ts) |
+| `Assignment` | [`types/orchestration.ts`](../packages/core/src/types/orchestration.ts) |
+| `Decision` | [`types/orchestration.ts`](../packages/core/src/types/orchestration.ts) |
+| `ExecutionRecord` | [`types/orchestration.ts`](../packages/core/src/types/orchestration.ts) |
 
 ## Core Interfaces
 
-### IStep
+All interfaces are defined in `packages/core/src/interfaces.ts`:
 
-```ts
-export interface IStep {
-  name: string;
-  execute(context: StepContext): Promise<StepContext>;
-}
-```
+| Interface | Description |
+|-----------|-------------|
+| `IStep` | Executable pipeline step with context transformation |
+| `IStrategy` | Strategy interface for trading decisions (execute → StrategyResult) |
+| `IOrchestrator` | Per-position orchestrator managing strategy lifecycle |
+| `IExecutionGate` | Decision filtering and prioritization gate |
+| `IExecutor` | Transaction execution handler for on-chain operations |
+| `IPositionProvider` | External data source abstraction for positions/markets |
+| `IRpcProvider` | RPC connection abstraction with retry logic |
+| `IStore` | Persistence layer for assignments and execution records |
+| `IPositionStore` | Persistence layer for known positions |
+| `IOrchestratorRegistry` | In-memory orchestrator lifecycle manager |
 
-### IStrategy
-
-```ts
-export interface IStrategy {
-  id: string;
-  execute(
-    position: Position,
-    market: MarketSnapshot,
-    params: Record<string, unknown>
-  ): Promise<StrategyResult>;
-}
-```
-
-### IOrchestrator
-
-```ts
-export interface IOrchestrator {
-  id: string;
-  assignmentId: string;
-  positionId: string;
-  strategyId: string;
-  mode: 'active' | 'monitoring';
-  tick(position: Position, market: MarketSnapshot): Promise<StrategyResult>;
-}
-```
-
-### IExecutionGate
-
-```ts
-export interface IExecutionGate {
-  consider(recommendations: Recommendation[], positionId: string): Decision | null;
-}
-```
-
-### IExecutor
-
-```ts
-export interface IExecutor {
-  apply(
-    decision: Decision,
-    market: MarketSnapshot,
-    reEvaluate: (positionId: string) => Promise<StrategyResult>
-  ): Promise<ExecutionRecord>;
-  setReEvaluate(reEvaluate: (positionId: string) => Promise<StrategyResult>): void;
-}
-```
-
-### IPositionProvider
-
-```ts
-export interface IPositionProvider {
-  getPositions(walletAddress: string): Promise<Position[]>;
-  getPosition(positionId: string): Promise<Position>;
-  getPoolInfo(poolAddress: string): Promise<PoolInfo>;
-  getMarketSnapshot(poolAddress: string): Promise<MarketSnapshot>;
-}
-```
+See [`interfaces.ts`](../packages/core/src/interfaces.ts) for full interface definitions.
