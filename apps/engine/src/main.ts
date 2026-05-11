@@ -31,11 +31,11 @@ import { startDiscovery, startTickLoop } from './lifecycle.js';
 import { startHttpServer } from './server.js';
 import { IRpcProvider } from '@lp-system/core';
 
-const TICK_INTERVAL_MS = Number(process.env.TICK_INTERVAL_MS) || 60_000;
-const METEORA_API_URL = process.env.METEORA_API_URL || 'https://dlmm.datapi.meteora.ag';
+const TICK_INTERVAL_MS = Number(process.env.TICK_INTERVAL_MS) || 120_000;
+const METEORA_API_URL = 'https://dlmm.datapi.meteora.ag';
 const HELIUS_URL = process.env.HELIUS_URL;
 const HELIUS_URL_2 = process.env.HELIUS_URL_2;
-const SOLANA_URL = process.env.SOLANA_URL || 'https://api.mainnet-beta.solana.com';
+const SOLANA_URL = process.env.SOLANA_URL;
 
 const logger = getLogger('engine');
 
