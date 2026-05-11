@@ -18,11 +18,11 @@ import {
   IStore,
   IOrchestratorRegistry,
   IExecutor,
-  Assignment,
   IPositionProvider,
 } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
+import { createAssignmentsRouter, createStrategiesRouter } from './routes/index.js';
 
 const logger = getLogger('server');
 
@@ -49,100 +49,8 @@ export function startHttpServer(
 
   const PORT = process.env.PORT || 3000;
 
-  // GET /assignments - lists assignments from persistent store
-  app.get('/assignments', async (_req, res) => {
-    try {
-      const assignments = await store.getAssignments();
-      res.json(assignments);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || String(error) });
-    }
-  });
-
-  // POST /assignments - creates a new assignment, persists, registers orchestrator
-  app.post('/assignments', async (req, res) => {
-    try {
-      const { id, strategyId, positionId, mode } = req.body;
-
-      if (!id || !strategyId || !positionId || !mode) {
-        res
-          .status(400)
-          .json({ error: 'Missing required parameters: id, strategyId, positionId, mode' });
-        return;
-      }
-
-      const assignment: Assignment = {
-        id,
-        strategyId,
-        positionId,
-        mode: mode as 'active' | 'monitoring',
-        createdAt: Date.now(),
-      };
-
-      // 1. Persist to store
-      await store.saveAssignment(assignment);
-
-      // 2. Create orchestrator and register
-      const orchestrator = factory.create(assignment);
-      registry.register(orchestrator);
-
-      res.status(201).json({ message: 'Assignment registered successfully', assignment });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || String(error) });
-    }
-  });
-
-  // DELETE /assignments/:id - deletes assignment, deregisters orchestrator
-  app.delete('/assignments/:id', async (req, res) => {
-    try {
-      const { id } = req.params;
-
-      // 1. Delete from persistent store
-      await store.deleteAssignment(id);
-
-      // 2. Deregister from memory registry
-      registry.deregisterByAssignmentId(id);
-
-      res.json({ message: `Assignment ${id} removed successfully` });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || String(error) });
-    }
-  });
-
-  // POST /strategies/:id/evaluate - runs strategy ad-hoc for a given position
-  app.post('/strategies/:id/evaluate', async (req, res) => {
-    try {
-      const { id: strategyId } = req.params;
-      const { positionId, poolAddress } = req.body;
-
-      if (!positionId) {
-        res.status(400).json({ error: 'Missing positionId in request body' });
-        return;
-      }
-
-      logger.info(
-        `[HTTP Server] Triggering manual ad-hoc strategy evaluation for ${strategyId} on position ${positionId}`
-      );
-
-      const position = await positionProvider.getPosition(positionId, poolAddress);
-      const market = await positionProvider.getMarketSnapshot(position.poolAddress);
-
-      const orchestrators = registry.getForPosition(positionId);
-      const targetOrch = orchestrators.find((o) => o.strategyId === strategyId);
-
-      if (!targetOrch) {
-        res.status(404).json({
-          error: `No active orchestrator for strategy ${strategyId} and position ${positionId} exists in registry`,
-        });
-        return;
-      }
-
-      const result = await targetOrch.tick(position, market);
-      res.json({ status: 'success', result });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || String(error) });
-    }
-  });
+  app.use('/assignments', createAssignmentsRouter(store, registry, factory));
+  app.use('/strategies', createStrategiesRouter(registry, positionProvider));
 
   app.get('/health', (_req, res) => {
     res.json({ status: 'healthy', timestamp: Date.now() });
