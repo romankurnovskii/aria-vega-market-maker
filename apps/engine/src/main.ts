@@ -15,14 +15,14 @@ import {
   MeteoraApiProvider,
   HeliusRpcProvider,
   SolanaRpcProvider,
-  RpcPool
+  RpcPool,
 } from '@lp-system/providers';
 import { JsonFileStore, JsonPositionStore } from '@lp-system/persistence';
 import { TrailingUsdcStrategy } from '@lp-system/strategy';
 import {
   OrchestratorRegistry,
   OrchestratorFactory,
-  ExecutionGate
+  ExecutionGate,
 } from '@lp-system/orchestration';
 import { SolanaExecutor } from '@lp-system/executor';
 import { getLogger } from '@lp-system/logger';
@@ -32,7 +32,10 @@ import { startHttpServer } from './server.js';
 const WALLET = process.env.WALLET_PUBKEY || 'mock_wallet_pubkey_77777777777777777777';
 const TICK_INTERVAL_MS = Number(process.env.TICK_INTERVAL_MS) || 10000;
 const METEORA_API_URL = process.env.METEORA_API_URL || 'https://dlmm.datapi.meteora.ag';
-const HELIUS_URL = process.env.HELIUS_URL || process.env.HELIO_URL || 'https://mainnet.helius-rpc.com/?api-key=xxx';
+const HELIUS_URL =
+  process.env.HELIUS_URL ||
+  process.env.HELIO_URL ||
+  'https://mainnet.helius-rpc.com/?api-key=xxx';
 const SOLANA_URL = process.env.SOLANA_URL || 'https://api.mainnet-beta.solana.com';
 
 const logger = getLogger('engine');
@@ -83,7 +86,7 @@ async function main() {
       strategyId: 'trailing-usdc',
       positionId: '9tA6m91FvP35G9A7eS982Yhd6pE35Z678WjLmoB67Pqr', // matches position created in Meteora mock
       mode: 'active',
-      createdAt: Date.now()
+      createdAt: Date.now(),
     });
   }
 
