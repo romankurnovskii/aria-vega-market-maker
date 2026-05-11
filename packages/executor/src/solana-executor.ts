@@ -477,7 +477,7 @@ export class SolanaExecutor implements IExecutor {
 
           const tokenProgramId = new PublicKey('TokenkegQfeZyiNWxFb9eeB2m3tFhGE5LBgxYvhFr1i');
           const token2022ProgramId = new PublicKey(
-            'TokenzQhb8NsH26e8m1Yg9UP9Kaj15saWJ361v27m1'
+            'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'
           );
 
           const fetchForProgram = async (programId: PublicKey) => {
