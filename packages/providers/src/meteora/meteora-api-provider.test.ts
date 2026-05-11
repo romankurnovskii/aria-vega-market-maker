@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert';
 import { MeteoraApiProvider } from './meteora-api-provider';
+import { parseDecimalToRaw } from './meteora.utils';
 
 test('getPositions returns an empty array when API returns no positions (no mock fallback)', async () => {
   const originalFetch = global.fetch;
@@ -108,6 +109,80 @@ test('getPositions dynamically fetches pool token metadata and maps position tok
     assert.strictEqual(pos.tokenY.amount, '2000');
     assert.strictEqual(pos.tokenX.mint, 'onChainTokenXMint');
     assert.strictEqual(pos.tokenY.mint, 'onChainTokenYMint');
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('parseDecimalToRaw converts decimal strings to raw integers without precision loss', () => {
+  assert.strictEqual(parseDecimalToRaw('2.978076', 6), '2978076');
+  assert.strictEqual(parseDecimalToRaw('0.03127759', 9), '31277590');
+  assert.strictEqual(parseDecimalToRaw('100', 6), '100000000');
+  assert.strictEqual(parseDecimalToRaw('0.5', 2), '50');
+  assert.strictEqual(parseDecimalToRaw('0', 6), '0');
+  assert.strictEqual(parseDecimalToRaw('', 6), '0');
+  assert.strictEqual(parseDecimalToRaw('1.2345678', 4), '12345');
+});
+
+test('getPositions maps positions with unrealizedPnl, isOutOfRange, and positionAddress correctly', async () => {
+  const originalFetch = global.fetch;
+
+  try {
+    global.fetch = async (url: any) => {
+      if (url.includes('/pools/test-pool-addr-2')) {
+        return {
+          ok: true,
+          json: async () => ({
+            token_x: { decimals: 9, address: 'mintX' },
+            token_y: { decimals: 6, address: 'mintY' },
+          }),
+        } as any;
+      }
+      if (url.includes('/positions/test-pool-addr-2/pnl')) {
+        return {
+          ok: true,
+          json: async () => ({
+            positions: [
+              {
+                positionAddress: '77aEZeqjbhYG784TB2foz8rv58bPsqLVCB2mGhNFBGfj',
+                lowerBinId: -5896,
+                upperBinId: -5871,
+                isOutOfRange: true,
+                createdAt: 1778488215,
+                unrealizedPnl: {
+                  balances: 2.9773754983893865,
+                  balancesSol: '0.03101105313408857',
+                  balanceTokenX: {
+                    amount: '0',
+                    usd: '0',
+                    amountSol: '0'
+                  },
+                  balanceTokenY: {
+                    amount: '2.978076',
+                    usd: '2.9773754983893865',
+                    amountSol: '0.03101105313408857'
+                  },
+                }
+              },
+            ],
+          }),
+        } as any;
+      }
+      return { ok: false } as any;
+    };
+
+    const provider = new MeteoraApiProvider('https://dummy-api.meteora.ag');
+    const positions = await provider.getPositions('mock_wallet', 'test-pool-addr-2');
+
+    assert.strictEqual(positions.length, 1);
+    const pos = positions[0];
+    assert.strictEqual(pos.id, '77aEZeqjbhYG784TB2foz8rv58bPsqLVCB2mGhNFBGfj');
+    assert.strictEqual(pos.isInRange, false);
+    assert.strictEqual(pos.openedAt, 1778488215000);
+    assert.strictEqual(pos.tokenX.amount, '0');
+    assert.strictEqual(pos.tokenY.amount, '2978076');
+    assert.strictEqual(pos.tokenX.decimals, 9);
+    assert.strictEqual(pos.tokenY.decimals, 6);
   } finally {
     global.fetch = originalFetch;
   }

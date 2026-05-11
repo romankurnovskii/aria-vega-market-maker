@@ -49,6 +49,24 @@ export class OrchestratorRegistry implements IOrchestratorRegistry {
   }
 
   /**
+   * Deregisters an orchestrator by its assignmentId.
+   *
+   * @param {string} assignmentId - Assignment ID to look up and remove.
+   */
+  public deregisterByAssignmentId(assignmentId: string): void {
+    for (const [id, orch] of this.registry.entries()) {
+      if (orch.assignmentId === assignmentId) {
+        logger.info(
+          `[OrchestratorRegistry] Deregistering orchestrator ${id} (assignment ${assignmentId}) from position ${orch.positionId}`
+        );
+        this.registry.delete(id);
+        return;
+      }
+    }
+    logger.warn(`[OrchestratorRegistry] No registered orchestrator found for assignmentId ${assignmentId}`);
+  }
+
+  /**
    * Returns all orchestrators currently managing a specific position.
    *
    * @param {string} positionId - Position to query.

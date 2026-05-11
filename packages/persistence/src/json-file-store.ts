@@ -9,11 +9,31 @@
  * - Uses in-memory array merge for assignment upserts
  *
  * @dependencies IStore, Assignment, ExecutionRecord (from @lp-system/core), fs/promises, path
- * @sideEffects Writes to ./data/assignments.json and ./data/executions.json
+ * @sideEffects Writes to ./data/{prefix}assignments.json and ./data/{prefix}executions.json
  */
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { IStore, Assignment, ExecutionRecord } from '@lp-system/core';
+
+/**
+ * Options for configuring namespaced storage files.
+ */
+export interface StoreOptions {
+  wallet?: string;
+  env?: string;
+}
+
+/**
+ * Truncates and formats a wallet public key to a compact representation.
+ * E.g., HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTYUQh -> HU5H_YUQh
+ *
+ * @param {string} wallet - Full Solana public key or identifier.
+ * @returns {string} Sliced version of the public key.
+ */
+function getShortWallet(wallet: string): string {
+  if (wallet.length <= 8) return wallet;
+  return `${wallet.slice(0, 4)}_${wallet.slice(-4)}`;
+}
 
 /**
  * JsonFileStore: file-system backed store for assignments and execution records.
@@ -24,13 +44,25 @@ export class JsonFileStore implements IStore {
   private executionsPath: string;
 
   /**
-   * Constructs the store with a directory path for persistence files.
+   * Constructs the store with a directory path and optional namespacing options.
    *
-   * @param {string} directoryPath - Base directory where assignments.json and executions.json live.
+   * @param {string} directoryPath - Base directory where files live.
+   * @param {StoreOptions} [options] - Optional namespacing configuration.
    */
-  constructor(private directoryPath: string) {
-    this.assignmentsPath = path.join(directoryPath, 'assignments.json');
-    this.executionsPath = path.join(directoryPath, 'executions.json');
+  constructor(
+    private directoryPath: string,
+    options?: StoreOptions
+  ) {
+    const parts: string[] = [];
+    if (options?.wallet) {
+      parts.push(getShortWallet(options.wallet));
+    }
+    if (options?.env) {
+      parts.push(options.env);
+    }
+    const prefix = parts.length > 0 ? `${parts.join('_')}_` : '';
+    this.assignmentsPath = path.join(directoryPath, `${prefix}assignments.json`);
+    this.executionsPath = path.join(directoryPath, `${prefix}executions.json`);
   }
 
   /**

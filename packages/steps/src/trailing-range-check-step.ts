@@ -40,7 +40,7 @@ export class TrailingRangeCheckStep implements IStep {
       context.market.activeBound <= context.position.upperBound;
 
     if (!isActiveBoundInRange) {
-      logger.warning(
+      logger.warn(
         `[${this.name}] Active bound ${context.market.activeBound} is OUT of position range. Triggering close+open rebalance.`
       );
       return {

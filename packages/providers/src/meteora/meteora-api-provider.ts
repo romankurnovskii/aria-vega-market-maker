@@ -12,7 +12,7 @@
  */
 import { IPositionProvider, Position, PoolInfo, MarketSnapshot } from '@lp-system/core';
 import { PoolResponse, OhlcvResponse, PositionsPnlResponse } from './types';
-import { getBinIdFromPrice } from './meteora.utils';
+import { getBinIdFromPrice, parseDecimalToRaw } from './meteora.utils';
 import { getLogger } from '@lp-system/logger';
 
 const logger = getLogger('meteora-api-provider');
@@ -158,11 +158,41 @@ export class MeteoraApiProvider implements IPositionProvider {
             const upperBinId =
               pos.upper_bin_id !== undefined ? pos.upper_bin_id : (pos.upperBinId ?? 0);
             const isInRange =
-              pos.is_in_range !== undefined ? pos.is_in_range : (pos.isInRange ?? true);
-            const openedAt = pos.opened_at || Date.now() - 3600000;
+              pos.is_in_range !== undefined
+                ? pos.is_in_range
+                : pos.isInRange !== undefined
+                  ? pos.isInRange
+                  : pos.isOutOfRange !== undefined
+                    ? !pos.isOutOfRange
+                    : true;
+            const openedAt =
+              pos.opened_at ||
+              (pos.createdAt ? pos.createdAt * 1000 : undefined) ||
+              Date.now() - 3600000;
+
+            const positionId = pos.address || pos.positionAddress || pos.position_address || '';
+
+            let amtX = '0';
+            let amtY = '0';
+
+            if (pos.unrealizedPnl?.balanceTokenX?.amount !== undefined) {
+              amtX = parseDecimalToRaw(pos.unrealizedPnl.balanceTokenX.amount, decimalsX);
+            } else if (pos.amount_x !== undefined) {
+              amtX = pos.amount_x;
+            } else if (pos.amountX !== undefined) {
+              amtX = pos.amountX;
+            }
+
+            if (pos.unrealizedPnl?.balanceTokenY?.amount !== undefined) {
+              amtY = parseDecimalToRaw(pos.unrealizedPnl.balanceTokenY.amount, decimalsY);
+            } else if (pos.amount_y !== undefined) {
+              amtY = pos.amount_y;
+            } else if (pos.amountY !== undefined) {
+              amtY = pos.amountY;
+            }
 
             allPositions.push({
-              id: pos.address,
+              id: positionId,
               poolAddress: pos.pool_address || pool,
               chain: 'solana',
               protocol: 'meteora_dlmm',
@@ -171,13 +201,13 @@ export class MeteoraApiProvider implements IPositionProvider {
               lowerBinId,
               upperBinId,
               tokenX: {
-                amount: pos.amount_x || pos.amountX || '0',
+                amount: amtX,
                 decimals: decimalsX,
                 mint: tokenXMint,
                 tokenAddress: tokenXMint,
               },
               tokenY: {
-                amount: pos.amount_y || pos.amountY || '0',
+                amount: amtY,
                 decimals: decimalsY,
                 mint: tokenYMint,
                 tokenAddress: tokenYMint,

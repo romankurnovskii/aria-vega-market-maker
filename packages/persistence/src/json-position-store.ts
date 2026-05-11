@@ -8,11 +8,31 @@
  * - Simple disk-based cache for position discovery diffing
  *
  * @dependencies IPositionStore, Position (from @lp-system/core), fs/promises, path
- * @sideEffects Writes to ./data/known_positions.json on saveKnown()
+ * @sideEffects Writes to ./data/{prefix}positions.json on saveKnown()
  */
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { IPositionStore, Position } from '@lp-system/core';
+
+/**
+ * Options for configuring namespaced storage files.
+ */
+export interface StoreOptions {
+  wallet?: string;
+  env?: string;
+}
+
+/**
+ * Truncates and formats a wallet public key to a compact representation.
+ * E.g., HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTYUQh -> HU5H_YUQh
+ *
+ * @param {string} wallet - Full Solana public key or identifier.
+ * @returns {string} Sliced version of the public key.
+ */
+function getShortWallet(wallet: string): string {
+  if (wallet.length <= 8) return wallet;
+  return `${wallet.slice(0, 4)}_${wallet.slice(-4)}`;
+}
 
 /**
  * JsonPositionStore: persists known positions to a local JSON file.
@@ -22,12 +42,24 @@ export class JsonPositionStore implements IPositionStore {
   private knownPositionsPath: string;
 
   /**
-   * Constructs the store with a directory path where known_positions.json will be stored.
+   * Constructs the store with a directory path and optional namespacing options.
    *
    * @param {string} directoryPath - Base directory for persistence files.
+   * @param {StoreOptions} [options] - Optional namespacing configuration.
    */
-  constructor(private directoryPath: string) {
-    this.knownPositionsPath = path.join(directoryPath, 'known_positions.json');
+  constructor(
+    private directoryPath: string,
+    options?: StoreOptions
+  ) {
+    const parts: string[] = [];
+    if (options?.wallet) {
+      parts.push(getShortWallet(options.wallet));
+    }
+    if (options?.env) {
+      parts.push(options.env);
+    }
+    const filename = parts.length > 0 ? `${parts.join('_')}_positions.json` : 'known_positions.json';
+    this.knownPositionsPath = path.join(directoryPath, filename);
   }
 
   /**
