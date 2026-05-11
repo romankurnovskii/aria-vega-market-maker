@@ -31,11 +31,11 @@ import { startDiscovery, startTickLoop } from './lifecycle.js';
 import { startHttpServer } from './server.js';
 import { IRpcProvider } from '@lp-system/core';
 
-const TICK_INTERVAL_MS = Number(process.env.TICK_INTERVAL_MS) || 10000;
-const METEORA_API_URL = process.env.METEORA_API_URL || 'https://dlmm.datapi.meteora.ag'
-const HELIUS_URL = process.env.HELIUS_URL
+const TICK_INTERVAL_MS = Number(process.env.TICK_INTERVAL_MS) || 60_000;
+const METEORA_API_URL = process.env.METEORA_API_URL || 'https://dlmm.datapi.meteora.ag';
+const HELIUS_URL = process.env.HELIUS_URL;
+const HELIUS_URL_2 = process.env.HELIUS_URL_2;
 const SOLANA_URL = process.env.SOLANA_URL || 'https://api.mainnet-beta.solana.com';
-const SHYFT_URL = process.env.SHYFT_URL;
 
 const logger = getLogger('engine');
 
@@ -67,9 +67,11 @@ async function main() {
       logger.info(
         `[Keypair] Successfully loaded signing wallet keypair. PublicKey: ${keypair.publicKey.toBase58()}`
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error(
-        `[Keypair] FATAL: Invalid private key configured in production. Crashing to prevent silent failures. Error: ${error.message}`
+        `[Keypair] FATAL: Invalid private key configured in production. Crashing to prevent silent failures. Error: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
       process.exit(1);
     }
@@ -81,8 +83,12 @@ async function main() {
         logger.info(
           `[Keypair] Successfully loaded signing wallet keypair. PublicKey: ${keypair.publicKey.toBase58()}`
         );
-      } catch (error: any) {
-        logger.error(`[Keypair] Failed to parse private key from Base64: ${error.message}`);
+      } catch (error: unknown) {
+        logger.error(
+          `[Keypair] Failed to parse private key from Base64: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
         logger.info(`[Keypair] Falling back to a random keypair for simulation/development.`);
         keypair = Keypair.generate();
       }
@@ -97,13 +103,13 @@ async function main() {
   const walletAddress = process.env.WALLET_PUBKEY || keypair.publicKey.toBase58();
 
   logger.info(`[Config] Target Wallet: ${walletAddress}`);
-  logger.info(`[Config] Tick Interval: ${TICK_INTERVAL_MS}ms`);
+  logger.info(`[Config] Tick Interval: ${TICK_INTERVAL_MS / 1000}s`);
 
   // 1. Providers initialization
   const rpcProviders: IRpcProvider[] = [];
-  if (SHYFT_URL) rpcProviders.push(new SolanaRpcProvider(SHYFT_URL));
   if (SOLANA_URL) rpcProviders.push(new SolanaRpcProvider(SOLANA_URL));
   if (HELIUS_URL) rpcProviders.push(new HeliusRpcProvider(HELIUS_URL));
+  if (HELIUS_URL_2) rpcProviders.push(new HeliusRpcProvider(HELIUS_URL_2));
   const rpcPool = new RpcPool(rpcProviders);
 
   const positionProvider = new MeteoraApiProvider(METEORA_API_URL);
@@ -151,7 +157,8 @@ async function main() {
     registry,
     executionGate,
     executor,
-    store
+    store,
+    rpcPool
   );
 
   startHttpServer(store, registry, executor, factory, positionProvider, walletAddress);
