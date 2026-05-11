@@ -9,7 +9,7 @@ export const stringify = (object: any): string => {
     depth: 10,
     maxArrayLength: null,
     breakLength: 25_000,
-    maxStringLength: 25_000
+    maxStringLength: 25_000,
   });
 };
 

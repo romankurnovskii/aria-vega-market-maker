@@ -1,7 +1,12 @@
 import path from 'node:path';
 import process from 'node:process';
 import fs from 'node:fs';
-import { createLogger as winstonCreateLogger, format, transports, Logger as LoggerWinston } from 'winston';
+import {
+  createLogger as winstonCreateLogger,
+  format,
+  transports,
+  Logger as LoggerWinston,
+} from 'winston';
 import dotenv from 'dotenv';
 import { LOCAL_DB_LOGS_PATH } from '@lp-system/config';
 import { stringify } from './helpers.js';
@@ -10,7 +15,10 @@ import { stringify } from './helpers.js';
 try {
   fs.mkdirSync(LOCAL_DB_LOGS_PATH, { recursive: true });
 } catch (error) {
-  console.error(`[logger-init] Failed to create logs directory at ${LOCAL_DB_LOGS_PATH}:`, error);
+  console.error(
+    `[logger-init] Failed to create logs directory at ${LOCAL_DB_LOGS_PATH}:`,
+    error
+  );
 }
 
 const isDocker = (process.env.DOCKER_ENV || 'false').toLowerCase() === 'true';
@@ -38,7 +46,7 @@ function processArguments(arguments_: any[]): string {
               {
                 ...argument,
                 message: argument.message,
-                stack: argument.stack
+                stack: argument.stack,
               },
               null,
               1
@@ -79,13 +87,24 @@ export const getLogger = (serviceName: string): LoggerWinston => {
     ),
     transports: [
       new transports.Console({ level: LOG_LEVEL }),
-      new transports.File({ level: LOG_FILE_LEVEL, filename: path.join(LOCAL_DB_LOGS_PATH, 'all-logger.log') }),
-      new transports.File({ level: LOG_FILE_LEVEL, filename: path.join(LOCAL_DB_LOGS_PATH, `${serviceName}.log`) })
-    ]
+      new transports.File({
+        level: LOG_FILE_LEVEL,
+        filename: path.join(LOCAL_DB_LOGS_PATH, 'all-logger.log'),
+      }),
+      new transports.File({
+        level: LOG_FILE_LEVEL,
+        filename: path.join(LOCAL_DB_LOGS_PATH, `${serviceName}.log`),
+      }),
+    ],
   });
 
   // Override leveled methods to handle multiple arguments seamlessly
-  const levels: Array<'info' | 'warn' | 'error' | 'debug'> = ['info', 'warn', 'error', 'debug'];
+  const levels: Array<'info' | 'warn' | 'error' | 'debug'> = [
+    'info',
+    'warn',
+    'error',
+    'debug',
+  ];
   for (const level of levels) {
     const originalMethod = logger[level].bind(logger);
     logger[level] = (...arguments_: any[]) => {
