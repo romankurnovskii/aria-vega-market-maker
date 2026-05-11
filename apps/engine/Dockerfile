@@ -1,9 +1,10 @@
 FROM node:24-slim
 
-WORKDIR /app
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable
 
-# Install pnpm globally
-RUN npm install -g pnpm
+WORKDIR /app
 
 # Copy root workspace manifests
 COPY package.json pnpm-workspace.yaml tsconfig.base.json tsconfig.json pnpm-lock.yaml ./

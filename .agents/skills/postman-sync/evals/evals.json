@@ -1,0 +1,17 @@
+{
+  "skill_name": "postman-sync",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "We have added a new GET /api/v1/metrics endpoint to server.ts. Please sync this with the Postman collections under our aria-vega-mm workspace. Set its order to 5000 and use variables where applicable.",
+      "expected_output": "Creates a new Metrics.request.yaml file with order 5000, baseUrl variable, and empty body type.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "The parameters for the POST /assignments route in server.ts have been modified; we now also accept an optional 'allocatedAmount' number in the JSON body. Please update the relevant Postman request files to reflect this change.",
+      "expected_output": "Updates the body content inside Create Assignment.request.yaml to include 'allocatedAmount' with an example value.",
+      "files": []
+    }
+  ]
+}

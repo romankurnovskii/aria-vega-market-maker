@@ -67,4 +67,25 @@ export class OrchestratorFactory {
       mergedParams
     );
   }
+
+  /**
+   * Returns the list of unique strategy IDs registered in the system.
+   *
+   * @returns {string[]} List of registered strategy IDs.
+   */
+  public getAvailableStrategyIds(): string[] {
+    return Object.keys(this.strategies);
+  }
+
+  /**
+   * Returns metadata for all strategies registered in the system.
+   *
+   * @returns {{ id: string; description?: string }[]} Array of strategy metadata.
+   */
+  public getAvailableStrategies(): { id: string; description?: string }[] {
+    return Object.values(this.strategies).map((s) => ({
+      id: s.id,
+      description: s.description,
+    }));
+  }
 }

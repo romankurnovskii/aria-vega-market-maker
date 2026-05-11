@@ -37,6 +37,7 @@ export interface IStep {
 
 export interface IStrategy {
   id: string;
+  description: string;
   execute(
     position: Position,
     market: MarketSnapshot,

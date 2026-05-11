@@ -104,10 +104,15 @@ export class SolanaExecutor implements IExecutor {
         );
 
         // 1. Fetch on-chain positions to find active range bins
-        const activePositions = await this.provider.getOnChainPositions(this.walletAddress, market.poolAddress);
+        const activePositions = await this.provider.getOnChainPositions(
+          this.walletAddress,
+          market.poolAddress
+        );
         const onChainPos = activePositions[decision.positionId];
         if (!onChainPos) {
-          throw new Error(`Cannot close position ${decision.positionId}: not found on-chain for wallet ${this.walletAddress}`);
+          throw new Error(
+            `Cannot close position ${decision.positionId}: not found on-chain for wallet ${this.walletAddress}`
+          );
         }
 
         // 2. Parse bin range from positionData using type-safe BN checks
@@ -135,7 +140,9 @@ export class SolanaExecutor implements IExecutor {
 
         // 4. Submit and confirm each transaction sequentially
         for (let i = 0; i < closeTxs.length; i++) {
-          logger.info(`[SolanaExecutor] Executing close transaction chunk ${i + 1}/${closeTxs.length}...`);
+          logger.info(
+            `[SolanaExecutor] Executing close transaction chunk ${i + 1}/${closeTxs.length}...`
+          );
           const sig = await this.executeTx(closeTxs[i]);
           txSignatures.push(sig);
         }
@@ -175,10 +182,15 @@ export class SolanaExecutor implements IExecutor {
         logger.info(`[SolanaExecutor] Step 1/3: Closing old position ${decision.positionId}`);
 
         // 1. Close the current position on-chain
-        const activePositions = await this.provider.getOnChainPositions(this.walletAddress, market.poolAddress);
+        const activePositions = await this.provider.getOnChainPositions(
+          this.walletAddress,
+          market.poolAddress
+        );
         const onChainPos = activePositions[decision.positionId];
         if (!onChainPos) {
-          throw new Error(`Cannot close position ${decision.positionId}: not found on-chain for wallet ${this.walletAddress}`);
+          throw new Error(
+            `Cannot close position ${decision.positionId}: not found on-chain for wallet ${this.walletAddress}`
+          );
         }
 
         const lowerBinId = BN.isBN(onChainPos.positionData.lowerBinId)
@@ -199,7 +211,9 @@ export class SolanaExecutor implements IExecutor {
         });
 
         for (let i = 0; i < closeTxs.length; i++) {
-          logger.info(`[SolanaExecutor] Executing close transaction chunk ${i + 1}/${closeTxs.length}...`);
+          logger.info(
+            `[SolanaExecutor] Executing close transaction chunk ${i + 1}/${closeTxs.length}...`
+          );
           const sig = await this.executeTx(closeTxs[i]);
           txSignatures.push(sig);
         }
@@ -245,6 +259,12 @@ export class SolanaExecutor implements IExecutor {
             'Cannot execute compound close+open rebalance without an injected re-evaluation callback'
           );
         }
+
+        // Explicit 2-second sleep to prevent balance synchronization race condition
+        logger.info(
+          `[SolanaExecutor] Sleeping 2s to allow RPC nodes to synchronize token balance indices...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
         // 3. Trigger re-evaluation with the guaranteed fresh on-chain balance state
         logger.info(
@@ -330,7 +350,9 @@ export class SolanaExecutor implements IExecutor {
       tx.feePayer = this.keypair.publicKey;
 
       // 2. Simulate to get exact Compute Units (Saves money and prevents overpaying)
-      logger.info(`[SolanaExecutor] Simulating transaction to calculate exact Compute Units...`);
+      logger.info(
+        `[SolanaExecutor] Simulating transaction to calculate exact Compute Units...`
+      );
 
       const simTx = new Transaction();
       simTx.add(...tx.instructions);
@@ -356,26 +378,34 @@ export class SolanaExecutor implements IExecutor {
       const computeUnitLimit = Math.ceil(consumedUnits * 1.15); // Add a 15% safety buffer
 
       // 3. Inject Compute Budget Instructions
-      tx.instructions.unshift(ComputeBudgetProgram.setComputeUnitLimit({ units: computeUnitLimit }));
+      const computeBudgetInstructions = [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: computeUnitLimit }),
+      ];
 
       if (this.options.priorityFeeMicroLamports && this.options.priorityFeeMicroLamports > 0) {
-        tx.instructions.unshift(
-          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: this.options.priorityFeeMicroLamports })
+        computeBudgetInstructions.push(
+          ComputeBudgetProgram.setComputeUnitPrice({
+            microLamports: this.options.priorityFeeMicroLamports,
+          })
         );
       }
+
+      tx.instructions.unshift(...computeBudgetInstructions);
 
       // 4. Sign and serialize the finalized transaction
       tx.sign(this.keypair);
       const rawTx = tx.serialize();
 
       // 5. The Active Rebroadcast "Spam Loop" (UDP Delivery Assurance)
-      logger.info(`[SolanaExecutor] Broadcasting transaction with ${computeUnitLimit} CU limit (buffered)...`);
+      logger.info(
+        `[SolanaExecutor] Broadcasting transaction with ${computeUnitLimit} CU limit (buffered)...`
+      );
       let signature = '';
       let confirmed = false;
       const startTime = Date.now();
       const timeoutMs = 60000; // 60-second execution timeout
 
-      while (!confirmed && (Date.now() - startTime) < timeoutMs) {
+      while (!confirmed && Date.now() - startTime < timeoutMs) {
         try {
           // Send with skipPreflight: true since we already simulated it manually
           signature = await connection.sendRawTransaction(rawTx, {
@@ -384,13 +414,17 @@ export class SolanaExecutor implements IExecutor {
           });
 
           // Check if transaction has hit the block status index
-          const status = await connection.getSignatureStatus(signature, { searchTransactionHistory: true });
+          const status = await connection.getSignatureStatus(signature, {
+            searchTransactionHistory: true,
+          });
 
           if (status && status.value && status.value.confirmationStatus) {
             if (status.value.err) {
-              throw new Error(`Transaction failed on-chain: ${JSON.stringify(status.value.err)}`);
+              throw new Error(
+                `Transaction failed on-chain: ${JSON.stringify(status.value.err)}`
+              );
             }
-            
+
             // Only consider confirmed or finalized consensus status as complete (supermajority consensus)
             const confStatus = status.value.confirmationStatus;
             if (confStatus === 'confirmed' || confStatus === 'finalized') {
@@ -411,10 +445,14 @@ export class SolanaExecutor implements IExecutor {
       }
 
       if (!confirmed) {
-        throw new Error(`Transaction ${signature} timed out after ${timeoutMs}ms without confirmation.`);
+        throw new Error(
+          `Transaction ${signature} timed out after ${timeoutMs}ms without confirmation.`
+        );
       }
 
-      logger.info(`[SolanaExecutor] Transaction successfully confirmed on-chain: ${signature}`);
+      logger.info(
+        `[SolanaExecutor] Transaction successfully confirmed on-chain: ${signature}`
+      );
       return signature;
     });
   }

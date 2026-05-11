@@ -8,6 +8,9 @@
  * @dependencies None
  * @sideEffects None
  */
+import { getLogger } from '@lp-system/logger';
+const logger = getLogger('steps');
+logger.info('Steps package loaded');
 export { InitializationCheckStep } from './initialization-check-step.js';
 export { TrailingRangeCheckStep } from './trailing-range-check-step.js';
 export { RangeCalculatorStep } from './range-calculator-step.js';

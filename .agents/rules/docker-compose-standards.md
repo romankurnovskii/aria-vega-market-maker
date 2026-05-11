@@ -196,60 +196,16 @@ networks:
 
 ## 7. Security & Execution Rules
 
-- **Data Safety**: Never run the engine without a persistent volume mapped to `/app/data`. The system relies on local JSON adapters (`@lp-system/persistence`) and will wipe positions/assignments if run purely ephemeral.
-- **Networking**: Never expose internal database or metric ports to the host in production. Use `expose` (internal Docker network) rather than `ports` (host bind).
+- **Data Safety & Persistence Mandate**: Both Section 5 (Development) and Section 6 (Production) **must** mount `./data` to `/app/data` (directly or via named volumes) to prevent the LP bot from losing critical trading state, assignments, and logs on restarts. The system relies on local JSON adapters (`@lp-system/persistence`) and will wipe positions/assignments if run purely ephemeral.
+- **Networking**: Never expose internal ports to the host in production. Use `expose` (internal Docker network) rather than `ports` (host bind).
 
 ---
 
-## 11. Common Commands Reference
+## 8. Useful Commands
+
+Use the following command to tail logs for the market-maker engine:
 
 ```bash
-# Start dev environment
-docker compose -f docker-compose.dev.yml up --build
-
-# Start dev in background
-docker compose -f docker-compose.dev.yml up -d --build
-
-# Tail logs for one service
-docker compose -f docker-compose.dev.yml logs -f backend
-
-# Rebuild a single service without restarting others
-docker compose -f docker-compose.dev.yml up -d --build backend
-
-# Run a one-off command (e.g. Alembic migration) in dev
-docker compose -f docker-compose.dev.yml exec backend alembic upgrade head
-
-# Stop and remove containers (keep volumes)
-docker compose -f docker-compose.dev.yml down
-
-# Stop and remove containers AND volumes (wipe DB)
-docker compose -f docker-compose.dev.yml down -v
-
-# Production deploy (on remote server, .env.prod already present)
-docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d --build
+# Tail logs for the market-maker engine
+docker compose -f docker-compose.dev.yml logs -f market-maker
 ```
-
----
-
-## 12. Security Rules
-
-- Never use `env_file: .env.prod` in a dev Compose file — a stale local `.env.prod`
-  would silently point your dev containers at production databases.
-- Never expose database ports (`27017`, `5432`) in prod — use `expose` (internal only),
-  not `ports` (binds to host network).
-- Nginx config and certs are always mounted `:ro` (read-only).
-- `SECRET_KEY`, `MONGODB_URL`, and `POSTGRES_URL` must never appear in a committed file.
-  They live only in `.env` (local) and `.env.prod` (remote).
-
----
-
-## 13. Feature Checklist (Adding a New Service)
-
-1. Add the service to **both** `docker-compose.dev.yml` and `docker-compose.prod.yml`.
-2. Add any new env vars to **`.env.example`** with blank values.
-3. Add the actual values to **`.env`** locally and update the remote `.env.prod` on the server.
-4. Add a `healthcheck` to the new service.
-5. Add `depends_on: condition: service_healthy` on any service that depends on it.
-6. If it has persistent data, declare a named volume and add it to the top-level `volumes:` block.
-7. Verify `.env` and `.env.prod` remain in `.gitignore`.

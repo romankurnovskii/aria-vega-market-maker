@@ -35,6 +35,7 @@ const logger = getLogger('trailing-usdc-strategy');
  */
 export class TrailingUsdcStrategy implements IStrategy {
   public id = 'trailing-usdc';
+  public description = 'Dynamic range trailing for USDC pairs using Meteora DLMM';
   private workflow: Workflow;
 
   /**
@@ -81,6 +82,10 @@ export class TrailingUsdcStrategy implements IStrategy {
       params: mergedParams,
     };
 
+    logger.info(
+      `[TrailingUsdcStrategy] Market snapshot - active bound: ${market.activeBound}, position range: [${position.lowerBound}, ${position.upperBound}]`
+    );
+
     const finalContext = await this.workflow.run(initialContext);
 
     logger.info(
@@ -88,6 +93,7 @@ export class TrailingUsdcStrategy implements IStrategy {
     );
 
     if (finalContext.signal === 'close+open' && finalContext.openParams) {
+      logger.info(`[TrailingUsdcStrategy] Decision: close+open with params`);
       return {
         action: 'close+open',
         openParams: finalContext.openParams,
@@ -95,18 +101,21 @@ export class TrailingUsdcStrategy implements IStrategy {
     }
 
     if (finalContext.signal === 'close') {
+      logger.info(`[TrailingUsdcStrategy] Decision: close`);
       return {
         action: 'close',
       };
     }
 
     if (finalContext.signal === 'open' && finalContext.openParams) {
+      logger.info(`[TrailingUsdcStrategy] Decision: open with params`);
       return {
         action: 'open',
         params: finalContext.openParams,
       };
     }
 
+    logger.info(`[TrailingUsdcStrategy] Decision: skip`);
     return {
       action: 'skip',
     };
