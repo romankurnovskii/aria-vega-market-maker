@@ -1,0 +1,117 @@
+/**
+ * @file types.ts
+ * @description TypeScript types for Meteora DLMM REST API responses.
+ *
+ * @features
+ * - PoolResponse: Full pool metadata and current state (GET /pools/{address})
+ * - ErrorResponse: API error response (400)
+ * - CumulativeMetrics: Aggregate volume, trade fee, and protocol fee
+ * - TimeWindowData: Time-windowed metrics (30m / 1h / 2h / 4h / 12h / 24h)
+ * - PoolConfig: Pool configuration (bin step, fee rates)
+ * - TokenMetrics: Token metadata (price, supply, holders, etc.)
+ *
+ * @dependencies None — standalone API response types
+ * @sideEffects None — type definitions only
+ */
+
+// ---------------------------------------------------------------------------
+// Top-level response types
+// ---------------------------------------------------------------------------
+
+export interface PoolResponse {
+  address: string; // Base58-encoded pool address
+  apr: number; // 24 hour APR
+  apy: number; // 24 hour APY
+  created_at: number; // Pool created at timestamp (int64)
+  cumulative_metrics: CumulativeMetrics;
+  current_price: number; // Price of the liquidity pair
+  dynamic_fee_pct: number; // Dynamic fee rate — base fee + variable fee
+  farm_apr: number; // Farm reward APR
+  farm_apy: number; // Farm reward APY
+  fee_tvl_ratio: TimeWindowData;
+  fees: TimeWindowData;
+  has_farm: boolean;
+  is_blacklisted: boolean;
+  name: string;
+  pool_config: PoolConfig;
+  protocol_fees: TimeWindowData;
+  reserve_x: string;
+  reserve_y: string;
+  reward_mint_x: string;
+  reward_mint_y: string;
+  tags: string[];
+  token_x: TokenMetrics;
+  token_x_amount: number;
+  token_y: TokenMetrics;
+  token_y_amount: number;
+  /**
+   * Total Value Locked — total liquidity the liquidity pair holds.
+   */
+  tvl: number;
+  volume: TimeWindowData;
+  launchpad: string | null;
+}
+
+export interface ErrorResponse {
+  message: string;
+}
+
+// ---------------------------------------------------------------------------
+// Component schemas
+// ---------------------------------------------------------------------------
+
+export interface CumulativeMetrics {
+  protocol_fee: number;
+  trade_fee: number;
+  volume: number;
+}
+
+export interface TimeWindowData {
+  "30m": number;
+  "1h": number;
+  "2h": number;
+  "4h": number;
+  "12h": number;
+  "24h": number;
+}
+
+export interface PoolConfig {
+  base_fee_pct: number;
+  bin_step: number;
+  max_fee_pct: number;
+  protocol_fee_pct: number;
+}
+
+export interface TokenMetrics {
+  address: string;
+  decimals: number;
+  freeze_authority_disabled: boolean;
+  holders: number;
+  is_verified: boolean;
+  market_cap: number;
+  name: string;
+  price: number;
+  symbol: string;
+  total_supply: number;
+}
+
+// ---------------------------------------------------------------------------
+// OHLCV Timeseries response types
+// ---------------------------------------------------------------------------
+
+export interface OhlcvCandle {
+  timestamp: number; // Unix timestamp in seconds
+  timestamp_str: string; // ISO-8601 string representation
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export interface OhlcvResponse {
+  start_time: number;
+  end_time: number;
+  timeframe: string | null;
+  data: OhlcvCandle[];
+}
