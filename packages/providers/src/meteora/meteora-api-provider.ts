@@ -13,13 +13,19 @@
 import { IPositionProvider, Position, PoolInfo, MarketSnapshot } from '@lp-system/core';
 import { PoolResponse, OhlcvResponse, PositionsPnlResponse } from './types';
 import { getBinIdFromPrice } from './meteora.utils';
+import { getLogger } from '@lp-system/logger';
+
+const logger = getLogger('meteora-api-provider');
 
 /**
  * Meteora API provider for position and market data.
  * Currently uses mock data; replace with real API calls in production.
  */
 export class MeteoraApiProvider implements IPositionProvider {
-  private poolTokenMetadataCache = new Map<string, { decimalsX: number; decimalsY: number; tokenXMint: string; tokenYMint: string }>();
+  private poolTokenMetadataCache = new Map<
+    string,
+    { decimalsX: number; decimalsY: number; tokenXMint: string; tokenYMint: string }
+  >();
 
   /**
    * Constructs the provider with the Meteora API base URL.
@@ -34,7 +40,12 @@ export class MeteoraApiProvider implements IPositionProvider {
    * Fetches full token metadata (decimals and addresses) for a given pool address dynamically.
    * Caches results to prevent redundant API queries.
    */
-  private async getPoolTokenMetadata(poolAddress: string): Promise<{ decimalsX: number; decimalsY: number; tokenXMint: string; tokenYMint: string }> {
+  private async getPoolTokenMetadata(poolAddress: string): Promise<{
+    decimalsX: number;
+    decimalsY: number;
+    tokenXMint: string;
+    tokenYMint: string;
+  }> {
     const cached = this.poolTokenMetadataCache.get(poolAddress);
     if (cached) return cached;
 
@@ -57,7 +68,9 @@ export class MeteoraApiProvider implements IPositionProvider {
         return metadata;
       }
     } catch (err) {
-      console.warn(`[MeteoraApiProvider] Failed to fetch token metadata for pool ${poolAddress}:`, err);
+      logger.warn(
+        `[MeteoraApiProvider] Failed to fetch token metadata for pool ${poolAddress}: ${err}`
+      );
     }
 
     throw new Error(`Failed to retrieve token metadata for pool ${poolAddress}`);
@@ -73,7 +86,7 @@ export class MeteoraApiProvider implements IPositionProvider {
    * @returns {Promise<Position[]>} Array of position objects.
    */
   public async getPositions(walletAddress: string, poolAddress?: string): Promise<Position[]> {
-    console.log(
+    logger.info(
       `[MeteoraApiProvider] Querying positions for wallet ${walletAddress} from API: ${this.apiUrl}`
     );
 
@@ -93,20 +106,23 @@ export class MeteoraApiProvider implements IPositionProvider {
         });
 
         if (portfolioResponse.ok) {
-          const portfolioData = await portfolioResponse.json() as any;
+          const portfolioData = (await portfolioResponse.json()) as any;
           const pools = Array.isArray(portfolioData)
             ? portfolioData
-            : (portfolioData.data || portfolioData.pools || []);
+            : portfolioData.data || portfolioData.pools || [];
 
           for (const p of pools) {
-            const addr = typeof p === 'string' ? p : (p.address || p.pool_address || p.poolAddress);
+            const addr =
+              typeof p === 'string' ? p : p.address || p.pool_address || p.poolAddress;
             if (addr) {
               poolsToQuery.push(addr);
             }
           }
         }
       } catch (err) {
-        console.warn(`[MeteoraApiProvider] Failed to fetch open portfolio for ${walletAddress}:`, err);
+        logger.warn(
+          `[MeteoraApiProvider] Failed to fetch open portfolio for ${walletAddress}: ${err}`
+        );
       }
     }
 
@@ -116,7 +132,7 @@ export class MeteoraApiProvider implements IPositionProvider {
       try {
         const metadataPromise = this.getPoolTokenMetadata(pool);
         const url = `${this.apiUrl}/positions/${pool}/pnl?user=${walletAddress}&status=open&pageSize=200&page=1`;
-        console.log(`[MeteoraApiProvider] Fetching positions PnL from Datapi for pool ${pool}`);
+        logger.info(`[MeteoraApiProvider] Fetching positions PnL from Datapi for pool ${pool}`);
 
         const response = await fetch(url, {
           headers: {
@@ -126,7 +142,9 @@ export class MeteoraApiProvider implements IPositionProvider {
         });
 
         if (!response.ok) {
-          console.warn(`[MeteoraApiProvider] Failed to fetch positions PnL from Datapi: ${response.status} ${response.statusText}`);
+          logger.warn(
+            `[MeteoraApiProvider] Failed to fetch positions PnL from Datapi: ${response.status} ${response.statusText}`
+          );
           continue;
         }
 
@@ -135,9 +153,12 @@ export class MeteoraApiProvider implements IPositionProvider {
 
         if (result && Array.isArray(result.positions)) {
           for (const pos of result.positions) {
-            const lowerBinId = pos.lower_bin_id !== undefined ? pos.lower_bin_id : (pos.lowerBinId ?? 0);
-            const upperBinId = pos.upper_bin_id !== undefined ? pos.upper_bin_id : (pos.upperBinId ?? 0);
-            const isInRange = pos.is_in_range !== undefined ? pos.is_in_range : (pos.isInRange ?? true);
+            const lowerBinId =
+              pos.lower_bin_id !== undefined ? pos.lower_bin_id : (pos.lowerBinId ?? 0);
+            const upperBinId =
+              pos.upper_bin_id !== undefined ? pos.upper_bin_id : (pos.upperBinId ?? 0);
+            const isInRange =
+              pos.is_in_range !== undefined ? pos.is_in_range : (pos.isInRange ?? true);
             const openedAt = pos.opened_at || Date.now() - 3600000;
 
             allPositions.push({
@@ -171,7 +192,7 @@ export class MeteoraApiProvider implements IPositionProvider {
           }
         }
       } catch (err) {
-        console.warn(`[MeteoraApiProvider] Failed to fetch positions for pool ${pool}:`, err);
+        logger.warn(`[MeteoraApiProvider] Failed to fetch positions for pool ${pool}: ${err}`);
       }
     }
 
@@ -186,11 +207,13 @@ export class MeteoraApiProvider implements IPositionProvider {
    * @returns {Promise<Position>} The position object.
    */
   public async getPosition(positionId: string): Promise<Position> {
-    console.log(`[MeteoraApiProvider] Fetching position details for ${positionId}`);
+    logger.info(`[MeteoraApiProvider] Fetching position details for ${positionId}`);
 
     const walletAddress = process.env.WALLET_PUBKEY;
     if (!walletAddress) {
-      throw new Error('Cannot fetch position: WALLET_PUBKEY is not configured in process environment');
+      throw new Error(
+        'Cannot fetch position: WALLET_PUBKEY is not configured in process environment'
+      );
     }
 
     const positions = await this.getPositions(walletAddress);
@@ -210,7 +233,7 @@ export class MeteoraApiProvider implements IPositionProvider {
    * @returns {Promise<PoolInfo>} Pool configuration and token addresses.
    */
   public async getPoolInfo(poolAddress: string): Promise<PoolInfo> {
-    console.log(`[MeteoraApiProvider] Fetching pool metadata for ${poolAddress}`);
+    logger.info(`[MeteoraApiProvider] Fetching pool metadata for ${poolAddress}`);
     const url = `${this.apiUrl}/pools/${poolAddress}`;
 
     const response = await fetch(url, {
@@ -259,7 +282,7 @@ export class MeteoraApiProvider implements IPositionProvider {
    * @returns {Promise<MarketSnapshot>} Live market data including price history.
    */
   public async getMarketSnapshot(poolAddress: string): Promise<MarketSnapshot> {
-    console.log(`[MeteoraApiProvider] Assembling Market Snapshot for pool ${poolAddress}`);
+    logger.info(`[MeteoraApiProvider] Assembling Market Snapshot for pool ${poolAddress}`);
 
     const poolInfoUrl = `${this.apiUrl}/pools/${poolAddress}`;
     const poolResponse = await fetch(poolInfoUrl, {
@@ -311,13 +334,12 @@ export class MeteoraApiProvider implements IPositionProvider {
             .slice(-24);
         }
       } catch (err) {
-        console.warn(
-          `[MeteoraApiProvider] Failed to parse OHLCV data for pool ${poolAddress}:`,
-          err
+        logger.warn(
+          `[MeteoraApiProvider] Failed to parse OHLCV data for pool ${poolAddress}: ${err}`
         );
       }
     } else {
-      console.warn(
+      logger.warn(
         `[MeteoraApiProvider] Failed to fetch OHLCV data: ${ohlcvResponse.status} ${ohlcvResponse.statusText}`
       );
     }

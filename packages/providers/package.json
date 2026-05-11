@@ -6,13 +6,14 @@
   "types": "dist/index.d.ts",
   "dependencies": {
     "@lp-system/core": "workspace:*",
+    "@lp-system/logger": "workspace:*",
     "@solana/web3.js": "^1.98.4"
   },
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "test": "node --test src/**/*.test.ts",
-    "test:coverage": "node --experimental-test-coverage --test src/**/*.test.ts",
-    "test:watch": "nodemon --exec \"npm test\" --watch src"
+    "test": "tsc && node --test dist/**/*.test.js",
+    "test:coverage": "tsc && node --experimental-test-coverage --test dist/**/*.test.js",
+    "test:watch": "nodemon --exec 'pnpm run test' --watch src --ext ts"
   }
 }
