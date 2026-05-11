@@ -67,12 +67,12 @@ export interface CumulativeMetrics {
 }
 
 export interface TimeWindowData {
-  "30m": number;
-  "1h": number;
-  "2h": number;
-  "4h": number;
-  "12h": number;
-  "24h": number;
+  '30m': number;
+  '1h': number;
+  '2h': number;
+  '4h': number;
+  '12h': number;
+  '24h': number;
 }
 
 export interface PoolConfig {
