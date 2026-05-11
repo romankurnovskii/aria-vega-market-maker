@@ -14,7 +14,13 @@ services:
       - ./packages:/app/packages
       - ./data:/app/data
     healthcheck:
-      test: ['CMD', 'node', '-e', "import('http').then(http => http.get('http://localhost:3000/health', r => process.exit(r.statusCode === 200 ? 0 : 1)))"]
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "import('http').then(http => http.get('http://localhost:3000/health', r => process.exit(r.statusCode === 200 ? 0 : 1)))",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5

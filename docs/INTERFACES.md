@@ -5,6 +5,7 @@ This document lists the formal models and contracts shared across all packages i
 ## Type Definitions
 
 ### TokenAmount
+
 ```ts
 export interface TokenAmount {
   amount: string; // BigInt or string representation
@@ -14,6 +15,7 @@ export interface TokenAmount {
 ```
 
 ### OpenParams
+
 ```ts
 export interface OpenParams {
   poolAddress: string;
@@ -26,6 +28,7 @@ export interface OpenParams {
 ```
 
 ### PricePoint
+
 ```ts
 export interface PricePoint {
   price: number;
@@ -34,6 +37,7 @@ export interface PricePoint {
 ```
 
 ### Position
+
 ```ts
 export interface Position {
   id: string; // on-chain pubkey
@@ -49,6 +53,7 @@ export interface Position {
 ```
 
 ### MarketSnapshot
+
 ```ts
 export interface MarketSnapshot {
   poolAddress: string;
@@ -61,6 +66,7 @@ export interface MarketSnapshot {
 ```
 
 ### StepContext
+
 ```ts
 export interface StepContext {
   position: Position;
@@ -73,6 +79,7 @@ export interface StepContext {
 ```
 
 ### StrategyResult
+
 ```ts
 export type StrategyResult =
   | { action: 'skip' }
@@ -86,6 +93,7 @@ export type StrategyResult =
 ## Core Interfaces
 
 ### IStep
+
 ```ts
 export interface IStep {
   name: string;
@@ -94,14 +102,20 @@ export interface IStep {
 ```
 
 ### IStrategy
+
 ```ts
 export interface IStrategy {
   id: string;
-  execute(position: Position, market: MarketSnapshot, params: Record<string, unknown>): Promise<StrategyResult>;
+  execute(
+    position: Position,
+    market: MarketSnapshot,
+    params: Record<string, unknown>
+  ): Promise<StrategyResult>;
 }
 ```
 
 ### IOrchestrator
+
 ```ts
 export interface IOrchestrator {
   id: string;
@@ -114,6 +128,7 @@ export interface IOrchestrator {
 ```
 
 ### IExecutionGate
+
 ```ts
 export interface IExecutionGate {
   consider(recommendations: Recommendation[], positionId: string): Decision | null;
@@ -121,6 +136,7 @@ export interface IExecutionGate {
 ```
 
 ### IExecutor
+
 ```ts
 export interface IExecutor {
   apply(
@@ -133,6 +149,7 @@ export interface IExecutor {
 ```
 
 ### IPositionProvider
+
 ```ts
 export interface IPositionProvider {
   getPositions(walletAddress: string): Promise<Position[]>;
