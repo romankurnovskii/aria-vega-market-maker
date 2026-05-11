@@ -1,3 +1,21 @@
+/**
+ * @file interfaces.ts
+ * @description Core interface definitions for domain services, strategies, and orchestration components.
+ *
+ * @features
+ * - IStep: Executable pipeline step with context transformation
+ * - IStrategy: Strategy interface for trading decisions (execute → StrategyResult)
+ * - IOrchestrator: Per-position orchestrator managing strategy lifecycle
+ * - IExecutionGate: Decision filtering and prioritization gate
+ * - IExecutor: Transaction execution handler for on-chain operations
+ * - IPositionProvider: External data source abstraction for positions/markets
+ * - IRpcProvider: RPC connection abstraction with retry logic
+ * - IStore / IPositionStore: Persistence layer interfaces
+ * - IOrchestratorRegistry: In-memory orchestrator lifecycle manager
+ *
+ * @dependencies None — defines contract types only
+ * @sideEffects None
+ */
 import {
   Position,
   MarketSnapshot,
@@ -7,7 +25,7 @@ import {
   ExecutionRecord,
   StrategyResult,
   Assignment,
-  StepContext
+  StepContext,
 } from './types';
 
 export type ConnectionPlaceholder = any;
@@ -19,7 +37,11 @@ export interface IStep {
 
 export interface IStrategy {
   id: string;
-  execute(position: Position, market: MarketSnapshot, params: Record<string, unknown>): Promise<StrategyResult>;
+  execute(
+    position: Position,
+    market: MarketSnapshot,
+    params: Record<string, unknown>
+  ): Promise<StrategyResult>;
 }
 
 export interface IOrchestrator {
