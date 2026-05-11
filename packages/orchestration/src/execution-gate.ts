@@ -15,6 +15,9 @@ import { IExecutionGate, Recommendation, Decision } from '@lp-system/core';
 /**
  * ExecutionGate: filters and prioritizes strategy recommendations into executable decisions.
  */
+import { getLogger } from '@lp-system/logger';
+const logger = getLogger('execution-gate');
+
 export class ExecutionGate implements IExecutionGate {
   /**
    * Evaluates recommendations and returns highest priority actionable decision, or null.
@@ -30,7 +33,9 @@ export class ExecutionGate implements IExecutionGate {
       return null;
     }
 
-    console.log(`[ExecutionGate] Evaluating ${recommendations.length} recommendations for position ${positionId}`);
+    logger.info(
+      `[ExecutionGate] Evaluating ${recommendations.length} recommendations for position ${positionId}`
+    );
 
     // Prioritize rebalance signals ('close+open'), then 'close', then 'open'
     const actionablePriorities = ['close+open', 'close', 'open'] as const;
@@ -43,17 +48,19 @@ export class ExecutionGate implements IExecutionGate {
           match.result.action === 'close+open'
             ? match.result.openParams
             : match.result.action === 'open'
-            ? match.result.params
-            : undefined;
+              ? match.result.params
+              : undefined;
 
-        console.log(`[ExecutionGate] Decision Gated: Approved '${action}' triggered by assignment ${match.assignmentId}`);
+        logger.info(
+          `[ExecutionGate] Decision Gated: Approved '${action}' triggered by assignment ${match.assignmentId}`
+        );
 
         return {
           positionId,
           action,
           openParams,
           sourceAssignmentId: match.assignmentId,
-          evaluatedAt: Date.now()
+          evaluatedAt: Date.now(),
         };
       }
     }

@@ -6,6 +6,7 @@
   "types": "dist/index.d.ts",
   "dependencies": {
     "@lp-system/core": "workspace:*",
+    "@lp-system/logger": "workspace:*",
     "@lp-system/strategy": "workspace:*"
   },
   "scripts": {
