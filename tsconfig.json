@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "files": [],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/persistence" },
+    { "path": "./packages/providers" },
+    { "path": "./packages/steps" },
+    { "path": "./packages/strategy" },
+    { "path": "./packages/orchestration" },
+    { "path": "./packages/executor" },
+    { "path": "./apps/engine" }
+  ]
+}

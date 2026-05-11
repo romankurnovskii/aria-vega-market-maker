@@ -1,0 +1,16 @@
+{
+  "name": "@lp-system/executor",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "@lp-system/core": "workspace:*",
+    "@lp-system/providers": "workspace:*",
+    "@solana/web3.js": "^1.91.1"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  }
+}

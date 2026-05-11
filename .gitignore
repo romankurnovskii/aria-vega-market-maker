@@ -1,0 +1,23 @@
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+
+# Environmental secrets
+.env
+.env.prod
+.env.local
+
+# Persistent local DB files
+data/
+*.json.bak
+
+# IDE & system files
+.DS_Store
+.idea/
+.vscode/
+.dev/data/

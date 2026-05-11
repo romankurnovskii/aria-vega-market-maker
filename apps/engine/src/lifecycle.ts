@@ -1,0 +1,132 @@
+import {
+  IPositionProvider,
+  IPositionStore,
+  IStore,
+  IOrchestratorRegistry,
+  IExecutionGate,
+  IExecutor,
+  Recommendation,
+  Decision
+} from '@lp-system/core';
+import { OrchestratorFactory } from '@lp-system/orchestration';
+
+export async function startDiscovery(
+  walletAddress: string,
+  positionProvider: IPositionProvider,
+  positionStore: IPositionStore,
+  factory: OrchestratorFactory,
+  store: IStore,
+  registry: IOrchestratorRegistry
+): Promise<void> {
+  console.log('[Discovery] Triggering position discovery cycle...');
+
+  // 1. Fetch live positions and known persisted positions
+  const livePositions = await positionProvider.getPositions(walletAddress);
+  const knownPositions = await positionStore.getKnown();
+  const assignments = await store.getAssignments();
+
+  const liveIds = new Set(livePositions.map((p) => p.id));
+  const knownIds = new Set(knownPositions.map((p) => p.id));
+
+  // 2. Identify new positions
+  for (const livePos of livePositions) {
+    if (!knownIds.has(livePos.id)) {
+      console.log(`[Discovery] Discovered new live position: ${livePos.id}`);
+      
+      // Match with stored assignments
+      const matchingAssignments = assignments.filter((a) => a.positionId === livePos.id);
+      for (const assignment of matchingAssignments) {
+        const orchestrator = factory.create(assignment);
+        registry.register(orchestrator);
+      }
+    }
+  }
+
+  // 3. Identify closed/removed positions
+  for (const knownPos of knownPositions) {
+    if (!liveIds.has(knownPos.id)) {
+      console.log(`[Discovery] Known position ${knownPos.id} is no longer on-chain. Pruning.`);
+      
+      const activeOrchestrators = registry.getForPosition(knownPos.id);
+      for (const orch of activeOrchestrators) {
+        registry.deregister(orch.id);
+      }
+    }
+  }
+
+  // 4. Update local tracking store
+  await positionStore.saveKnown(livePositions);
+  console.log('[Discovery] Discovery cycle finalized successfully.');
+}
+
+export function startTickLoop(
+  intervalMs: number,
+  walletAddress: string,
+  positionProvider: IPositionProvider,
+  positionStore: IPositionStore,
+  registry: IOrchestratorRegistry,
+  executionGate: IExecutionGate,
+  executor: IExecutor,
+  store: IStore
+): NodeJS.Timeout {
+  console.log(`[Tick Loop] Launching continuous evaluation tick loop for wallet ${walletAddress}. Interval: ${intervalMs}ms`);
+
+  const loop = setInterval(async () => {
+    try {
+      console.log('\n[Tick Loop] Starting tick execution cycle...');
+      const knownPositions = await positionStore.getKnown();
+
+      for (const position of knownPositions) {
+        console.log(`[Tick Loop] Evaluating position ${position.id}`);
+
+        // Fetch fresh status and snapshot
+        const freshPosition = await positionProvider.getPosition(position.id);
+        const market = await positionProvider.getMarketSnapshot(freshPosition.poolAddress);
+        const orchestrators = registry.getForPosition(freshPosition.id);
+
+        const activeResults: Recommendation[] = [];
+
+        for (const orch of orchestrators) {
+          try {
+            const result = await orch.tick(freshPosition, market);
+            if (result.action !== 'skip' && orch.mode === 'active') {
+              activeResults.push({ assignmentId: orch.assignmentId, result });
+            }
+          } catch (orchError: any) {
+            console.error(`[Tick Loop] Orchestrator ${orch.id} failed tick: ${orchError.message || orchError}`);
+          }
+        }
+
+        // Pass active recommendations through execution gate
+        const decision: Decision | null = executionGate.consider(activeResults, freshPosition.id);
+
+        if (decision) {
+          console.log(`[Tick Loop] Executable decision gated. Dispatched to executor...`);
+          // SolanaExecutor uses RpcPool for Connection. We pass our global executor apply.
+          const record = await executor.apply(decision, market, async (posId: string) => {
+            console.log(`[Re-Evaluation Callback] Initiated for position: ${posId}`);
+            const updatedPos = await positionProvider.getPosition(posId);
+            const updatedMarket = await positionProvider.getMarketSnapshot(updatedPos.poolAddress);
+            const activeOrchs = registry.getForPosition(posId);
+
+            for (const o of activeOrchs) {
+              const res = await o.tick(updatedPos, updatedMarket);
+              if (res.action !== 'skip') {
+                return res;
+              }
+            }
+            return { action: 'skip' };
+          });
+
+          await store.saveExecutionRecord(record);
+        } else {
+          console.log(`[Tick Loop] No execution required for position ${position.id}`);
+        }
+      }
+    } catch (error: any) {
+      console.error(`[Tick Loop] Fatal error during tick execution cycle: ${error.message || error}`);
+    }
+  }, intervalMs);
+
+  return loop;
+}

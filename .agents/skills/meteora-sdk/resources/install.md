@@ -1,0 +1,112 @@
+> ## Documentation Index
+>
+> Fetch the complete documentation index at: https://docs.meteora.ag/llms.txt
+> Use this file to discover all available pages before exploring further.
+
+<AgentInstructions>
+
+## Submitting Feedback
+
+If you encounter incorrect, outdated, or confusing documentation on this page, submit feedback:
+
+POST https://docs.meteora.ag/feedback
+
+```json
+{
+  "path": "/developer-guide/guides/dlmm/typescript-sdk/getting-started",
+  "feedback": "Description of the issue"
+}
+```
+
+Only submit feedback when you have something specific and actionable to report.
+
+</AgentInstructions>
+
+# Getting Started
+
+> DLMM
+
+This guide provides instructions on how to get started with building on Meteora's DLMM program using the DLMM TypeScript SDK.
+
+Before you begin, here are some important resources:
+
+<CardGroup cols={2}>
+  <Card title="Typescript SDK" icon="node-js" iconType="solid" href="https://github.com/MeteoraAg/dlmm-sdk/tree/main/ts-client">
+    Meteora DLMM Typescript SDK
+  </Card>
+
+  <Card title="DLMM NPM Package" icon="npm" iconType="solid" href="https://www.npmjs.com/package/@meteora-ag/dlmm">
+    Meteora DLMM NPM Package
+  </Card>
+</CardGroup>
+
+# Installation
+
+To use the SDK in your project, install it using your preferred package manager:
+
+<Tabs>
+  <Tab title="npm">
+    ```bash theme={"system"}
+    npm install @meteora-ag/dlmm @solana/web3.js
+    ```
+  </Tab>
+
+  <Tab title="pnpm">
+    ```bash theme={"system"}
+    pnpm install @meteora-ag/dlmm @solana/web3.js
+    ```
+  </Tab>
+
+  <Tab title="yarn">
+    ```bash theme={"system"}
+    yarn add @meteora-ag/dlmm @solana/web3.js
+    ```
+  </Tab>
+</Tabs>
+
+# Initialization
+
+Once installed, you can initialize the DLMM client in your `Node.js` project like this:
+
+```typescript theme={"system"}
+import DLMM from '@meteora-ag/dlmm';
+import { Connection, PublicKey } from '@solana/web3.js';
+
+const mainnetConnection = new Connection('https://api.mainnet-beta.solana.com');
+
+// Create pool instances
+
+// e.g. creating a DLMM pool
+// You can get your desired pool address from the API https://dlmm.datapi.meteora.ag/pair/all
+const USDC_USDT_POOL_ADDRESS = new PublicKey('ARwi1S4DaiTG5DX7S4M4ZsrXqpMD1MrTmbu9ue2tpmEq');
+const dlmmPool = await DLMM.create(connection, USDC_USDT_POOL_ADDRESS);
+
+// e.g. creating multiple pools
+const dlmmMultiplePools = await DLMM.createMultiple(connection, [
+  USDC_USDT_POOL_ADDRESS,
+  ...otherPoolAddresses,
+]);
+```
+
+# Testing the SDK (for contributors)
+
+If you have cloned the SDK repository and want to run the built-in tests:
+
+```bash theme={"system"}
+# Install dependencies
+cd ts-client
+bun install
+
+# Run tests
+bun test
+```
+
+# Development Resources
+
+## Faucets
+
+<CardGroup cols={1}>
+  <Card title="Devnet Faucet" icon="faucet" href="https://faucet.raccoons.dev/">
+    <p>When working on devnet, you might need test tokens. Here is a helpful faucet.</p>
+  </Card>
+</CardGroup>

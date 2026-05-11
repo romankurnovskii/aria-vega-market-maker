@@ -1,0 +1,15 @@
+{
+  "name": "@lp-system/orchestration",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "@lp-system/core": "workspace:*",
+    "@lp-system/strategy": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist"
+  }
+}

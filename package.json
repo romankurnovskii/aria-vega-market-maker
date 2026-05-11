@@ -1,0 +1,26 @@
+{
+  "name": "lp-system-root",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Solana CLMM LP Strategy System Monorepo",
+  "scripts": {
+    "build": "pnpm --recursive run build",
+    "clean": "pnpm --recursive run clean",
+    "start": "pnpm --filter @lp-system/engine run start",
+    "test": "pnpm --recursive run test",
+    "format": "prettier --write .",
+    "prepare": "husky",
+    "repomix": "npm run repomix:md",
+    "repomix:md": "repomix --include \"**/*.md\""
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "typescript": "^5.4.5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "bufferutil",
+      "utf-8-validate"
+    ]
+  }
+}
