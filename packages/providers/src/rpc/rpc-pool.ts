@@ -35,7 +35,7 @@ export class RpcPool implements IRpcProvider {
    * If the current provider fails, it automatically rotates to the next available one.
    */
   public async execute<T>(fn: (conn: Connection) => Promise<T>): Promise<T> {
-    let lastError: any;
+    let lastError: unknown;
 
     // Attempt to execute the call, potentially trying every provider in the pool once
     for (let i = 0; i < this.providers.length; i++) {
@@ -47,10 +47,12 @@ export class RpcPool implements IRpcProvider {
         // On success, we move the index forward for the NEXT call (Round-Robin)
         this.rotate();
         return result;
-      } catch (error: any) {
+      } catch (error: unknown) {
         lastError = error;
         logger.warn(
-          `[RpcPool] Provider ${this.currentIndex} failed. Rotating to next... Error: ${error.message}`
+          `[RpcPool] Provider ${this.currentIndex} failed. Rotating to next... Error: ${
+            error instanceof Error ? error.stack || error.message : String(error)
+          }`
         );
         this.rotate();
       }
