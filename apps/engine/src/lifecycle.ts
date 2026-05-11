@@ -20,6 +20,8 @@ import {
   Recommendation,
   Decision,
   Position,
+  RebalanceTask,
+  StrategyResult,
 } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
@@ -96,13 +98,23 @@ export async function startDiscovery(
 ): Promise<void> {
   logger.info('[Discovery] Triggering position discovery cycle...');
 
-  // 1. Fetch live positions and known persisted positions
+  // 1. Fetch live positions, known persisted positions, and active tasks
   const livePositions = await positionProvider.getPositions(walletAddress);
   const knownPositions = await positionStore.getKnown();
   const assignments = await store.getAssignments();
 
+  const tasksStore = store as unknown as { getTasks?: () => Promise<RebalanceTask[]> };
+  const tasks = tasksStore.getTasks ? await tasksStore.getTasks() : [];
+
   const liveIds = new Set(livePositions.map((p) => p.id));
   const knownIds = new Set(knownPositions.map((p) => p.id));
+  const inFlightPositionIds = new Set<string>(
+    tasks
+      .filter(
+        (t: RebalanceTask) => t.status === 'awaiting_settlement' || t.status === 'pending_open'
+      )
+      .map((t: RebalanceTask) => t.originalPositionId)
+  );
 
   // 2. Identify new positions
   for (const livePos of livePositions) {
@@ -120,12 +132,30 @@ export async function startDiscovery(
 
   // 3. Identify closed/removed positions
   for (const knownPos of knownPositions) {
-    if (!liveIds.has(knownPos.id)) {
+    if (!liveIds.has(knownPos.id) && !inFlightPositionIds.has(knownPos.id)) {
       logger.info(`[Discovery] Known position ${knownPos.id} is no longer on-chain. Pruning.`);
 
       const activeOrchestrators = registry.getForPosition(knownPos.id);
       for (const orch of activeOrchestrators) {
         registry.deregister(orch.id);
+      }
+    } else if (inFlightPositionIds.has(knownPos.id)) {
+      logger.info(
+        `[Discovery] Position ${knownPos.id} is not on-chain but has an active rebalance task. Retaining orchestrator.`
+      );
+      // Ensure orchestrator is registered and marked as executing
+      const activeOrchestrators = registry.getForPosition(knownPos.id);
+      if (activeOrchestrators.length === 0) {
+        const matchingAssignments = assignments.filter((a) => a.positionId === knownPos.id);
+        for (const assignment of matchingAssignments) {
+          const orchestrator = factory.create(assignment);
+          orchestrator.isExecuting = true;
+          registry.register(orchestrator);
+        }
+      } else {
+        for (const orch of activeOrchestrators) {
+          orch.isExecuting = true;
+        }
       }
     }
   }
@@ -133,6 +163,236 @@ export async function startDiscovery(
   // 4. Update local tracking store
   await positionStore.saveKnown(livePositions);
   logger.info('[Discovery] Discovery cycle finalized successfully.');
+}
+
+/**
+ * Execution Monitor: reads the Task Store and drives the transaction lifecycle.
+ */
+export async function processTasks(
+  store: IStore,
+  executor: IExecutor,
+  positionProvider: IPositionProvider,
+  rpcPool: IRpcProvider,
+  walletAddress: string,
+  registry: IOrchestratorRegistry,
+  positionStore: IPositionStore
+): Promise<void> {
+  const tasksStore = store as unknown as {
+    getTasks: () => Promise<RebalanceTask[]>;
+    saveTask: (t: RebalanceTask) => Promise<void>;
+    deleteTask: (id: string) => Promise<void>;
+  };
+  if (typeof tasksStore.getTasks !== 'function') return;
+
+  const tasks: RebalanceTask[] = await tasksStore.getTasks();
+  if (tasks.length === 0) return;
+
+  logger.info(`[Execution Monitor] Found ${tasks.length} active task(s) in task store.`);
+
+  const processingPromises = tasks.map(async (task) => {
+    try {
+      logger.info(
+        `[Execution Monitor] Processing task ${task.id} (${task.status}) for position ${task.originalPositionId}`
+      );
+
+      // 1. Sync orchestrator isExecuting flag
+      const orchestrators = registry.getForPosition(task.originalPositionId);
+      for (const orch of orchestrators) {
+        orch.isExecuting = true;
+      }
+
+      // 2. Timeout check (fail-safe)
+      const MAX_TASK_AGE_MS = 5 * 60 * 1000; // 5 minutes
+      if (Date.now() - task.evaluatedAt > MAX_TASK_AGE_MS) {
+        logger.error(
+          `[Execution Monitor] [ALERT] RebalanceTask ${task.id} has been active for over 5 minutes. Idle capital warning!`
+        );
+      }
+
+      if (task.status === 'pending_close') {
+        const poolAddress = task.intent.openParams?.poolAddress || task.intent.positionId;
+        const poolInfo = await positionProvider.getPoolInfo(poolAddress);
+        const market = await positionProvider.getMarketSnapshot(poolInfo.poolAddress);
+
+        // Fetch initial balances to detect changes/increases later
+        const initialBalances = await rpcPool.execute(async (connection: Connection) => {
+          return await getWalletBalances(
+            connection,
+            walletAddress,
+            poolInfo.tokenXAddress,
+            poolInfo.tokenYAddress
+          );
+        });
+
+        logger.info(`[Execution Monitor] Executing CLOSE transaction for task ${task.id}...`);
+        const closeDecision: Decision = {
+          ...task.intent,
+          action: 'close' as const,
+        };
+
+        const record = await executor.apply(closeDecision, market, async () => {
+          return { action: 'skip' };
+        });
+        if (record.status === 'failed') {
+          throw new Error(`Close transaction failed: ${record.error}`);
+        }
+
+        logger.info(
+          `[Execution Monitor] Close transaction succeeded. Polling balances for settlement...`
+        );
+        const solanaExecutor = executor as unknown as {
+          pollBalances?: (
+            tx: string,
+            ty: string,
+            w: string,
+            ix: bigint,
+            iy: bigint
+          ) => Promise<void>;
+        };
+        if (solanaExecutor.pollBalances) {
+          await solanaExecutor.pollBalances(
+            poolInfo.tokenXAddress,
+            poolInfo.tokenYAddress,
+            walletAddress,
+            BigInt(initialBalances.amountX),
+            BigInt(initialBalances.amountY)
+          );
+        }
+
+        task.status = 'awaiting_settlement';
+        task.evaluatedAt = Date.now();
+        await tasksStore.saveTask(task);
+        logger.info(
+          `[Execution Monitor] Task ${task.id} transitioned to 'awaiting_settlement'`
+        );
+      }
+
+      if (task.status === 'awaiting_settlement') {
+        const poolAddress = task.intent.openParams?.poolAddress || task.intent.positionId;
+        const poolInfo = await positionProvider.getPoolInfo(poolAddress);
+        const market = await positionProvider.getMarketSnapshot(poolInfo.poolAddress);
+
+        // Fetch decimals from cached known positions
+        const knownPositions = await positionStore.getKnown();
+        const cachedPos = knownPositions.find((p) => p.id === task.originalPositionId);
+        const decimalsX = cachedPos?.tokenX.decimals ?? 9;
+        const decimalsY = cachedPos?.tokenY.decimals ?? 6;
+
+        // Fetch fresh settled wallet balances
+        const walletBalances = await rpcPool.execute(async (connection: Connection) => {
+          return await getWalletBalances(
+            connection,
+            walletAddress,
+            poolInfo.tokenXAddress,
+            poolInfo.tokenYAddress
+          );
+        });
+
+        logger.info(
+          `[Execution Monitor] Synthesizing Position with wallet balances: X=${walletBalances.amountX}, Y=${walletBalances.amountY}`
+        );
+
+        // Build synthetic position using pre-closure metadata and live balances
+        const syntheticPos: Position = {
+          id: task.originalPositionId,
+          poolAddress: poolInfo.poolAddress,
+          chain: 'solana' as const,
+          protocol: 'meteora_dlmm' as const,
+          lowerBound: task.intent.openParams?.lowerBound || 0,
+          upperBound: task.intent.openParams?.upperBound || 0,
+          tokenX: {
+            tokenAddress: poolInfo.tokenXAddress,
+            mint: poolInfo.tokenXAddress,
+            decimals: decimalsX,
+            amount: walletBalances.amountX,
+          },
+          tokenY: {
+            tokenAddress: poolInfo.tokenYAddress,
+            mint: poolInfo.tokenYAddress,
+            decimals: decimalsY,
+            amount: walletBalances.amountY,
+          },
+          isInRange: true,
+          openedAt: Date.now(),
+          metadata: {},
+        };
+
+        logger.info(`[Execution Monitor] Re-evaluating strategy using synthetic position...`);
+        let reEvalResult: StrategyResult = { action: 'skip' };
+        for (const orch of orchestrators) {
+          const res = await orch.tick(syntheticPos, market);
+          if (res.action !== 'skip') {
+            reEvalResult = res;
+            break;
+          }
+        }
+
+        if (reEvalResult.action === 'open' || reEvalResult.action === 'close+open') {
+          const openParams =
+            reEvalResult.action === 'close+open'
+              ? reEvalResult.openParams
+              : reEvalResult.params;
+          task.intent.openParams = openParams;
+          task.intent.action = 'open';
+          task.status = 'pending_open';
+          task.evaluatedAt = Date.now();
+          await tasksStore.saveTask(task);
+          logger.info(
+            `[Execution Monitor] Task ${task.id} updated with open params and transitioned to 'pending_open'`
+          );
+        } else {
+          logger.info(
+            `[Execution Monitor] Strategy re-evaluation recommended 'skip'. Deleting task and unlocking orchestrator.`
+          );
+          await tasksStore.deleteTask(task.id);
+          for (const orch of orchestrators) {
+            orch.isExecuting = false;
+          }
+        }
+      }
+
+      if (task.status === 'pending_open') {
+        const poolAddress = task.intent.openParams?.poolAddress || task.intent.positionId;
+        const poolInfo = await positionProvider.getPoolInfo(poolAddress);
+        const market = await positionProvider.getMarketSnapshot(poolInfo.poolAddress);
+
+        // JIT Signal Validation: check if signal is stale (e.g., > 10,000ms)
+        const MAX_SIGNAL_AGE_MS = 10000;
+        if (Date.now() - task.evaluatedAt > MAX_SIGNAL_AGE_MS) {
+          logger.warn(
+            `[Execution Monitor] Signal for task ${task.id} is stale (${Date.now() - task.evaluatedAt}ms). Re-triggering re-evaluation...`
+          );
+          task.status = 'awaiting_settlement';
+          await tasksStore.saveTask(task);
+          return;
+        }
+
+        logger.info(`[Execution Monitor] Executing OPEN transaction for task ${task.id}...`);
+        const record = await executor.apply(task.intent, market, async () => {
+          return { action: 'skip' };
+        });
+        if (record.status === 'failed') {
+          throw new Error(`Open transaction failed: ${record.error}`);
+        }
+
+        await store.saveExecutionRecord(record);
+
+        logger.info(
+          `[Execution Monitor] Task ${task.id} successfully completed! Deleting task.`
+        );
+        await tasksStore.deleteTask(task.id);
+        for (const orch of orchestrators) {
+          orch.isExecuting = false;
+        }
+      }
+    } catch (err: unknown) {
+      logger.error(
+        `[Execution Monitor] Error processing task ${task.id}: ${(err as Error).message || String(err)}`
+      );
+    }
+  });
+
+  await Promise.all(processingPromises);
 }
 
 /**
@@ -166,6 +426,18 @@ export function startTickLoop(
   const loop = setInterval(async () => {
     try {
       logger.info('[Tick Loop] Starting tick execution cycle...');
+
+      // 1. Run Execution Monitor to process in-flight stateful tasks first
+      await processTasks(
+        store,
+        executor,
+        positionProvider,
+        rpcPool,
+        walletAddress,
+        registry,
+        positionStore
+      );
+
       const knownPositions = await positionStore.getKnown();
       const updatedKnownPositions: Position[] = [...knownPositions];
       let storeNeedsUpdate = false;
@@ -178,6 +450,15 @@ export function startTickLoop(
           if (chain !== 'solana') {
             logger.info(
               `[Tick Loop] Position ${position.id} is on chain ${chain} (EVM/Uniswap execution is pending Phase B). Skipping evaluation.`
+            );
+            continue;
+          }
+
+          // Fetch orchestrators and check lock before querying RPC to avoid useless RPC workload
+          const orchestrators = registry.getForPosition(position.id);
+          if (orchestrators.some((o) => o.isExecuting)) {
+            logger.info(
+              `[Tick Loop] Position ${position.id} is currently locked (active rebalance task in-flight). Skipping evaluation.`
             );
             continue;
           }
@@ -212,8 +493,6 @@ export function startTickLoop(
 
           const market = await positionProvider.getMarketSnapshot(freshPosition.poolAddress);
 
-          const orchestrators = registry.getForPosition(freshPosition.id);
-
           const activeResults: Recommendation[] = [];
 
           for (const orch of orchestrators) {
@@ -238,57 +517,44 @@ export function startTickLoop(
           );
 
           if (decision) {
-            logger.info(`[Tick Loop] Executable decision gated. Dispatched to executor...`);
-            // SolanaExecutor uses RpcPool for Connection. We pass our global executor apply.
-            const record = await executor.apply(decision, market, async (posId: string) => {
-              logger.info(`[Re-Evaluation Callback] Initiated for position: ${posId}`);
+            logger.info(
+              `[Tick Loop] Executable decision gated. Creating stateful RebalanceTask...`
+            );
 
-              // Get the live token balances for X and Y from the wallet
-              const poolInfo = await positionProvider.getPoolInfo(freshPosition.poolAddress);
+            // Create the write-ahead persistent task
+            const tasksStore = store as unknown as {
+              saveTask: (t: RebalanceTask) => Promise<void>;
+            };
+            const task: RebalanceTask = {
+              id: `task_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+              assignmentId: decision.sourceAssignmentId,
+              status: 'pending_close',
+              originalPositionId: decision.positionId,
+              intent: decision,
+              evaluatedAt: decision.evaluatedAt || Date.now(),
+            };
 
-              // Query RPC for wallet token balances
-              const walletBalances = await rpcPool.execute(async (connection: Connection) => {
-                return await getWalletBalances(
-                  connection,
-                  walletAddress,
-                  poolInfo.tokenXAddress,
-                  poolInfo.tokenYAddress
-                );
-              });
+            await tasksStore.saveTask(task);
 
-              logger.info(
-                `[Re-Evaluation Callback] Fetched wallet balances for rebalance. Token X: ${walletBalances.amountX}, Token Y: ${walletBalances.amountY}`
-              );
+            // Set the execution lock on all associated orchestrators
+            for (const orch of orchestrators) {
+              orch.isExecuting = true;
+            }
 
-              // Construct synthetic position using pre-closure metadata and fresh wallet balances
-              const syntheticPos: Position = {
-                ...freshPosition,
-                tokenX: {
-                  ...freshPosition.tokenX,
-                  amount: walletBalances.amountX,
-                },
-                tokenY: {
-                  ...freshPosition.tokenY,
-                  amount: walletBalances.amountY,
-                },
-                isInRange: true,
-              };
+            logger.info(
+              `[Tick Loop] Stateful RebalanceTask ${task.id} created successfully on disk. Triggering Execution Monitor...`
+            );
 
-              const updatedMarket = await positionProvider.getMarketSnapshot(
-                freshPosition.poolAddress
-              );
-              const activeOrchs = registry.getForPosition(posId);
-
-              for (const o of activeOrchs) {
-                const res = await o.tick(syntheticPos, updatedMarket);
-                if (res.action !== 'skip') {
-                  return res;
-                }
-              }
-              return { action: 'skip' };
-            });
-
-            await store.saveExecutionRecord(record);
+            // Run Task Monitor immediately to begin execution without waiting for next tick interval
+            await processTasks(
+              store,
+              executor,
+              positionProvider,
+              rpcPool,
+              walletAddress,
+              registry,
+              positionStore
+            );
           } else {
             logger.info(`[Tick Loop] No execution required for position ${position.id}`);
           }

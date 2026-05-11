@@ -2,41 +2,74 @@
 
 This document lists the formal models and contracts shared across all packages in the monorepo workspace.
 
-## Type Definitions
+---
+
+## 1. Type Definitions
 
 All types are defined in `packages/core/src/types/`:
 
-| Type              | Source File                                                             |
-| ----------------- | ----------------------------------------------------------------------- |
-| `TokenAmount`     | [`types/token.ts`](../packages/core/src/types/token.ts)                 |
-| `OpenParams`      | [`types/position.ts`](../packages/core/src/types/position.ts)           |
-| `Position`        | [`types/position.ts`](../packages/core/src/types/position.ts)           |
-| `PricePoint`      | [`types/market.ts`](../packages/core/src/types/market.ts)               |
-| `MarketSnapshot`  | [`types/market.ts`](../packages/core/src/types/market.ts)               |
-| `PoolInfo`        | [`types/market.ts`](../packages/core/src/types/market.ts)               |
-| `StepContext`     | [`types/strategy.ts`](../packages/core/src/types/strategy.ts)           |
-| `StrategyResult`  | [`types/strategy.ts`](../packages/core/src/types/strategy.ts)           |
-| `Recommendation`  | [`types/strategy.ts`](../packages/core/src/types/strategy.ts)           |
-| `LPEvent`         | [`types/strategy.ts`](../packages/core/src/types/strategy.ts)           |
-| `Assignment`      | [`types/orchestration.ts`](../packages/core/src/types/orchestration.ts) |
-| `Decision`        | [`types/orchestration.ts`](../packages/core/src/types/orchestration.ts) |
-| `ExecutionRecord` | [`types/orchestration.ts`](../packages/core/src/types/orchestration.ts) |
+| Type                  | Source File                                                             | Description                                                                                  |
+| :-------------------- | :---------------------------------------------------------------------- | :------------------------------------------------------------------------------------------- |
+| `TokenAmount`         | [`types/token.ts`](../packages/core/src/types/token.ts)                 | Representation of a token amount with decimals and address.                                  |
+| `OpenParams`          | [`types/position.ts`](../packages/core/src/types/position.ts)           | Parameters needed to open a CLMM position (bounds, amounts).                                 |
+| `Position`            | [`types/position.ts`](../packages/core/src/types/position.ts)           | Complete on-chain position state.                                                            |
+| `PricePoint`          | [`types/market.ts`](../packages/core/src/types/market.ts)               | Timestamped on-chain price data point.                                                       |
+| `MarketSnapshot`      | [`types/market.ts`](../packages/core/src/types/market.ts)               | Complete snapshot of pool state and history.                                                 |
+| `PoolInfo`            | [`types/market.ts`](../packages/core/src/types/market.ts)               | Immutable pool configuration metadata.                                                       |
+| `StepContext`         | [`types/strategy.ts`](../packages/core/src/types/strategy.ts)           | Context pipeline shared across execution steps.                                              |
+| `StrategyResult`      | [`types/strategy.ts`](../packages/core/src/types/strategy.ts)           | Output recommendation of a strategy execution.                                               |
+| `Recommendation`      | [`types/strategy.ts`](../packages/core/src/types/strategy.ts)           | Recommendation bound to a specific assignment.                                               |
+| `LPEvent`             | [`types/strategy.ts`](../packages/core/src/types/strategy.ts)           | Representation of liquidity events.                                                          |
+| `Assignment`          | [`types/orchestration.ts`](../packages/core/src/types/orchestration.ts) | Config binding between a strategy and position.                                              |
+| `Decision`            | [`types/orchestration.ts`](../packages/core/src/types/orchestration.ts) | Gated decision dispatched for execution.                                                     |
+| `ExecutionRecord`     | [`types/orchestration.ts`](../packages/core/src/types/orchestration.ts) | On-chain execution outcome and signatures log.                                               |
+| `RebalanceTask`       | [`types/orchestration.ts`](../packages/core/src/types/orchestration.ts) | Persistent write-ahead rebalance task tracker.                                               |
+| `RebalanceTaskStatus` | [`types/orchestration.ts`](../packages/core/src/types/orchestration.ts) | Union type for rebalance phases: `pending_close` \| `awaiting_settlement` \| `pending_open`. |
 
-## Core Interfaces
+### `RebalanceTask` Schema Contract
+
+```typescript
+export type RebalanceTaskStatus = 'pending_close' | 'awaiting_settlement' | 'pending_open';
+
+export interface RebalanceTask {
+  id: string; // Unique task UUID
+  assignmentId: string; // Link to active strategy assignment
+  status: RebalanceTaskStatus; // Current rebalance phase
+  originalPositionId: string; // Position ID of the closed position (PDA deleted on-chain)
+  newPositionId?: string; // Position ID of the newly opened position. Null until the
+  // open transaction confirms. Set by the executor on success.
+  // Used by the discovery loop on recovery to register the new
+  // orchestrator without waiting for the next chain poll.
+  intent: Decision; // Gated decision being executed, including range and metadata
+  evaluatedAt: number; // Epoch ms timestamp of strategy evaluation. Used by the
+  // JIT staleness check: if Date.now() - evaluatedAt > MAX_SIGNAL_AGE_MS
+  // the signal is stale and the task re-enters awaiting_settlement.
+}
+```
+
+**Field notes:**
+
+`newPositionId` is `undefined` through the `pending_close` and `awaiting_settlement` phases. The executor sets it immediately after the open transaction confirms, before calling `deleteTask`. On crash recovery during `awaiting_settlement`, it will always be `undefined` — which is the correct signal that the open leg has not yet run.
+
+`evaluatedAt` records when the strategy produced the `Decision` stored in `intent`, not when the task was created. These can differ if the task was created with a slightly delayed write. The JIT check compares this timestamp against the moment the executor is about to sign the open transaction.
+
+---
+
+## 2. Core Interfaces
 
 All interfaces are defined in `packages/core/src/interfaces.ts`:
 
-| Interface               | Description                                                         |
-| ----------------------- | ------------------------------------------------------------------- |
-| `IStep`                 | Executable pipeline step with context transformation                |
-| `IStrategy`             | Strategy interface for trading decisions (execute → StrategyResult) |
-| `IOrchestrator`         | Per-position orchestrator managing strategy lifecycle               |
-| `IExecutionGate`        | Decision filtering and prioritization gate                          |
-| `IExecutor`             | Transaction execution handler for on-chain operations               |
-| `IPositionProvider`     | External data source abstraction for positions/markets              |
-| `IRpcProvider`          | RPC connection abstraction with retry logic                         |
-| `IStore`                | Persistence layer for assignments and execution records             |
-| `IPositionStore`        | Persistence layer for known positions                               |
-| `IOrchestratorRegistry` | In-memory orchestrator lifecycle manager                            |
+| Interface               | Description                                                               | Key methods / properties                                                                                                                                   |
+| :---------------------- | :------------------------------------------------------------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `IStep`                 | Pipeline step with context transformation                                 | `execute(context): Promise<StepContext>`                                                                                                                   |
+| `IStrategy`             | Evaluates trading rules against a position                                | `execute(position, market, params): Promise<StrategyResult>`                                                                                               |
+| `IOrchestrator`         | Per-position strategy runtime manager                                     | `tick(position, market): Promise<StrategyResult>`, `isExecuting: boolean`                                                                                  |
+| `IExecutionGate`        | Filters and prioritizes recommendations into decisions                    | `consider(recommendations, positionId): Decision \| null`                                                                                                  |
+| `IExecutor`             | Handles stateful on-chain transaction execution                           | `apply(decision, market, reEvaluate): Promise<ExecutionRecord>`                                                                                            |
+| `IPositionProvider`     | Queries live positions and market snapshots                               | `getPositions()`, `getPosition()`, `getPoolInfo()`, `getMarketSnapshot()`                                                                                  |
+| `IRpcProvider`          | Abstracts Solana Connection with retry and rate-limit handling            | `getConnection()`, `execute(fn)`                                                                                                                           |
+| `IStore`                | Persistence layer for assignments, execution records, and rebalance tasks | `getAssignments()`, `saveAssignment()`, `deleteAssignment()`, `getExecutionRecords()`, `saveExecutionRecord()`, `getTasks()`, `saveTask()`, `deleteTask()` |
+| `IPositionStore`        | Local cache of known on-chain positions for discovery diffing             | `getKnown()`, `saveKnown(positions)`                                                                                                                       |
+| `IOrchestratorRegistry` | In-memory runtime index of active orchestrators                           | `register(orch)`, `deregister(id)`, `getForPosition(posId)`, `getAll()`                                                                                    |
 
-See [`interfaces.ts`](../packages/core/src/interfaces.ts) for full interface definitions.
+See [`interfaces.ts`](../packages/core/src/interfaces.ts) for full interface declarations.

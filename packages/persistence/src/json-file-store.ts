@@ -13,7 +13,7 @@
  */
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { IStore, Assignment, ExecutionRecord } from '@lp-system/core';
+import { IStore, Assignment, ExecutionRecord, RebalanceTask } from '@lp-system/core';
 
 /**
  * Options for configuring namespaced storage files.
@@ -42,6 +42,7 @@ function getShortWallet(wallet: string): string {
 export class JsonFileStore implements IStore {
   private assignmentsPath: string;
   private executionsPath: string;
+  private tasksPath: string;
 
   /**
    * Constructs the store with a directory path and optional namespacing options.
@@ -63,6 +64,7 @@ export class JsonFileStore implements IStore {
     const prefix = parts.length > 0 ? `${parts.join('_')}_` : '';
     this.assignmentsPath = path.join(directoryPath, `${prefix}assignments.json`);
     this.executionsPath = path.join(directoryPath, `${prefix}executions.json`);
+    this.tasksPath = path.join(directoryPath, `${prefix}tasks.json`);
   }
 
   /**
@@ -83,8 +85,8 @@ export class JsonFileStore implements IStore {
     try {
       const data = await fs.readFile(this.assignmentsPath, 'utf-8');
       return JSON.parse(data) as Assignment[];
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
         return [];
       }
       throw error;
@@ -129,8 +131,8 @@ export class JsonFileStore implements IStore {
     try {
       const data = await fs.readFile(this.executionsPath, 'utf-8');
       return JSON.parse(data) as ExecutionRecord[];
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
         return [];
       }
       throw error;
@@ -147,5 +149,86 @@ export class JsonFileStore implements IStore {
     const records = await this.getExecutionRecords();
     records.push(record);
     await fs.writeFile(this.executionsPath, JSON.stringify(records, null, 2), 'utf-8');
+  }
+
+  private taskMutex: Promise<unknown> = Promise.resolve();
+
+  /**
+   * Helper to serialize file access for tasks.
+   */
+  private async runTaskLocked<T>(fn: () => Promise<T>): Promise<T> {
+    const next = this.taskMutex.then(fn);
+    this.taskMutex = next.catch(() => {});
+    return next;
+  }
+
+  /**
+   * Reads all tasks from disk. Returns [] if file is missing.
+   *
+   * @returns {Promise<RebalanceTask[]>} All persisted tasks.
+   */
+  public async getTasks(): Promise<RebalanceTask[]> {
+    return this.runTaskLocked(async () => {
+      try {
+        const data = await fs.readFile(this.tasksPath, 'utf-8');
+        return JSON.parse(data) as RebalanceTask[];
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+          return [];
+        }
+        throw error;
+      }
+    });
+  }
+
+  /**
+   * Inserts or updates a task in the persistent store.
+   *
+   * @param {RebalanceTask} task - The task to persist.
+   */
+  public async saveTask(task: RebalanceTask): Promise<void> {
+    await this.runTaskLocked(async () => {
+      await this.ensureDirectory();
+      let tasks: RebalanceTask[] = [];
+      try {
+        const data = await fs.readFile(this.tasksPath, 'utf-8');
+        tasks = JSON.parse(data) as RebalanceTask[];
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'code' in error && error.code !== 'ENOENT') {
+          throw error;
+        }
+      }
+
+      const index = tasks.findIndex((t) => t.id === task.id);
+      if (index >= 0) {
+        tasks[index] = task;
+      } else {
+        tasks.push(task);
+      }
+      await fs.writeFile(this.tasksPath, JSON.stringify(tasks, null, 2), 'utf-8');
+    });
+  }
+
+  /**
+   * Removes a task by ID.
+   *
+   * @param {string} id - Task identifier to delete.
+   */
+  public async deleteTask(id: string): Promise<void> {
+    await this.runTaskLocked(async () => {
+      await this.ensureDirectory();
+      let tasks: RebalanceTask[] = [];
+      try {
+        const data = await fs.readFile(this.tasksPath, 'utf-8');
+        tasks = JSON.parse(data) as RebalanceTask[];
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'code' in error && error.code !== 'ENOENT') {
+          throw error;
+        }
+      }
+
+      const filtered = tasks.filter((t) => t.id !== id);
+      await fs.writeFile(this.tasksPath, JSON.stringify(filtered, null, 2), 'utf-8');
+    });
   }
 }
