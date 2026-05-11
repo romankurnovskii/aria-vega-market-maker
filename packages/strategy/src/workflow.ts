@@ -11,11 +11,10 @@
  * @sideEffects None — pure functional pipeline runner, no state retained between runs
  */
 import { IStep, StepContext } from '@lp-system/core';
+import { getLogger } from '@lp-system/logger';
 
-/**
- * Workflow: executes a sequence of IStep instances in order.
- * Each step receives the output context of the previous step.
- */
+const logger = getLogger('workflow');
+
 export class Workflow {
   /**
    * Constructs a workflow with the configured step chain.
@@ -30,12 +29,12 @@ export class Workflow {
    * @param {StepContext} initialContext - Input context with position, market, params.
    * @returns {Promise<StepContext>} Final context after all steps have executed (may include signal + openParams).
    */
-   public async run(initialContext: StepContext): Promise<StepContext> {
-     let context = { ...initialContext };
-     for (const step of this.steps) {
-       console.log(`[Workflow] Running step: ${step.name}`);
-       context = await step.execute(context);
-     }
-     return context;
-   }
- }
+  public async run(initialContext: StepContext): Promise<StepContext> {
+    let context = { ...initialContext };
+    for (const step of this.steps) {
+      logger.info(`[Workflow] Running step: ${step.name}`);
+      context = await step.execute(context);
+    }
+    return context;
+  }
+}
