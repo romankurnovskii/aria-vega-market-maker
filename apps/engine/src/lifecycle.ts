@@ -468,8 +468,17 @@ export function startTickLoop(
   let isRunning = false;
   const loop = setInterval(async () => {
     if (isRunning) {
+      let activeTasksInfo = '';
+      try {
+        const tasks = await store.getTasks();
+        if (tasks && tasks.length > 0) {
+          activeTasksInfo = ` (Active tasks in flight: ${tasks.map((t) => `${t.id} [${t.status}] for position ${t.originalPositionId || t.intent.positionId}`).join(', ')})`;
+        }
+      } catch {
+        /* ignore */
+      }
       logger.info(
-        `[Tick Loop] Previous execution cycle is still active. Skipping overlapping tick loop.`
+        `[Tick Loop] Previous execution cycle is still active. Skipping overlapping tick loop.${activeTasksInfo}`
       );
       return;
     }
@@ -542,6 +551,10 @@ export function startTickLoop(
           }
 
           const market = await positionProvider.getMarketSnapshot(freshPosition.poolAddress);
+
+          logger.info(
+            `[Tick Loop] Position ${position.id} details: Pool Price: ${market.price} | Bounds: [${freshPosition.lowerBound}, ${freshPosition.upperBound}] | In-Range: ${freshPosition.isInRange}`
+          );
 
           const activeResults: Recommendation[] = [];
 
@@ -627,6 +640,8 @@ export function startTickLoop(
           error instanceof Error ? error.message : String(error)
         }`
       );
+    } finally {
+      isRunning = false;
     }
   }, intervalMs);
 
