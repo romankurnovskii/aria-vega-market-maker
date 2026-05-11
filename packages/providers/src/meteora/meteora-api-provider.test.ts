@@ -187,3 +187,51 @@ test('getPositions maps positions with unrealizedPnl, isOutOfRange, and position
     global.fetch = originalFetch;
   }
 });
+
+test('getPositions propagates error when open portfolio endpoint returns non-ok status', async () => {
+  const originalFetch = global.fetch;
+
+  try {
+    global.fetch = async (url: any) => {
+      if (url.includes('/portfolio/open')) {
+        return {
+          ok: false,
+          status: 429,
+          statusText: 'Too Many Requests',
+        } as any;
+      }
+      return { ok: true, json: async () => [] } as any;
+    };
+
+    const provider = new MeteoraApiProvider('https://dummy-api.meteora.ag');
+    await assert.rejects(async () => {
+      await provider.getPositions('mock_wallet');
+    }, /Failed to fetch open portfolio: HTTP 429 Too Many Requests/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('getPositions propagates error when pool pnl endpoint returns non-ok status', async () => {
+  const originalFetch = global.fetch;
+
+  try {
+    global.fetch = async (url: any) => {
+      if (url.includes('/positions/test-pool/pnl')) {
+        return {
+          ok: false,
+          status: 502,
+          statusText: 'Bad Gateway',
+        } as any;
+      }
+      return { ok: true, json: async () => [] } as any;
+    };
+
+    const provider = new MeteoraApiProvider('https://dummy-api.meteora.ag');
+    await assert.rejects(async () => {
+      await provider.getPositions('mock_wallet', 'test-pool');
+    }, /Failed to fetch positions PnL from Datapi for pool test-pool: HTTP 502 Bad Gateway/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});

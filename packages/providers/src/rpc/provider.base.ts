@@ -17,7 +17,6 @@ export class SolanaRpcProvider implements IRpcProvider {
   protected connection: Connection;
 
   constructor(protected rpcUrl: string) {
-    // Falls back to a mock mainnet endpoint if not provided, for compilable safety.
     const url = rpcUrl || 'https://api.mainnet-beta.solana.com';
     this.connection = new Connection(url, 'confirmed');
   }

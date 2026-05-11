@@ -24,7 +24,7 @@ const logger = getLogger('meteora-api-provider');
 export class MeteoraApiProvider implements IPositionProvider {
   private poolTokenMetadataCache = new Map<
     string,
-    { decimalsX: number; decimalsY: number; tokenXMint: string; tokenYMint: string }
+    Promise<{ decimalsX: number; decimalsY: number; tokenXMint: string; tokenYMint: string }>
   >();
 
   /**
@@ -46,34 +46,33 @@ export class MeteoraApiProvider implements IPositionProvider {
     tokenXMint: string;
     tokenYMint: string;
   }> {
-    const cached = this.poolTokenMetadataCache.get(poolAddress);
-    if (cached) return cached;
+    if (this.poolTokenMetadataCache.has(poolAddress)) {
+      return this.poolTokenMetadataCache.get(poolAddress)!;
+    }
 
-    try {
-      const response = await fetch(`${this.apiUrl}/pools/${poolAddress}`, {
-        headers: {
-          Accept: 'application/json',
-          'User-Agent': 'MeteoraLPBot/1.0',
-        },
-      });
-      if (response.ok) {
+    const metadataPromise = fetch(`${this.apiUrl}/pools/${poolAddress}`, {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'MeteoraLPBot/1.0',
+      },
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(
+            `[MeteoraApiProvider] Failed to fetch token metadata for pool ${poolAddress}: HTTP ${response.status} ${response.statusText}`
+          );
+        }
         const data = (await response.json()) as PoolResponse;
-        const metadata = {
+        return {
           decimalsX: data.token_x.decimals,
           decimalsY: data.token_y.decimals,
           tokenXMint: data.token_x.address,
           tokenYMint: data.token_y.address,
         };
-        this.poolTokenMetadataCache.set(poolAddress, metadata);
-        return metadata;
-      }
-    } catch (err) {
-      logger.warn(
-        `[MeteoraApiProvider] Failed to fetch token metadata for pool ${poolAddress}: ${err}`
-      );
-    }
+      });
 
-    throw new Error(`Failed to retrieve token metadata for pool ${poolAddress}`);
+    this.poolTokenMetadataCache.set(poolAddress, metadataPromise);
+    return metadataPromise;
   }
 
   /**
@@ -96,133 +95,125 @@ export class MeteoraApiProvider implements IPositionProvider {
       poolsToQuery.push(poolAddress);
     } else {
       // Try to discover active pools via the /portfolio/open endpoint
-      try {
-        const portfolioUrl = `${this.apiUrl}/portfolio/open?user=${walletAddress}`;
-        const portfolioResponse = await fetch(portfolioUrl, {
-          headers: {
-            Accept: 'application/json',
-            'User-Agent': 'MeteoraLPBot/1.0',
-          },
-        });
+      const portfolioUrl = `${this.apiUrl}/portfolio/open?user=${walletAddress}`;
+      const portfolioResponse = await fetch(portfolioUrl, {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'MeteoraLPBot/1.0',
+        },
+      });
 
-        if (portfolioResponse.ok) {
-          const portfolioData = (await portfolioResponse.json()) as any;
-          const pools = Array.isArray(portfolioData)
-            ? portfolioData
-            : portfolioData.data || portfolioData.pools || [];
-
-          for (const p of pools) {
-            const addr =
-              typeof p === 'string' ? p : p.address || p.pool_address || p.poolAddress;
-            if (addr) {
-              poolsToQuery.push(addr);
-            }
-          }
-        }
-      } catch (err) {
-        logger.warn(
-          `[MeteoraApiProvider] Failed to fetch open portfolio for ${walletAddress}: ${err}`
+      if (!portfolioResponse.ok) {
+        throw new Error(
+          `[MeteoraApiProvider] Failed to fetch open portfolio: HTTP ${portfolioResponse.status} ${portfolioResponse.statusText}`
         );
+      }
+
+      const portfolioData = (await portfolioResponse.json()) as any;
+      const pools = Array.isArray(portfolioData)
+        ? portfolioData
+        : portfolioData.data || portfolioData.pools || [];
+
+      for (const p of pools) {
+        const addr =
+          typeof p === 'string' ? p : p.address || p.pool_address || p.poolAddress;
+        if (addr) {
+          poolsToQuery.push(addr);
+        }
       }
     }
 
     const allPositions: Position[] = [];
 
     for (const pool of poolsToQuery) {
-      try {
-        const metadataPromise = this.getPoolTokenMetadata(pool);
-        const url = `${this.apiUrl}/positions/${pool}/pnl?user=${walletAddress}&status=open&pageSize=200&page=1`;
-        logger.info(`[MeteoraApiProvider] Fetching positions PnL from Datapi for pool ${pool}`);
+      const url = `${this.apiUrl}/positions/${pool}/pnl?user=${walletAddress}&status=open&pageSize=200&page=1`;
+      logger.info(`[MeteoraApiProvider] Fetching positions PnL from Datapi for pool ${pool}`);
 
-        const response = await fetch(url, {
-          headers: {
-            Accept: 'application/json',
-            'User-Agent': 'MeteoraLPBot/1.0',
-          },
-        });
+      const response = await fetch(url, {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'MeteoraLPBot/1.0',
+        },
+      });
 
-        if (!response.ok) {
-          logger.warn(
-            `[MeteoraApiProvider] Failed to fetch positions PnL from Datapi: ${response.status} ${response.statusText}`
-          );
-          continue;
-        }
+      if (!response.ok) {
+        throw new Error(
+          `[MeteoraApiProvider] Failed to fetch positions PnL from Datapi for pool ${pool}: HTTP ${response.status} ${response.statusText}`
+        );
+      }
 
-        const result = (await response.json()) as PositionsPnlResponse;
-        const { decimalsX, decimalsY, tokenXMint, tokenYMint } = await metadataPromise;
+      const result = (await response.json()) as PositionsPnlResponse;
+      const { decimalsX, decimalsY, tokenXMint, tokenYMint } = await this.getPoolTokenMetadata(pool);
 
-        if (result && Array.isArray(result.positions)) {
-          for (const pos of result.positions) {
-            const lowerBinId =
-              pos.lower_bin_id !== undefined ? pos.lower_bin_id : (pos.lowerBinId ?? 0);
-            const upperBinId =
-              pos.upper_bin_id !== undefined ? pos.upper_bin_id : (pos.upperBinId ?? 0);
-            const isInRange =
-              pos.is_in_range !== undefined
-                ? pos.is_in_range
-                : pos.isInRange !== undefined
-                  ? pos.isInRange
-                  : pos.isOutOfRange !== undefined
-                    ? !pos.isOutOfRange
-                    : true;
-            const openedAt =
-              pos.opened_at ||
-              (pos.createdAt ? pos.createdAt * 1000 : undefined) ||
-              Date.now() - 3600000;
+      if (result && Array.isArray(result.positions)) {
+        for (const pos of result.positions) {
+          const lowerBinId =
+            pos.lower_bin_id !== undefined ? pos.lower_bin_id : (pos.lowerBinId ?? 0);
+          const upperBinId =
+            pos.upper_bin_id !== undefined ? pos.upper_bin_id : (pos.upperBinId ?? 0);
+          const isInRange =
+            pos.is_in_range !== undefined
+              ? pos.is_in_range
+              : pos.isInRange !== undefined
+                ? pos.isInRange
+                : pos.isOutOfRange !== undefined
+                  ? !pos.isOutOfRange
+                  : true;
+          const openedAt =
+            pos.opened_at ||
+            (pos.createdAt ? pos.createdAt * 1000 : undefined) ||
+            Date.now() - 3600000;
 
-            const positionId = pos.address || pos.positionAddress || pos.position_address || '';
+          const positionId = pos.address || pos.positionAddress || pos.position_address || '';
 
-            let amtX = '0';
-            let amtY = '0';
+          let amtX = '0';
+          let amtY = '0';
 
-            if (pos.unrealizedPnl?.balanceTokenX?.amount !== undefined) {
-              amtX = parseDecimalToRaw(pos.unrealizedPnl.balanceTokenX.amount, decimalsX);
-            } else if (pos.amount_x !== undefined) {
-              amtX = pos.amount_x;
-            } else if (pos.amountX !== undefined) {
-              amtX = pos.amountX;
-            }
-
-            if (pos.unrealizedPnl?.balanceTokenY?.amount !== undefined) {
-              amtY = parseDecimalToRaw(pos.unrealizedPnl.balanceTokenY.amount, decimalsY);
-            } else if (pos.amount_y !== undefined) {
-              amtY = pos.amount_y;
-            } else if (pos.amountY !== undefined) {
-              amtY = pos.amountY;
-            }
-
-            allPositions.push({
-              id: positionId,
-              poolAddress: pos.pool_address || pool,
-              chain: 'solana',
-              protocol: 'meteora_dlmm',
-              lowerBound: lowerBinId,
-              upperBound: upperBinId,
-              lowerBinId,
-              upperBinId,
-              tokenX: {
-                amount: amtX,
-                decimals: decimalsX,
-                mint: tokenXMint,
-                tokenAddress: tokenXMint,
-              },
-              tokenY: {
-                amount: amtY,
-                decimals: decimalsY,
-                mint: tokenYMint,
-                tokenAddress: tokenYMint,
-              },
-              isInRange,
-              openedAt,
-              metadata: {
-                strategy: 'trailing-usdc',
-                leverage: 10,
-              },
-            });
+          if (pos.unrealizedPnl?.balanceTokenX?.amount !== undefined) {
+            amtX = parseDecimalToRaw(pos.unrealizedPnl.balanceTokenX.amount, decimalsX);
+          } else if (pos.amount_x !== undefined) {
+            amtX = pos.amount_x;
+          } else if (pos.amountX !== undefined) {
+            amtX = pos.amountX;
           }
+
+          if (pos.unrealizedPnl?.balanceTokenY?.amount !== undefined) {
+            amtY = parseDecimalToRaw(pos.unrealizedPnl.balanceTokenY.amount, decimalsY);
+          } else if (pos.amount_y !== undefined) {
+            amtY = pos.amount_y;
+          } else if (pos.amountY !== undefined) {
+            amtY = pos.amountY;
+          }
+
+          allPositions.push({
+            id: positionId,
+            poolAddress: pos.pool_address || pool,
+            chain: 'solana',
+            protocol: 'meteora_dlmm',
+            lowerBound: lowerBinId,
+            upperBound: upperBinId,
+            lowerBinId,
+            upperBinId,
+            tokenX: {
+              amount: amtX,
+              decimals: decimalsX,
+              mint: tokenXMint,
+              tokenAddress: tokenXMint,
+            },
+            tokenY: {
+              amount: amtY,
+              decimals: decimalsY,
+              mint: tokenYMint,
+              tokenAddress: tokenYMint,
+            },
+            isInRange,
+            openedAt,
+            metadata: {
+              strategy: 'trailing-usdc',
+              leverage: 10,
+            },
+          });
         }
-      } catch (err) {
-        logger.warn(`[MeteoraApiProvider] Failed to fetch positions for pool ${pool}: ${err}`);
       }
     }
 
@@ -234,9 +225,10 @@ export class MeteoraApiProvider implements IPositionProvider {
    * Reuses getPositions under the hood.
    *
    * @param {string} positionId - Unique position ID (pubkey on Solana).
+   * @param {string} [poolAddress] - Optional specific pool address to query.
    * @returns {Promise<Position>} The position object.
    */
-  public async getPosition(positionId: string): Promise<Position> {
+  public async getPosition(positionId: string, poolAddress?: string): Promise<Position> {
     logger.info(`[MeteoraApiProvider] Fetching position details for ${positionId}`);
 
     const walletAddress = process.env.WALLET_PUBKEY;
@@ -246,7 +238,7 @@ export class MeteoraApiProvider implements IPositionProvider {
       );
     }
 
-    const positions = await this.getPositions(walletAddress);
+    const positions = await this.getPositions(walletAddress, poolAddress);
 
     const position = positions.find((p) => p.id === positionId);
     if (position) {

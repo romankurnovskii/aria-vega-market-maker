@@ -113,7 +113,7 @@ export function startHttpServer(
   app.post('/strategies/:id/evaluate', async (req, res) => {
     try {
       const { id: strategyId } = req.params;
-      const { positionId } = req.body;
+      const { positionId, poolAddress } = req.body;
 
       if (!positionId) {
         res.status(400).json({ error: 'Missing positionId in request body' });
@@ -124,7 +124,7 @@ export function startHttpServer(
         `[HTTP Server] Triggering manual ad-hoc strategy evaluation for ${strategyId} on position ${positionId}`
       );
 
-      const position = await positionProvider.getPosition(positionId);
+      const position = await positionProvider.getPosition(positionId, poolAddress);
       const market = await positionProvider.getMarketSnapshot(position.poolAddress);
 
       const orchestrators = registry.getForPosition(positionId);

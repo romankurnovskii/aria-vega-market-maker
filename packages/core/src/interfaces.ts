@@ -67,8 +67,8 @@ export interface IExecutor {
 }
 
 export interface IPositionProvider {
-  getPositions(walletAddress: string): Promise<Position[]>;
-  getPosition(positionId: string): Promise<Position>;
+  getPositions(walletAddress: string, poolAddress?: string): Promise<Position[]>;
+  getPosition(positionId: string, poolAddress?: string): Promise<Position>;
   getPoolInfo(poolAddress: string): Promise<PoolInfo>;
   getMarketSnapshot(poolAddress: string): Promise<MarketSnapshot>;
 }
