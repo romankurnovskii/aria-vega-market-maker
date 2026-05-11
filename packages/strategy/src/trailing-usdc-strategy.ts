@@ -16,15 +16,18 @@ import {
   Position,
   MarketSnapshot,
   StrategyResult,
-  StepContext
+  StepContext,
 } from '@lp-system/core';
 import {
   InitializationCheckStep,
   TrailingRangeCheckStep,
   RangeCalculatorStep,
-  AmountCalculatorStep
+  AmountCalculatorStep,
 } from '@lp-system/steps';
 import { Workflow } from './workflow.js';
+import { getLogger } from '@lp-system/logger';
+
+const logger = getLogger('trailing-usdc-strategy');
 
 /**
  * TrailingUsdcStrategy: maintains a CLMM LP position centered on the active price bin.
@@ -45,7 +48,7 @@ export class TrailingUsdcStrategy implements IStrategy {
       new InitializationCheckStep(),
       new TrailingRangeCheckStep(),
       new RangeCalculatorStep(),
-      new AmountCalculatorStep()
+      new AmountCalculatorStep(),
     ]);
   }
 
@@ -63,45 +66,49 @@ export class TrailingUsdcStrategy implements IStrategy {
     market: MarketSnapshot,
     params: Record<string, unknown>
   ): Promise<StrategyResult> {
-    console.log(`[TrailingUsdcStrategy] Initiating strategy evaluation for position: ${position.id}`);
+    logger.info(
+      `[TrailingUsdcStrategy] Initiating strategy evaluation for position: ${position.id}`
+    );
 
     const mergedParams = {
       ...this.defaultParams,
-      ...params
+      ...params,
     };
 
     const initialContext: StepContext = {
       position,
       market,
-      params: mergedParams
+      params: mergedParams,
     };
 
     const finalContext = await this.workflow.run(initialContext);
 
-    console.log(`[TrailingUsdcStrategy] Finished evaluation. Signal: ${finalContext.signal || 'skip'}. Reason: ${finalContext.reason || 'None'}`);
+    logger.info(
+      `[TrailingUsdcStrategy] Finished evaluation. Signal: ${finalContext.signal || 'skip'}. Reason: ${finalContext.reason || 'None'}`
+    );
 
     if (finalContext.signal === 'close+open' && finalContext.openParams) {
       return {
         action: 'close+open',
-        openParams: finalContext.openParams
+        openParams: finalContext.openParams,
       };
     }
 
     if (finalContext.signal === 'close') {
       return {
-        action: 'close'
+        action: 'close',
       };
     }
 
     if (finalContext.signal === 'open' && finalContext.openParams) {
       return {
         action: 'open',
-        params: finalContext.openParams
+        params: finalContext.openParams,
       };
     }
 
     return {
-      action: 'skip'
+      action: 'skip',
     };
   }
 }
