@@ -1,6 +1,19 @@
+/**
+ * @file main.ts
+ * @description Engine entry point: boots the full Solana CLMM automation system.
+ *
+ * @features
+ * - Initializes all layers: providers (RPC + API), persistence, strategy, orchestration, executor
+ * - Bootstraps a demo assignment on first run (writes to data/assignments.json)
+ * - Starts three concurrent systems: discovery loop, tick loop, HTTP server
+ * - Registers SIGINT/SIGTERM handlers for graceful shutdown
+ *
+ * @dependencies All @lp-system packages: providers, core, persistence, strategy, orchestration, executor
+ * @sideEffects Console logging, writes initial demo assignment to disk, starts HTTP server on PORT, spawns intervals
+ */
 import {
   MeteoraApiProvider,
-  HelioRpcProvider,
+  HeliusRpcProvider,
   SolanaRpcProvider,
   RpcPool
 } from '@lp-system/providers';
@@ -18,9 +31,12 @@ import { startHttpServer } from './server.js';
 const WALLET = process.env.WALLET_PUBKEY || 'mock_wallet_pubkey_77777777777777777777';
 const TICK_INTERVAL_MS = Number(process.env.TICK_INTERVAL_MS) || 10000;
 const METEORA_API_URL = process.env.METEORA_API_URL || 'https://dlmm.datapi.meteora.ag';
-const HELIO_URL = process.env.HELIO_URL || 'https://mainnet.helius-rpc.com/?api-key=xxx';
+const HELIUS_URL = process.env.HELIUS_URL || process.env.HELIO_URL || 'https://mainnet.helius-rpc.com/?api-key=xxx';
 const SOLANA_URL = process.env.SOLANA_URL || 'https://api.mainnet-beta.solana.com';
 
+/**
+ * Main application bootstrap: wires all layers and starts event loops.
+ */
 async function main() {
   console.log('====================================================');
   console.log('       SOLANA CLMM LP AUTOMATION SYSTEM             ');
@@ -29,9 +45,9 @@ async function main() {
   console.log(`[Config] Tick Interval: ${TICK_INTERVAL_MS}ms`);
 
   // 1. Providers initialization
-  const helio = new HelioRpcProvider(HELIO_URL);
+  const helius = new HeliusRpcProvider(HELIUS_URL);
   const solana = new SolanaRpcProvider(SOLANA_URL);
-  const rpcPool = new RpcPool([helio, solana]);
+  const rpcPool = new RpcPool([helius, solana]);
   const positionProvider = new MeteoraApiProvider(METEORA_API_URL);
 
   // 2. Persistence Layer initialization

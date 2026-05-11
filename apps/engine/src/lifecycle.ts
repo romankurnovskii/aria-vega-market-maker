@@ -1,3 +1,14 @@
+/**
+ * @file lifecycle.ts
+ * @description Engine lifecycle management: discovery and tick loop orchestration.
+ *
+ * @features
+ * - startDiscovery(): Initial position discovery — detects new/closed positions, syncs local store, registers orchestrators
+ * - startTickLoop(): Continuous evaluation loop — ticks all orchestrators, gates decisions, executes via executor, persists records
+ *
+ * @dependencies All I* interfaces from @lp-system/core, OrchestratorFactory
+ * @sideEffects startDiscovery modifies JsonPositionStore; startTickLoop spawns interval that mutates persistent store and calls executor
+ */
 import {
   IPositionProvider,
   IPositionStore,
@@ -10,6 +21,17 @@ import {
 } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 
+/**
+ * Starts the one-time position discovery cycle.
+ * Fetches live on-chain positions, identifies new vs closed, and registers new orchestrators.
+ *
+ * @param {string} walletAddress - Wallet to fetch positions for.
+ * @param {IPositionProvider} positionProvider - Data source for on-chain positions and markets.
+ * @param {IPositionStore} positionStore - Persistence layer for known position cache.
+ * @param {OrchestratorFactory} factory - Creates orchestrators for new assignments.
+ * @param {IStore} store - Assignment store (for matching assignments to new positions).
+ * @param {IOrchestratorRegistry} registry - Runtime registry where new orchestrators are registered.
+ */
 export async function startDiscovery(
   walletAddress: string,
   positionProvider: IPositionProvider,
@@ -59,6 +81,19 @@ export async function startDiscovery(
   console.log('[Discovery] Discovery cycle finalized successfully.');
 }
 
+/**
+ * Starts the continuous tick loop for all registered orchestrators.
+ *
+ * @param {number} intervalMs - Tick interval in milliseconds.
+ * @param {string} walletAddress - Wallet address (for RPC calls).
+ * @param {IPositionProvider} positionProvider - On-chain data fetching.
+ * @param {IPositionStore} positionStore - Known position cache.
+ * @param {IOrchestratorRegistry} registry - Active orchestrators to tick.
+ * @param {IExecutionGate} executionGate - Decision filter before executor.
+ * @param {IExecutor} executor - Transaction executor.
+ * @param {IStore} store - Persists execution records.
+ * @returns {NodeJS.Timeout} Interval handle for cancellation.
+ */
 export function startTickLoop(
   intervalMs: number,
   walletAddress: string,
@@ -77,11 +112,18 @@ export function startTickLoop(
       const knownPositions = await positionStore.getKnown();
 
       for (const position of knownPositions) {
-        console.log(`[Tick Loop] Evaluating position ${position.id}`);
+        const chain = position.chain || 'solana';
+        console.log(`[Tick Loop] Evaluating position ${position.id} on chain [${chain}]`);
 
         // Fetch fresh status and snapshot
         const freshPosition = await positionProvider.getPosition(position.id);
         const market = await positionProvider.getMarketSnapshot(freshPosition.poolAddress);
+
+        if (chain !== 'solana') {
+          console.log(`[Tick Loop] Position ${position.id} is on chain ${chain} (EVM/Uniswap execution is pending Phase B). Skipping evaluation.`);
+          continue;
+        }
+
         const orchestrators = registry.getForPosition(freshPosition.id);
 
         const activeResults: Recommendation[] = [];
