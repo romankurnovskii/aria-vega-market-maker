@@ -465,7 +465,15 @@ export function startTickLoop(
     `[Tick Loop] Launching continuous evaluation tick loop for wallet ${walletAddress}. Interval: ${intervalMs}ms`
   );
 
+  let isRunning = false;
   const loop = setInterval(async () => {
+    if (isRunning) {
+      logger.info(
+        `[Tick Loop] Previous execution cycle is still active. Skipping overlapping tick loop.`
+      );
+      return;
+    }
+    isRunning = true;
     try {
       logger.info('[Tick Loop] Starting tick execution cycle...');
 

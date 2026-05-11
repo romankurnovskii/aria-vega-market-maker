@@ -8,7 +8,7 @@ import {
   Logger as LoggerWinston,
 } from 'winston';
 import dotenv from 'dotenv';
-import { LOCAL_DB_LOGS_PATH } from '@lp-system/config';
+import { LOCAL_DB_LOGS_PATH, PROJECT_ROOT_PATH } from '@lp-system/config';
 import { stringify } from './helpers.js';
 
 // Ensure the logs directory exists immediately when logger is loaded.
@@ -22,7 +22,7 @@ try {
 }
 
 const isDocker = (process.env.DOCKER_ENV || 'false').toLowerCase() === 'true';
-dotenv.config({ path: '.env', override: !isDocker });
+dotenv.config({ path: path.join(PROJECT_ROOT_PATH, '.env'), override: !isDocker });
 
 const customFormat = format.printf(({ level, label, message, timestamp }) => {
   return `${timestamp} [${label}] ${level.toUpperCase()}: ${message}`;
@@ -32,7 +32,7 @@ const customFormat = format.printf(({ level, label, message, timestamp }) => {
  * Processes multiple logging arguments (including errors, nested objects, Maps, and Sets)
  * and returns a single concatenated human-readable string.
  */
-function processArguments(arguments_: any[]): string {
+function processArguments(arguments_: unknown[]): string {
   return arguments_
     .map((argument) => {
       if (argument instanceof Map || argument instanceof Set) {
@@ -107,7 +107,7 @@ export const getLogger = (serviceName: string): LoggerWinston => {
   ];
   for (const level of levels) {
     const originalMethod = logger[level].bind(logger);
-    logger[level] = (...arguments_: any[]) => {
+    logger[level] = (...arguments_: unknown[]) => {
       const message = processArguments(arguments_);
       return originalMethod(message);
     };
