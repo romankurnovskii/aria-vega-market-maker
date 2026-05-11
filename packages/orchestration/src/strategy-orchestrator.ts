@@ -10,6 +10,7 @@
  * @dependencies IOrchestrator, IStrategy, Position, MarketSnapshot, StrategyResult (from @lp-system/core)
  * @sideEffects None — pure delegation, state held externally in registry
  */
+import { IOrchestrator, IStrategy, Position, MarketSnapshot, StrategyResult } from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
 const logger = getLogger('strategy-orchestrator');
 
@@ -48,7 +49,9 @@ export class StrategyOrchestrator implements IOrchestrator {
    * @returns {Promise<StrategyResult>} Strategy's recommendation (skip/close/open/close+open).
    */
   public async tick(position: Position, market: MarketSnapshot): Promise<StrategyResult> {
-    logger.info(`[StrategyOrchestrator] Ticking orchestrator ${this.id} for position ${this.positionId}. Mode: ${this.mode}`);
+    logger.info(
+      `[StrategyOrchestrator] Ticking orchestrator ${this.id} for position ${this.positionId}. Mode: ${this.mode}`
+    );
     return await this.strategy.execute(position, market, this.params);
   }
 }

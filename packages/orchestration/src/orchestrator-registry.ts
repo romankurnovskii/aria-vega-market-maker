@@ -15,6 +15,9 @@ import { IOrchestratorRegistry, IOrchestrator } from '@lp-system/core';
 /**
  * OrchestratorRegistry: in-memory Map-based registry for orchestrator lifecycle.
  */
+import { getLogger } from '@lp-system/logger';
+const logger = getLogger('orchestrator-registry');
+
 export class OrchestratorRegistry implements IOrchestratorRegistry {
   private registry = new Map<string, IOrchestrator>();
 
@@ -24,7 +27,9 @@ export class OrchestratorRegistry implements IOrchestratorRegistry {
    * @param {IOrchestrator} orchestrator - The orchestrator to register.
    */
   public register(orchestrator: IOrchestrator): void {
-    console.log(`[OrchestratorRegistry] Registering orchestrator ${orchestrator.id} for position ${orchestrator.positionId}`);
+    logger.info(
+      `[OrchestratorRegistry] Registering orchestrator ${orchestrator.id} for position ${orchestrator.positionId}`
+    );
     this.registry.set(orchestrator.id, orchestrator);
   }
 
@@ -36,7 +41,9 @@ export class OrchestratorRegistry implements IOrchestratorRegistry {
   public deregister(id: string): void {
     const existing = this.registry.get(id);
     if (existing) {
-      console.log(`[OrchestratorRegistry] Deregistering orchestrator ${id} from position ${existing.positionId}`);
+      logger.info(
+        `[OrchestratorRegistry] Deregistering orchestrator ${id} from position ${existing.positionId}`
+      );
       this.registry.delete(id);
     }
   }

@@ -12,6 +12,8 @@
  */
 import { Assignment, IOrchestrator, IStrategy } from '@lp-system/core';
 import { StrategyOrchestrator } from './strategy-orchestrator.js';
+import { getLogger } from '@lp-system/logger';
+const logger = getLogger('orchestrator-factory');
 
 /**
  * Orchestrator factory: creates per-assignment orchestrator instances.
@@ -37,18 +39,25 @@ export class OrchestratorFactory {
    * @returns {IOrchestrator} Configured orchestrator ready to tick.
    * @throws {Error} If assignment.strategyId is not in the strategies registry.
    */
-  public create(assignment: Assignment, customParams: Record<string, unknown> = {}): IOrchestrator {
+  public create(
+    assignment: Assignment,
+    customParams: Record<string, unknown> = {}
+  ): IOrchestrator {
     const strategy = this.strategies[assignment.strategyId];
     if (!strategy) {
-      throw new Error(`Strategy with ID '${assignment.strategyId}' is not registered in this factory`);
+      throw new Error(
+        `Strategy with ID '${assignment.strategyId}' is not registered in this factory`
+      );
     }
 
     const mergedParams = {
       ...this.defaultParams,
-      ...customParams
+      ...customParams,
     };
 
-    console.log(`[OrchestratorFactory] Creating StrategyOrchestrator for assignment ${assignment.id} targeting position ${assignment.positionId}`);
+    logger.info(
+      `[OrchestratorFactory] Creating StrategyOrchestrator for assignment ${assignment.id} targeting position ${assignment.positionId}`
+    );
     return new StrategyOrchestrator(
       assignment.id,
       assignment.positionId,

@@ -10,6 +10,9 @@
  * @dependencies None
  * @sideEffects Logs failure count and trip events to console
  */
+import { getLogger } from '@lp-system/logger';
+const logger = getLogger('circuit-breaker');
+
 export class CircuitBreaker {
   private tripped = false;
   private consecutiveFailures = 0;
@@ -31,10 +34,14 @@ export class CircuitBreaker {
    */
   public recordFailure(error: any): void {
     this.consecutiveFailures++;
-    console.error(`[CircuitBreaker] Failure recorded: ${error?.message || error}. Consecutive count: ${this.consecutiveFailures}`);
+    logger.error(
+      `[CircuitBreaker] Failure recorded: ${error?.message || error}. Consecutive count: ${this.consecutiveFailures}`
+    );
     if (this.consecutiveFailures >= this.maxConsecutiveFailures) {
       this.tripped = true;
-      console.error(`[CircuitBreaker] TRIPPED! Maximum consecutive failures exceeded. System halted.`);
+      logger.error(
+        `[CircuitBreaker] TRIPPED! Maximum consecutive failures exceeded. System halted.`
+      );
     }
   }
 
@@ -51,6 +58,6 @@ export class CircuitBreaker {
   public reset(): void {
     this.tripped = false;
     this.consecutiveFailures = 0;
-    console.log('[CircuitBreaker] Circuit breaker reset to healthy closed state.');
+    logger.info('[CircuitBreaker] Circuit breaker reset to healthy closed state.');
   }
 }
