@@ -58,8 +58,9 @@ async function main() {
 
   // 2. Persistence Layer initialization
   // Saving persistence database in ./data directory inside root workspace
-  const store = new JsonFileStore('./data');
-  const positionStore = new JsonPositionStore('./data');
+  const APP_ENV = process.env.APP_ENV || process.env.NODE_ENV || 'dev';
+  const store = new JsonFileStore('./data', { wallet: WALLET, env: APP_ENV });
+  const positionStore = new JsonPositionStore('./data', { wallet: WALLET, env: APP_ENV });
 
   // 3. Strategy initialization
   const trailingUsdcStrategy = new TrailingUsdcStrategy({ rangePercent: 20 });

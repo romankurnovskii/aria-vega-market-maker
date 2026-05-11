@@ -101,8 +101,7 @@ export function startHttpServer(
       await store.deleteAssignment(id);
 
       // 2. Deregister from memory registry
-      const orchId = `orch_${id}`;
-      registry.deregister(orchId);
+      registry.deregisterByAssignmentId(id);
 
       res.json({ message: `Assignment ${id} removed successfully` });
     } catch (error: any) {

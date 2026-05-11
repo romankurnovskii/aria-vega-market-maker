@@ -94,6 +94,7 @@ export interface IPositionStore {
 export interface IOrchestratorRegistry {
   register(orchestrator: IOrchestrator): void;
   deregister(id: string): void;
+  deregisterByAssignmentId(assignmentId: string): void;
   getForPosition(positionId: string): IOrchestrator[];
   get(id: string): IOrchestrator | undefined;
   getAll(): IOrchestrator[];

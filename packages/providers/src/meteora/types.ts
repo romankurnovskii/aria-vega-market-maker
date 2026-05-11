@@ -138,6 +138,24 @@ export interface DatapiPosition {
   amountX?: string;
   amountY?: string;
   isInRange?: boolean;
+  positionAddress?: string;
+  position_address?: string;
+  isOutOfRange?: boolean;
+  createdAt?: number;
+  unrealizedPnl?: {
+    balances?: number;
+    balancesSol?: string;
+    balanceTokenX?: {
+      amount: string;
+      usd: string;
+      amountSol: string;
+    };
+    balanceTokenY?: {
+      amount: string;
+      usd: string;
+      amountSol: string;
+    };
+  };
 }
 
 export interface PositionsPnlResponse {
