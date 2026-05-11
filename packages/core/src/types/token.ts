@@ -12,7 +12,7 @@ export interface TokenAmount {
   amount: string;
   decimals: number;
   tokenAddress: string; // Agnostic address/mint
-  
+
   /**
    * @deprecated Use `tokenAddress` instead. This is kept for legacy Solana support.
    */
