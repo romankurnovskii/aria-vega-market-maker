@@ -8,7 +8,8 @@
     "@lp-system/core": "workspace:*",
     "@lp-system/logger": "workspace:*",
     "@lp-system/providers": "workspace:*",
-    "@solana/web3.js": "^1.98.4"
+    "@solana/web3.js": "^1.98.4",
+    "bn.js": "^5.2.3"
   },
   "scripts": {
     "build": "tsc",

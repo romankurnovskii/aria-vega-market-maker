@@ -1,49 +1,67 @@
 /**
  * @file rpc-pool.ts
- * @description Connection pool aggregating multiple IRpcProvider endpoints for resilience and load balancing.
- *
- * @features
- * - Holds an array of IRpcProvider instances (e.g., Helius + public Solana)
- * - Placeholder implementation: currently a stub; full load-balancing/failover logic to be implemented
- *
- * @dependencies IRpcProvider (from @lp-system/core)
- * @sideEffects None — in-memory aggregation layer
+ * @description Load-balanced RPC pool for high-availability Solana interactions.
+ * * @features
+ * - Round-robin provider selection to distribute request load.
+ * - Automatic failover: If a provider fails, it tries the next one in the pool.
+ * - Seamless integration with SolanaExecutor for transaction submission and verification.
  */
+import { Connection } from '@solana/web3.js';
 import { IRpcProvider } from '@lp-system/core';
+import { getLogger } from '@lp-system/logger';
 
-/**
- * RpcPool: aggregates multiple RPC providers for failover and load distribution.
- * Currently implements basic constructor only; full pooling logic pending.
- */
+const logger = getLogger('rpc-pool');
+
 export class RpcPool implements IRpcProvider {
   private providers: IRpcProvider[];
+  private currentIndex: number = 0;
 
-  /**
-   * Constructs the pool with a list of RPC providers.
-   *
-   * @param {IRpcProvider[]} providers - Array of provider instances to pool.
-   */
   constructor(providers: IRpcProvider[]) {
+    if (providers.length === 0) {
+      throw new Error('[RpcPool] Cannot initialize with an empty provider list.');
+    }
     this.providers = providers;
   }
 
   /**
-   * Returns the connection of the first provider (placeholder).
-   *
-   * @returns {any} Connection placeholder from first provider.
+   * Returns the connection from the currently active provider in the rotation.
    */
-  public getConnection(): any {
-    return this.providers[0]?.getConnection();
+  public getConnection(): Connection {
+    return this.providers[this.currentIndex].getConnection();
   }
 
   /**
-   * Executes function against provider pool (round-robin or failover strategy placeholder).
-   *
-   * @param {<T>(conn: any) => Promise<T>} fn - Async function to execute.
-   * @returns {Promise<T>} Result from the provider execution.
+   * Executes an RPC call with built-in failover across the pool.
+   * If the current provider fails, it automatically rotates to the next available one.
    */
-  public async execute<T>(fn: (conn: any) => Promise<T>): Promise<T> {
-    // TODO: Implement round-robin or failover across providers
-    return fn(this.getConnection());
+  public async execute<T>(fn: (conn: Connection) => Promise<T>): Promise<T> {
+    let lastError: any;
+
+    // Attempt to execute the call, potentially trying every provider in the pool once
+    for (let i = 0; i < this.providers.length; i++) {
+      const provider = this.providers[this.currentIndex];
+
+      try {
+        const result = await provider.execute(fn);
+
+        // On success, we move the index forward for the NEXT call (Round-Robin)
+        this.rotate();
+        return result;
+      } catch (error: any) {
+        lastError = error;
+        logger.warn(`[RpcPool] Provider ${this.currentIndex} failed. Rotating to next... Error: ${error.message}`);
+        this.rotate();
+      }
+    }
+
+    logger.error('[RpcPool] All providers in the pool failed to execute the request.');
+    throw lastError;
+  }
+
+  /**
+   * Moves the internal pointer to the next provider in a circular fashion.
+   */
+  private rotate(): void {
+    this.currentIndex = (this.currentIndex + 1) % this.providers.length;
   }
 }
