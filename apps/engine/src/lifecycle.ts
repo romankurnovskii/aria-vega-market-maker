@@ -16,13 +16,64 @@ import {
   IOrchestratorRegistry,
   IExecutionGate,
   IExecutor,
+  IRpcProvider,
   Recommendation,
   Decision,
+  Position,
 } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
 
 const logger = getLogger('lifecycle');
+
+import { PublicKey, Connection } from '@solana/web3.js';
+
+/**
+ * Robust helper to fetch raw SPL token account balances for token X and token Y of a pool.
+ */
+async function getWalletBalances(
+  connection: Connection,
+  walletAddress: string,
+  mintX: string,
+  mintY: string
+): Promise<{ amountX: string; amountY: string }> {
+  let amountX = '0';
+  let amountY = '0';
+
+  const tokenProgramId = new PublicKey('TokenkegQfeZyiNWxFb9eeB2m3tFhGE5IBgxYvhFr1i');
+  const token2022ProgramId = new PublicKey('TokenzQhb8NsH26e8m1Yg9UP9Kaj15saWJ361v27m1');
+
+  const fetchForProgram = async (programId: PublicKey) => {
+    try {
+      const response = await connection.getParsedTokenAccountsByOwner(
+        new PublicKey(walletAddress),
+        { programId }
+      );
+      for (const account of response.value) {
+        const info = account.account.data.parsed.info;
+        const mint = info.mint;
+        const amount = info.tokenAmount.amount; // raw string format
+
+        if (mint === mintX) {
+          amountX = amount;
+        } else if (mint === mintY) {
+          amountY = amount;
+        }
+      }
+    } catch (err: unknown) {
+      logger.warn(
+        `[getWalletBalances] Failed to fetch token accounts for program ${programId.toBase58()}: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+    }
+  };
+
+  await fetchForProgram(tokenProgramId);
+  await fetchForProgram(token2022ProgramId);
+
+  return { amountX, amountY };
+}
 
 /**
  * Starts the one-time position discovery cycle.
@@ -105,7 +156,8 @@ export function startTickLoop(
   registry: IOrchestratorRegistry,
   executionGate: IExecutionGate,
   executor: IExecutor,
-  store: IStore
+  store: IStore,
+  rpcPool: IRpcProvider
 ): NodeJS.Timeout {
   logger.info(
     `[Tick Loop] Launching continuous evaluation tick loop for wallet ${walletAddress}. Interval: ${intervalMs}ms`
@@ -115,79 +167,149 @@ export function startTickLoop(
     try {
       logger.info('[Tick Loop] Starting tick execution cycle...');
       const knownPositions = await positionStore.getKnown();
+      const updatedKnownPositions: Position[] = [...knownPositions];
+      let storeNeedsUpdate = false;
 
       for (const position of knownPositions) {
-        const chain = position.chain || 'solana';
-        logger.info(`[Tick Loop] Evaluating position ${position.id} on chain [${chain}]`);
+        try {
+          const chain = position.chain || 'solana';
+          logger.info(`[Tick Loop] Evaluating position ${position.id} on chain [${chain}]`);
 
-        // Fetch fresh status and snapshot
-        const freshPosition = await positionProvider.getPosition(
-          position.id,
-          position.poolAddress
-        );
-        const market = await positionProvider.getMarketSnapshot(freshPosition.poolAddress);
-
-        if (chain !== 'solana') {
-          logger.info(
-            `[Tick Loop] Position ${position.id} is on chain ${chain} (EVM/Uniswap execution is pending Phase B). Skipping evaluation.`
-          );
-          continue;
-        }
-
-        const orchestrators = registry.getForPosition(freshPosition.id);
-
-        const activeResults: Recommendation[] = [];
-
-        for (const orch of orchestrators) {
-          try {
-            const result = await orch.tick(freshPosition, market);
-            if (result.action !== 'skip' && orch.mode === 'active') {
-              activeResults.push({ assignmentId: orch.assignmentId, result });
-            }
-          } catch (orchError: any) {
-            logger.error(
-              `[Tick Loop] Orchestrator ${orch.id} failed tick: ${orchError.message || orchError}`
+          if (chain !== 'solana') {
+            logger.info(
+              `[Tick Loop] Position ${position.id} is on chain ${chain} (EVM/Uniswap execution is pending Phase B). Skipping evaluation.`
             );
+            continue;
           }
-        }
 
-        // Pass active recommendations through execution gate
-        const decision: Decision | null = executionGate.consider(
-          activeResults,
-          freshPosition.id
-        );
-
-        if (decision) {
-          logger.info(`[Tick Loop] Executable decision gated. Dispatched to executor...`);
-          // SolanaExecutor uses RpcPool for Connection. We pass our global executor apply.
-          const record = await executor.apply(decision, market, async (posId: string) => {
-            logger.info(`[Re-Evaluation Callback] Initiated for position: ${posId}`);
-            const updatedPos = await positionProvider.getPosition(
-              posId,
-              freshPosition.poolAddress
+          // Fetch fresh status and snapshot
+          let freshPosition: Position;
+          try {
+            freshPosition = await positionProvider.getPosition(
+              position.id,
+              position.poolAddress
             );
-            const updatedMarket = await positionProvider.getMarketSnapshot(
-              updatedPos.poolAddress
-            );
-            const activeOrchs = registry.getForPosition(posId);
-
-            for (const o of activeOrchs) {
-              const res = await o.tick(updatedPos, updatedMarket);
-              if (res.action !== 'skip') {
-                return res;
+          } catch (getPosError: unknown) {
+            if (getPosError instanceof Error && getPosError.message.includes('not found')) {
+              logger.warn(
+                `[Tick Loop] Position ${position.id} was not found on-chain. Pruning from local cache and registry.`
+              );
+              // Deregister from registry
+              const activeOrchs = registry.getForPosition(position.id);
+              for (const orch of activeOrchs) {
+                registry.deregister(orch.id);
               }
+              // Remove from updated known list
+              const index = updatedKnownPositions.findIndex((p) => p.id === position.id);
+              if (index >= 0) {
+                updatedKnownPositions.splice(index, 1);
+                storeNeedsUpdate = true;
+              }
+              continue;
             }
-            return { action: 'skip' };
-          });
+            throw getPosError;
+          }
 
-          await store.saveExecutionRecord(record);
-        } else {
-          logger.info(`[Tick Loop] No execution required for position ${position.id}`);
+          const market = await positionProvider.getMarketSnapshot(freshPosition.poolAddress);
+
+          const orchestrators = registry.getForPosition(freshPosition.id);
+
+          const activeResults: Recommendation[] = [];
+
+          for (const orch of orchestrators) {
+            try {
+              const result = await orch.tick(freshPosition, market);
+              if (result.action !== 'skip' && orch.mode === 'active') {
+                activeResults.push({ assignmentId: orch.assignmentId, result });
+              }
+            } catch (orchError: unknown) {
+              logger.error(
+                `[Tick Loop] Orchestrator ${orch.id} failed tick: ${
+                  orchError instanceof Error ? orchError.message : String(orchError)
+                }`
+              );
+            }
+          }
+
+          // Pass active recommendations through execution gate
+          const decision: Decision | null = executionGate.consider(
+            activeResults,
+            freshPosition.id
+          );
+
+          if (decision) {
+            logger.info(`[Tick Loop] Executable decision gated. Dispatched to executor...`);
+            // SolanaExecutor uses RpcPool for Connection. We pass our global executor apply.
+            const record = await executor.apply(decision, market, async (posId: string) => {
+              logger.info(`[Re-Evaluation Callback] Initiated for position: ${posId}`);
+
+              // Get the live token balances for X and Y from the wallet
+              const poolInfo = await positionProvider.getPoolInfo(freshPosition.poolAddress);
+
+              // Query RPC for wallet token balances
+              const walletBalances = await rpcPool.execute(async (connection: Connection) => {
+                return await getWalletBalances(
+                  connection,
+                  walletAddress,
+                  poolInfo.tokenXAddress,
+                  poolInfo.tokenYAddress
+                );
+              });
+
+              logger.info(
+                `[Re-Evaluation Callback] Fetched wallet balances for rebalance. Token X: ${walletBalances.amountX}, Token Y: ${walletBalances.amountY}`
+              );
+
+              // Construct synthetic position using pre-closure metadata and fresh wallet balances
+              const syntheticPos: Position = {
+                ...freshPosition,
+                tokenX: {
+                  ...freshPosition.tokenX,
+                  amount: walletBalances.amountX,
+                },
+                tokenY: {
+                  ...freshPosition.tokenY,
+                  amount: walletBalances.amountY,
+                },
+                isInRange: true,
+              };
+
+              const updatedMarket = await positionProvider.getMarketSnapshot(
+                freshPosition.poolAddress
+              );
+              const activeOrchs = registry.getForPosition(posId);
+
+              for (const o of activeOrchs) {
+                const res = await o.tick(syntheticPos, updatedMarket);
+                if (res.action !== 'skip') {
+                  return res;
+                }
+              }
+              return { action: 'skip' };
+            });
+
+            await store.saveExecutionRecord(record);
+          } else {
+            logger.info(`[Tick Loop] No execution required for position ${position.id}`);
+          }
+        } catch (posError: unknown) {
+          logger.error(
+            `[Tick Loop] Error evaluating position ${position.id}: ${
+              posError instanceof Error ? posError.message : String(posError)
+            }`
+          );
         }
       }
-    } catch (error: any) {
+
+      if (storeNeedsUpdate) {
+        logger.info(`[Tick Loop] Saving updated known positions cache...`);
+        await positionStore.saveKnown(updatedKnownPositions);
+      }
+    } catch (error: unknown) {
       logger.error(
-        `[Tick Loop] Fatal error during tick execution cycle: ${error.message || error}`
+        `[Tick Loop] Fatal error during tick execution cycle: ${
+          error instanceof Error ? error.message : String(error)
+        }`
       );
     }
   }, intervalMs);
