@@ -4,18 +4,13 @@
     "ses_1e8d383d6ffez6Eqq0rDubzulW": {
       "worktreeId": null,
       "createdAt": "2026-05-11T13:14:11.903Z"
-    },
-    "ses_1e8adc9ecffePVKymAzGIcWxBE": {
-      "worktreeId": null,
-      "createdAt": "2026-05-11T13:55:24.327Z"
     }
   },
   "tabOrder": {
     "local": [
       "ses_1e8db92e7ffe0iBbKyL6h9Eg0p",
       "ses_1e8d383d6ffez6Eqq0rDubzulW",
-      "ses_1e8b8f174ffep6qIQnjBP2mmBV",
-      "ses_1e8adc9ecffePVKymAzGIcWxBE"
+      "ses_1e8b8f174ffep6qIQnjBP2mmBV"
     ]
   }
 }
