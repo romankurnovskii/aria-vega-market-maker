@@ -1,0 +1,20 @@
+services:
+  market-maker:
+    build:
+      context: .
+      dockerfile: apps/engine/Dockerfile
+    image: aria-vega-market-maker:latest
+    env_file: .env.prod
+    expose:
+      - '3000'
+    healthcheck:
+      test: ['CMD', 'node', '-e', "import('http').then(http => http.get('http://localhost:3000/health', r => process.exit(r.statusCode === 200 ? 0 : 1)))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    restart: always
+
+networks:
+  default:
+    name: aria-vega-prod
