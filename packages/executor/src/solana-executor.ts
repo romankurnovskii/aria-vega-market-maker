@@ -320,6 +320,16 @@ export class SolanaExecutor implements IExecutor {
 
       // 2. Sign and serialize the transaction
       tx.sign(this.keypair, ...additionalSigners);
+
+      // Preflight Simulation: verify transaction validity before broadcasting
+      logger.info(`[SolanaExecutor] Simulating transaction preflight check...`);
+      const simulation = await connection.simulateTransaction(tx);
+      if (simulation.value.err) {
+        logger.error(`[SolanaExecutor] Preflight simulation failed: ${JSON.stringify(simulation.value.err)}`);
+        throw new Error(`Transaction simulation failed: ${JSON.stringify(simulation.value.err)}`);
+      }
+      logger.info(`[SolanaExecutor] Preflight simulation succeeded. Units consumed: ${simulation.value.unitsConsumed || 0}`);
+
       const rawTx = tx.serialize();
 
       // 3. The Active Rebroadcast "Spam Loop" (UDP Delivery Assurance)
