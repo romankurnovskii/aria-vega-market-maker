@@ -203,7 +203,6 @@ export class MeteoraApiProvider implements IPositionProvider {
             isInRange,
             openedAt,
             metadata: {
-              strategy: 'trailing-usdc',
               leverage: 10,
               feeX: pos.fee_x || '0',
               feeY: pos.fee_y || '0',
