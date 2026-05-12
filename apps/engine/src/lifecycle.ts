@@ -25,6 +25,7 @@ import {
   Position,
   RebalanceTask,
   StrategyResult,
+  ExecutionRecord,
 } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
@@ -95,21 +96,56 @@ export async function startDiscovery(
   // 1. Fetch live positions, known persisted positions, and active tasks
   const livePositions = await positionProvider.getPositions(walletAddress);
   const knownPositions = await positionStore.getKnown();
-  const assignments = await store.getAssignments();
+  let assignments = await store.getAssignments();
 
-  const tasksStore = store as unknown as { getTasks?: () => Promise<RebalanceTask[]> };
-  const tasks = tasksStore.getTasks ? await tasksStore.getTasks() : [];
+  const tasksStore = store as unknown as {
+    getTasks?: () => Promise<RebalanceTask[]>;
+    deleteTask?: (id: string) => Promise<void>;
+  };
+  let tasks = tasksStore.getTasks ? await tasksStore.getTasks() : [];
+
+  // Recover tasks that finished opening but failed to clean up (newPositionId is set)
+  for (const task of tasks) {
+    if (task.newPositionId) {
+      logger.info(
+        `[Discovery] Recovered task ${task.id} with already-set newPositionId: ${task.newPositionId}. Registering new orchestrator and completing task.`
+      );
+
+      const matchingAssignment = assignments.find((a) => a.id === task.assignmentId);
+      if (matchingAssignment) {
+        matchingAssignment.positionId = task.newPositionId;
+        await store.saveAssignment(matchingAssignment);
+        logger.info(
+          `[Discovery] Recovered assignment ${matchingAssignment.id} updated to target new position ${task.newPositionId}`
+        );
+
+        // Register the new orchestrator
+        const orchestrator = factory.create(matchingAssignment);
+        orchestrator.isExecuting = false;
+        registry.register(orchestrator);
+      }
+
+      if (tasksStore.deleteTask) {
+        await tasksStore.deleteTask(task.id);
+        logger.info(`[Discovery] Cleaned up recovered task ${task.id}`);
+      }
+    }
+  }
+
+  // Reload assignments and tasks after recovery to work with clean state
+  assignments = await store.getAssignments();
+  tasks = tasksStore.getTasks ? await tasksStore.getTasks() : [];
 
   const liveIds = new Set(livePositions.map((p) => p.id));
   const knownIds = new Set(knownPositions.map((p) => p.id));
-  const inFlightPositionIds = new Set<string>(
-    tasks
-      .filter((t: RebalanceTask) => t.status === 'awaiting_settlement' || t.status === 'pending_open')
-      .map((t: RebalanceTask) => t.originalPositionId)
-  );
+  const inFlightPositionIds = new Set<string>(tasks.map((t: RebalanceTask) => t.originalPositionId));
 
   // 2. Identify live positions and ensure their orchestrators are registered
   for (const livePos of livePositions) {
+    if (!livePos.state) {
+      livePos.state = 'OPEN';
+    }
+
     const isNew = !knownIds.has(livePos.id);
     if (isNew) {
       logger.info(`[Discovery] Discovered new live position: ${livePos.id}`);
@@ -122,12 +158,21 @@ export async function startDiscovery(
     const existingOrchs = registry.getForPosition(livePos.id);
 
     for (const assignment of matchingAssignments) {
-      if (!existingOrchs.some((o) => o.id === assignment.id)) {
+      let orchestrator = existingOrchs.find((o) => o.assignmentId === assignment.id);
+      if (!orchestrator) {
         logger.info(
           `[Discovery] Registering orchestrator on startup for assignment ${assignment.id} (strategy: ${assignment.strategyId}) targeting position ${livePos.id}`
         );
-        const orchestrator = factory.create(assignment);
+        orchestrator = factory.create(assignment);
         registry.register(orchestrator);
+      }
+
+      // Restore executing lock if this position has an active rebalance task in flight (e.g. pending_close)
+      if (inFlightPositionIds.has(livePos.id)) {
+        orchestrator.isExecuting = true;
+        logger.info(
+          `[Discovery] Position ${livePos.id} is mid-rebalance on boot. Lock isExecuting set to true for orchestrator ${orchestrator.id}`
+        );
       }
     }
   }
@@ -135,15 +180,21 @@ export async function startDiscovery(
   // 3. Identify closed/removed positions
   for (const knownPos of knownPositions) {
     if (!liveIds.has(knownPos.id) && !inFlightPositionIds.has(knownPos.id)) {
-      logger.info(`[Discovery] Known position ${knownPos.id} is no longer on-chain. Pruning.`);
+      logger.info(`[Discovery] Known position ${knownPos.id} is no longer on-chain. Marking as CLOSED and archiving.`);
+
+      knownPos.state = 'CLOSED';
+      knownPos.closedAt = Date.now();
+      await positionStore.archivePosition(knownPos);
 
       const activeOrchestrators = registry.getForPosition(knownPos.id);
       for (const orch of activeOrchestrators) {
         registry.deregister(orch.id);
       }
     } else if (inFlightPositionIds.has(knownPos.id)) {
+      const task = tasks.find((t) => t.originalPositionId === knownPos.id);
+      knownPos.state = task?.intent.action === 'close' ? 'CLOSING' : 'REBALANCING';
       logger.info(
-        `[Discovery] Position ${knownPos.id} is not on-chain but has an active rebalance task. Retaining orchestrator.`
+        `[Discovery] Position ${knownPos.id} is not on-chain but has an active rebalance task. Retaining orchestrator and setting state to ${knownPos.state}.`
       );
       // Ensure orchestrator is registered and marked as executing
       const activeOrchestrators = registry.getForPosition(knownPos.id);
@@ -163,9 +214,23 @@ export async function startDiscovery(
   }
 
   // 4. Update local tracking store
-  if (!isDeepStrictEqual(knownPositions, livePositions)) {
+  const positionsToPersist: Position[] = [];
+  for (const livePos of livePositions) {
+    if (!positionsToPersist.some((p) => p.id === livePos.id)) {
+      positionsToPersist.push(livePos);
+    }
+  }
+  for (const knownPos of knownPositions) {
+    if (inFlightPositionIds.has(knownPos.id)) {
+      if (!positionsToPersist.some((p) => p.id === knownPos.id)) {
+        positionsToPersist.push(knownPos);
+      }
+    }
+  }
+
+  if (!isDeepStrictEqual(knownPositions, positionsToPersist)) {
     logger.info('[Discovery] Positions changed on-chain compared to cached. Persisting updated cache...');
-    await positionStore.saveKnown(livePositions);
+    await positionStore.saveKnown(positionsToPersist);
   } else {
     logger.info('[Discovery] Cached positions match on-chain positions. Disk write skipped.');
   }
@@ -182,7 +247,8 @@ export async function processTasks(
   rpcPool: IRpcProvider,
   walletAddress: string,
   registry: IOrchestratorRegistry,
-  positionStore: IPositionStore
+  positionStore: IPositionStore,
+  factory?: OrchestratorFactory
 ): Promise<void> {
   const tasksStore = store as unknown as {
     getTasks: () => Promise<RebalanceTask[]>;
@@ -238,6 +304,15 @@ export async function processTasks(
           return await getWalletBalances(connection, walletAddress, poolInfo.tokenXAddress, poolInfo.tokenYAddress);
         });
 
+        // Transition Position State in local cache
+        const knownPositions = await positionStore.getKnown();
+        const cachedPos = knownPositions.find((p) => p.id === task.originalPositionId);
+        if (cachedPos) {
+          cachedPos.state = task.intent.action === 'close' ? 'CLOSING' : 'REBALANCING';
+          await positionStore.saveKnown(knownPositions);
+          logger.info(`[Execution Monitor] Position ${task.originalPositionId} state updated to ${cachedPos.state}`);
+        }
+
         logger.info(`[Execution Monitor] Executing CLOSE transaction for task ${task.id}...`);
         const closeDecision: Decision = {
           ...task.intent,
@@ -285,6 +360,17 @@ export async function processTasks(
               error: msg,
             });
             await tasksStore.saveTask(task);
+
+            if (cachedPos) {
+              cachedPos.state = 'FAILED';
+              cachedPos.closedAt = Date.now();
+              await positionStore.archivePosition(cachedPos);
+              await positionStore.saveKnown(knownPositions);
+              logger.error(
+                `[Execution Monitor] Position ${cachedPos.id} state updated to FAILED and archived due to close failure.`
+              );
+            }
+
             throw err;
           }
         }
@@ -309,6 +395,17 @@ export async function processTasks(
           await tasksStore.deleteTask(task.id);
           for (const orch of orchestrators) {
             orch.isExecuting = false;
+          }
+
+          if (cachedPos) {
+            cachedPos.state = 'CLOSED';
+            cachedPos.closedAt = Date.now();
+            await positionStore.archivePosition(cachedPos);
+            const remaining = knownPositions.filter((p) => p.id !== cachedPos.id);
+            await positionStore.saveKnown(remaining);
+            logger.info(
+              `[Execution Monitor] Pure closed position ${cachedPos.id} archived and pruned from known positions cache.`
+            );
           }
           return;
         }
@@ -489,7 +586,7 @@ export async function processTasks(
         });
         await tasksStore.saveTask(task);
 
-        let record;
+        let record: ExecutionRecord;
         try {
           record = await executor.apply(task.intent, market, async () => {
             return { action: 'skip' };
@@ -506,6 +603,19 @@ export async function processTasks(
             error: msg,
           });
           await tasksStore.saveTask(task);
+
+          const knownPositions = await positionStore.getKnown();
+          const cachedPos = knownPositions.find((p) => p.id === task.originalPositionId);
+          if (cachedPos) {
+            cachedPos.state = 'FAILED';
+            cachedPos.closedAt = Date.now();
+            await positionStore.archivePosition(cachedPos);
+            await positionStore.saveKnown(knownPositions);
+            logger.error(
+              `[Execution Monitor] Rebalance failed during open leg. Cached position ${cachedPos.id} state updated to FAILED and archived.`
+            );
+          }
+
           throw err;
         }
 
@@ -514,9 +624,6 @@ export async function processTasks(
         logger.info(`[Execution Monitor] 🎉 SUCCESS: RebalanceTask ${task.id} has successfully completed!`);
         logger.info(
           `[Execution Monitor] Transmitted transaction signature(s): ${record.txSignatures?.join(', ') || 'none'}`
-        );
-        logger.info(
-          `[Execution Monitor] The next on-chain position discovery cycle will automatically register and track the newly created position.`
         );
 
         // --- Log OPEN_CONFIRMED ---
@@ -532,7 +639,63 @@ export async function processTasks(
           timestamp: Date.now(),
           message: 'Rebalance task completed successfully.',
         });
-        await tasksStore.saveTask(task);
+
+        // Update task and assignments with newPositionId on successful open
+        const newPositionId = record.newPositionId;
+        if (newPositionId) {
+          task.newPositionId = newPositionId;
+          await tasksStore.saveTask(task);
+
+          const assignmentsList = await store.getAssignments();
+          const matchingAssignments = assignmentsList.filter(
+            (a) => a.id === task.assignmentId || a.positionId === task.originalPositionId
+          );
+
+          for (const assignment of matchingAssignments) {
+            logger.info(
+              `[Execution Monitor] Updating assignment ${assignment.id} position ID from ${assignment.positionId} to ${newPositionId}`
+            );
+            assignment.positionId = newPositionId;
+            await store.saveAssignment(assignment);
+
+            // Register a new orchestrator for the new position ID if factory is available
+            if (factory) {
+              const newOrch = factory.create(assignment);
+              newOrch.isExecuting = false;
+              registry.register(newOrch);
+            }
+          }
+
+          // Fetch the fresh position and update positionStore cache seamlessly
+          try {
+            const freshNewPos = await positionProvider.getPosition(newPositionId, poolInfo.poolAddress);
+            freshNewPos.state = 'OPEN';
+
+            const knownPositions = await positionStore.getKnown();
+            const filteredKnown = knownPositions.filter((p) => p.id !== task.originalPositionId);
+
+            // Archive old position as CLOSED
+            const oldPos = knownPositions.find((p) => p.id === task.originalPositionId);
+            if (oldPos) {
+              oldPos.state = 'CLOSED';
+              oldPos.closedAt = Date.now();
+              await positionStore.archivePosition(oldPos);
+              logger.info(`[Execution Monitor] Rebalanced old position ${oldPos.id} archived as CLOSED.`);
+            }
+
+            filteredKnown.push(freshNewPos);
+            await positionStore.saveKnown(filteredKnown);
+            logger.info(
+              `[Execution Monitor] Successfully cached new position ${newPositionId} and pruned old position ${task.originalPositionId}`
+            );
+          } catch (cacheError) {
+            logger.warn(
+              `[Execution Monitor] Failed to update positionStore cache immediately for new position ${newPositionId}: ${
+                cacheError instanceof Error ? cacheError.message : String(cacheError)
+              }. It will synchronize on next engine boot.`
+            );
+          }
+        }
 
         await tasksStore.deleteTask(task.id);
         for (const orch of orchestrators) {
@@ -573,14 +736,16 @@ export function startTickLoop(
   executionGate: IExecutionGate,
   executor: IExecutor,
   store: IStore,
-  rpcPool: IRpcProvider
+  rpcPool: IRpcProvider,
+  factory?: OrchestratorFactory
 ): NodeJS.Timeout {
   logger.info(
     `[Tick Loop] Launching continuous evaluation tick loop for wallet ${walletAddress}. Interval: ${intervalMs}ms`
   );
 
   let isRunning = false;
-  const loop = setInterval(async () => {
+
+  const runCycle = async () => {
     if (isRunning) {
       let activeTasksInfo = '';
       try {
@@ -599,7 +764,7 @@ export function startTickLoop(
       logger.info('[Tick Loop] Starting tick execution cycle...');
 
       // 1. Run Execution Monitor to process in-flight stateful tasks first
-      await processTasks(store, executor, positionProvider, rpcPool, walletAddress, registry, positionStore);
+      await processTasks(store, executor, positionProvider, rpcPool, walletAddress, registry, positionStore, factory);
 
       const knownPositions = await positionStore.getKnown();
       const updatedKnownPositions: Position[] = [...knownPositions];
@@ -630,11 +795,17 @@ export function startTickLoop(
           let freshPosition: Position;
           try {
             freshPosition = await positionProvider.getPosition(position.id, position.poolAddress);
+            if (!freshPosition.state) {
+              freshPosition.state = 'OPEN';
+            }
           } catch (getPosError: unknown) {
             if (getPosError instanceof Error && getPosError.message.includes('not found')) {
-              logger.warn(
-                `[Tick Loop] Position ${position.id} was not found on-chain. Pruning from local cache and registry.`
-              );
+              logger.warn(`[Tick Loop] Position ${position.id} was not found on-chain. Marking as CLOSED and archiving.`);
+
+              position.state = 'CLOSED';
+              position.closedAt = Date.now();
+              await positionStore.archivePosition(position);
+
               // Deregister from registry
               const activeOrchs = registry.getForPosition(position.id);
               for (const orch of activeOrchs) {
@@ -722,7 +893,7 @@ export function startTickLoop(
             );
 
             // Run Task Monitor immediately to begin execution without waiting for next tick interval
-            await processTasks(store, executor, positionProvider, rpcPool, walletAddress, registry, positionStore);
+            await processTasks(store, executor, positionProvider, rpcPool, walletAddress, registry, positionStore, factory);
           } else {
             logger.info(`[Tick Loop] No execution required for position ${position.id}`);
           }
@@ -746,7 +917,14 @@ export function startTickLoop(
     } finally {
       isRunning = false;
     }
-  }, intervalMs);
+  };
 
+  // Run initial cycle immediately (synchronous boot recovery gate)
+  logger.info('[Tick Loop] Executing immediate initial tick cycle on boot...');
+  runCycle().catch((error) => {
+    logger.error('[Tick Loop] Error in initial immediate tick execution cycle:', error);
+  });
+
+  const loop = setInterval(runCycle, intervalMs);
   return loop;
 }

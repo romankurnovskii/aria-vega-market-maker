@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { processTasks } from './lifecycle.js';
+import { processTasks, startDiscovery } from './lifecycle.js';
 import {
   RebalanceTask,
   Decision,
@@ -140,17 +141,39 @@ function createMocks() {
   };
 
   const registry: IOrchestratorRegistry = {
-    register: () => {},
-    deregister: () => {},
-    deregisterByAssignmentId: () => {},
-    getForPosition: () => orchestrators,
-    get: () => undefined,
-    getAll: () => [],
+    register: (orch) => {
+      const idx = orchestrators.findIndex((o) => o.id === orch.id);
+      if (idx >= 0) {
+        orchestrators[idx] = orch;
+      } else {
+        orchestrators.push(orch);
+      }
+    },
+    deregister: (id) => {
+      const idx = orchestrators.findIndex((o) => o.id === id);
+      if (idx >= 0) {
+        orchestrators.splice(idx, 1);
+      }
+    },
+    deregisterByAssignmentId: (assignmentId) => {
+      const idx = orchestrators.findIndex((o) => o.assignmentId === assignmentId);
+      if (idx >= 0) {
+        orchestrators.splice(idx, 1);
+      }
+    },
+    getForPosition: (posId) => orchestrators.filter((o) => o.positionId === posId),
+    get: (id) => orchestrators.find((o) => o.id === id),
+    getAll: () => orchestrators,
   };
 
   const positionStore: IPositionStore = {
     getKnown: async () => knownPositions,
-    saveKnown: async () => {},
+    saveKnown: async (positions) => {
+      knownPositions.length = 0;
+      knownPositions.push(...positions);
+    },
+    archivePosition: async () => {},
+    getArchived: async () => [],
   };
 
   return {
@@ -447,4 +470,275 @@ test('processTasks - Timeout Scenario', async () => {
   await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_PUBKEY_1, m.registry, m.positionStore);
 
   assert.ok(task.events?.some((e) => e.stage === 'TIMEOUT'));
+});
+
+test('startDiscovery - Scenario E: Crash Recovery with newPositionId', async () => {
+  const m = createMocks();
+  const assignmentsList = [
+    {
+      id: 'assign_123',
+      strategyId: 'active-restake',
+      positionId: MOCK_PUBKEY_1,
+      mode: 'active' as any,
+      createdAt: Date.now(),
+    },
+  ];
+
+  m.store.getAssignments = async () => assignmentsList;
+  m.store.saveAssignment = async (assignment) => {
+    const idx = assignmentsList.findIndex((a) => a.id === assignment.id);
+    if (idx >= 0) assignmentsList[idx] = assignment;
+  };
+
+  const task: RebalanceTask = {
+    id: 'task_abc',
+    assignmentId: 'assign_123',
+    status: 'pending_open',
+    originalPositionId: MOCK_PUBKEY_1,
+    newPositionId: MOCK_PUBKEY_2, // This simulates success on-chain but crash before cleanup
+    intent: {
+      positionId: MOCK_PUBKEY_1,
+      action: 'open',
+      evaluatedAt: Date.now(),
+      sourceAssignmentId: 'assign_123',
+    },
+    evaluatedAt: Date.now(),
+    events: [],
+  };
+  m.tasks.push(task);
+
+  const factory = {
+    create: (assignment: any) => {
+      const orchestrator: IOrchestrator = {
+        id: `orch_${assignment.id}`,
+        assignmentId: assignment.id,
+        positionId: assignment.positionId,
+        strategyId: assignment.strategyId,
+        mode: assignment.mode,
+        isExecuting: false,
+        tick: async () => ({ action: 'skip' }),
+      };
+      return orchestrator;
+    },
+  } as any;
+
+  // Run startDiscovery
+  await startDiscovery(MOCK_PUBKEY_1, m.positionProvider, m.positionStore, factory, m.store, m.registry);
+
+  // Assignment positionId must be updated to newPositionId
+  assert.strictEqual(assignmentsList[0].positionId, MOCK_PUBKEY_2);
+
+  // The task must be deleted from store
+  assert.strictEqual(m.tasks.length, 0);
+
+  // Orchestrator targeting the new position must be registered in the registry
+  const registeredOrchs = m.registry.getForPosition(MOCK_PUBKEY_2);
+  assert.strictEqual(registeredOrchs.length, 1);
+  assert.strictEqual(registeredOrchs[0].id, 'orch_assign_123');
+});
+
+test('startDiscovery - Scenario F: Lock Restoration with Active Task', async () => {
+  const m = createMocks();
+  const assignmentsList = [
+    {
+      id: 'assign_123',
+      strategyId: 'active-restake',
+      positionId: MOCK_PUBKEY_1,
+      mode: 'active' as any,
+      createdAt: Date.now(),
+    },
+  ];
+
+  m.store.getAssignments = async () => assignmentsList;
+
+  // Position is still on-chain
+  const livePositions = [
+    {
+      id: MOCK_PUBKEY_1,
+      poolAddress: MOCK_PUBKEY_2,
+      chain: 'solana' as const,
+      protocol: 'meteora_dlmm' as const,
+      lowerBound: 1.0,
+      upperBound: 2.0,
+      tokenX: { tokenAddress: MOCK_PUBKEY_2, mint: MOCK_PUBKEY_2, decimals: 9, amount: '0' },
+      tokenY: { tokenAddress: MOCK_PUBKEY_3, mint: MOCK_PUBKEY_3, decimals: 6, amount: '0' },
+      isInRange: true,
+      openedAt: Date.now(),
+      metadata: {},
+    },
+  ];
+  m.positionProvider.getPositions = async () => livePositions;
+
+  // Active in-flight task (pending_close)
+  const task: RebalanceTask = {
+    id: 'task_abc',
+    assignmentId: 'assign_123',
+    status: 'pending_close',
+    originalPositionId: MOCK_PUBKEY_1,
+    intent: {
+      positionId: MOCK_PUBKEY_1,
+      action: 'close',
+      evaluatedAt: Date.now(),
+      sourceAssignmentId: 'assign_123',
+    },
+    evaluatedAt: Date.now(),
+    events: [],
+  };
+  m.tasks.push(task);
+
+  const factory = {
+    create: (assignment: any) => {
+      const orchestrator: IOrchestrator = {
+        id: `orch_${assignment.id}`,
+        assignmentId: assignment.id,
+        positionId: assignment.positionId,
+        strategyId: assignment.strategyId,
+        mode: assignment.mode,
+        isExecuting: false,
+        tick: async () => ({ action: 'skip' }),
+      };
+      return orchestrator;
+    },
+  } as any;
+
+  // Run startDiscovery
+  await startDiscovery(MOCK_PUBKEY_1, m.positionProvider, m.positionStore, factory, m.store, m.registry);
+
+  // Orchestrator must be registered
+  const registeredOrchs = m.registry.getForPosition(MOCK_PUBKEY_1);
+  assert.strictEqual(registeredOrchs.length, 1);
+
+  // isExecuting lock must be restored to true!
+  assert.strictEqual(registeredOrchs[0].isExecuting, true);
+});
+
+test('processTasks - Scenario G: Seamless Transition with newPositionId', async () => {
+  const m = createMocks();
+  const assignmentsList = [
+    {
+      id: 'assign_123',
+      strategyId: 'active-restake',
+      positionId: MOCK_PUBKEY_1,
+      mode: 'active' as any,
+      createdAt: Date.now(),
+    },
+  ];
+
+  m.store.getAssignments = async () => assignmentsList;
+  m.store.saveAssignment = async (assignment) => {
+    const idx = assignmentsList.findIndex((a) => a.id === assignment.id);
+    if (idx >= 0) assignmentsList[idx] = assignment;
+  };
+
+  const knownPositionsList: Position[] = [
+    {
+      id: MOCK_PUBKEY_1,
+      poolAddress: MOCK_PUBKEY_2,
+      chain: 'solana' as const,
+      protocol: 'meteora_dlmm' as const,
+      lowerBound: 1.0,
+      upperBound: 2.0,
+      tokenX: { tokenAddress: MOCK_PUBKEY_2, mint: MOCK_PUBKEY_2, decimals: 9, amount: '0' },
+      tokenY: { tokenAddress: MOCK_PUBKEY_3, mint: MOCK_PUBKEY_3, decimals: 6, amount: '0' },
+      isInRange: true,
+      openedAt: Date.now(),
+      metadata: {},
+    },
+  ];
+  m.positionStore.getKnown = async () => knownPositionsList;
+  m.positionStore.saveKnown = async (positions) => {
+    knownPositionsList.length = 0;
+    knownPositionsList.push(...positions);
+  };
+
+  const newOnChainPos = {
+    id: MOCK_PUBKEY_3,
+    poolAddress: MOCK_PUBKEY_2,
+    chain: 'solana' as const,
+    protocol: 'meteora_dlmm' as const,
+    lowerBound: 1.1,
+    upperBound: 2.1,
+    tokenX: { tokenAddress: MOCK_PUBKEY_2, mint: MOCK_PUBKEY_2, decimals: 9, amount: '500' },
+    tokenY: { tokenAddress: MOCK_PUBKEY_3, mint: MOCK_PUBKEY_3, decimals: 6, amount: '500' },
+    isInRange: true,
+    openedAt: Date.now(),
+    metadata: {},
+  };
+  m.positionProvider.getPosition = async (id) => {
+    if (id === MOCK_PUBKEY_3) return newOnChainPos;
+    throw new Error('not found');
+  };
+
+  // Mock executor to return a successful record with newPositionId
+  m.executor.apply = async (decision) => {
+    return {
+      id: 'exec_xyz',
+      decision,
+      txSignatures: ['tx_sig_xyz'],
+      status: 'success',
+      executedAt: Date.now(),
+      newPositionId: MOCK_PUBKEY_3,
+    };
+  };
+
+  const task: RebalanceTask = {
+    id: 'task_abc',
+    assignmentId: 'assign_123',
+    status: 'pending_open',
+    originalPositionId: MOCK_PUBKEY_1,
+    intent: {
+      positionId: MOCK_PUBKEY_1,
+      action: 'open',
+      sourceAssignmentId: 'assign_123',
+      openParams: {
+        poolAddress: MOCK_PUBKEY_2,
+        lowerBound: 1.1,
+        upperBound: 2.1,
+        tokenXAmount: '500',
+        tokenYAmount: '500',
+      },
+      evaluatedAt: Date.now(),
+    },
+    evaluatedAt: Date.now(),
+    events: [],
+  };
+  m.tasks.push(task);
+
+  const factory = {
+    create: (assignment: any) => {
+      const orchestrator: IOrchestrator = {
+        id: `orch_${assignment.id}`,
+        assignmentId: assignment.id,
+        positionId: assignment.positionId,
+        strategyId: assignment.strategyId,
+        mode: assignment.mode,
+        isExecuting: false,
+        tick: async () => ({ action: 'skip' }),
+      };
+      return orchestrator;
+    },
+  } as any;
+
+  // Run processTasks
+  await processTasks(
+    m.store,
+    m.executor,
+    m.positionProvider,
+    m.rpcPool,
+    MOCK_PUBKEY_1,
+    m.registry,
+    m.positionStore,
+    factory
+  );
+
+  // The assignment positionId must be updated
+  assert.strictEqual(assignmentsList[0].positionId, MOCK_PUBKEY_3);
+
+  // The new orchestrator must be registered in the registry targeting MOCK_PUBKEY_3
+  const registeredOrchs = m.registry.getForPosition(MOCK_PUBKEY_3);
+  assert.strictEqual(registeredOrchs.length, 1);
+
+  // The old position must be removed from cache, and the new position must be added
+  assert.strictEqual(knownPositionsList.length, 1);
+  assert.strictEqual(knownPositionsList[0].id, MOCK_PUBKEY_3);
 });

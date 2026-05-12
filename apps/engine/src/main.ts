@@ -152,10 +152,11 @@ async function main() {
     executionGate,
     executor,
     store,
-    rpcPool
+    rpcPool,
+    factory
   );
 
-  startHttpServer(store, registry, executor, factory, positionProvider, walletAddress);
+  startHttpServer(store, registry, executor, factory, positionProvider, walletAddress, positionStore);
 
   // 7. Graceful Shutdown handlers
   process.on('SIGINT', () => {
