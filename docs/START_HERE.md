@@ -31,3 +31,4 @@ Start here. Every doc in this directory is listed below.
 - [@lp-system/orchestration docs](../packages/orchestration/docs/START_HERE.md) — Position orchestration & safety gates Documentation
 - [@lp-system/executor docs](../packages/executor/docs/START_HERE.md) — Transaction dispatchers & re-evaluation loops Documentation
 - [@lp-system/engine docs](../apps/engine/docs/START_HERE.md) — Composition root & loop runner Documentation
+- [@lp-system/frontend docs](../apps/frontend/docs/START_HERE.md) — Next.js Control Panel Frontend Interface Documentation

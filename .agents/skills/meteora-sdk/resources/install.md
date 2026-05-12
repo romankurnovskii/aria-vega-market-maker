@@ -82,10 +82,7 @@ const USDC_USDT_POOL_ADDRESS = new PublicKey('ARwi1S4DaiTG5DX7S4M4ZsrXqpMD1MrTmb
 const dlmmPool = await DLMM.create(connection, USDC_USDT_POOL_ADDRESS);
 
 // e.g. creating multiple pools
-const dlmmMultiplePools = await DLMM.createMultiple(connection, [
-  USDC_USDT_POOL_ADDRESS,
-  ...otherPoolAddresses,
-]);
+const dlmmMultiplePools = await DLMM.createMultiple(connection, [USDC_USDT_POOL_ADDRESS, ...otherPoolAddresses]);
 ```
 
 # Testing the SDK (for contributors)

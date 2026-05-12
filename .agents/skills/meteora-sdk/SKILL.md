@@ -1938,14 +1938,9 @@ Public key of the pair if it exists, null otherwise.
 const WEN = new PublicKey('WENWENvqqNya429ubCdR81ZmD69brwQaaBYY6p3LCpk');
 const USDC = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 
-const pairPubkey = await DLMM.getCustomizablePermissionlessLbPairIfExists(
-  connection,
-  WEN,
-  USDC,
-  {
-    cluster: 'localhost',
-  }
-);
+const pairPubkey = await DLMM.getCustomizablePermissionlessLbPairIfExists(connection, WEN, USDC, {
+  cluster: 'localhost',
+});
 ```
 
 ---
@@ -2997,10 +2992,7 @@ An object with `x0` (base amount), `deltaX` (per-bin increment), and `amountX` (
 **Example**
 
 ```typescript theme={"system"}
-import {
-  suggestBalancedXParametersFromY,
-  getLiquidityStrategyParameterBuilder,
-} from '@meteora-ag/dlmm';
+import { suggestBalancedXParametersFromY, getLiquidityStrategyParameterBuilder } from '@meteora-ag/dlmm';
 
 const builder = getLiquidityStrategyParameterBuilder(StrategyType.Spot);
 const { x0, deltaX, amountX } = suggestBalancedXParametersFromY(
@@ -3062,10 +3054,7 @@ An object with `y0` (base amount), `deltaY` (per-bin increment), and `amountY` (
 **Example**
 
 ```typescript theme={"system"}
-import {
-  suggestBalancedYParametersFromX,
-  getLiquidityStrategyParameterBuilder,
-} from '@meteora-ag/dlmm';
+import { suggestBalancedYParametersFromX, getLiquidityStrategyParameterBuilder } from '@meteora-ag/dlmm';
 
 const builder = getLiquidityStrategyParameterBuilder(StrategyType.Spot);
 const { y0, deltaY, amountY } = suggestBalancedYParametersFromX(
@@ -3245,19 +3234,11 @@ The zero-based index of the bin within the array.
 **Example**
 
 ```typescript theme={"system"}
-import {
-  getBinIdIndexInBinArray,
-  getBinArrayLowerUpperBinId,
-  binIdToBinArrayIndex,
-} from '@meteora-ag/dlmm';
+import { getBinIdIndexInBinArray, getBinArrayLowerUpperBinId, binIdToBinArrayIndex } from '@meteora-ag/dlmm';
 
 const binArrayIndex = binIdToBinArrayIndex(new BN(dlmmPool.lbPair.activeId));
 const [lowerBinId, upperBinId] = getBinArrayLowerUpperBinId(binArrayIndex);
-const index = getBinIdIndexInBinArray(
-  new BN(dlmmPool.lbPair.activeId),
-  lowerBinId,
-  upperBinId
-);
+const index = getBinIdIndexInBinArray(new BN(dlmmPool.lbPair.activeId), lowerBinId, upperBinId);
 ```
 
 ---
@@ -3792,11 +3773,7 @@ The variable fee amount (`BN`).
 ```typescript theme={"system"}
 import { getVariableFee } from '@meteora-ag/dlmm';
 
-const variableFee = getVariableFee(
-  dlmmPool.lbPair.binStep,
-  dlmmPool.lbPair.parameters,
-  dlmmPool.lbPair.vParameters
-);
+const variableFee = getVariableFee(dlmmPool.lbPair.binStep, dlmmPool.lbPair.parameters, dlmmPool.lbPair.vParameters);
 ```
 
 ---
@@ -4065,11 +4042,7 @@ A tuple of `[PublicKey, bump]` for the LB pair PDA.
 import { deriveCustomizablePermissionlessLbPair } from '@meteora-ag/dlmm';
 
 const programId = new PublicKey('LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo');
-const [lbPairAddress] = deriveCustomizablePermissionlessLbPair(
-  tokenXMint,
-  tokenYMint,
-  programId
-);
+const [lbPairAddress] = deriveCustomizablePermissionlessLbPair(tokenXMint, tokenYMint, programId);
 ```
 
 ---
@@ -4151,13 +4124,7 @@ A tuple of `[PublicKey, bump]` for the LB pair PDA.
 ```typescript theme={"system"}
 import { deriveLbPair2 } from '@meteora-ag/dlmm';
 
-const [lbPairAddress] = deriveLbPair2(
-  tokenXMint,
-  tokenYMint,
-  new BN(25),
-  new BN(10000),
-  programId
-);
+const [lbPairAddress] = deriveLbPair2(tokenXMint, tokenYMint, new BN(25), new BN(10000), programId);
 ```
 
 ---
@@ -4533,12 +4500,7 @@ Nothing. The `binArray` is mutated in place.
 ```typescript theme={"system"}
 import { updateBinArray } from '@meteora-ag/dlmm';
 
-updateBinArray(
-  new BN(dlmmPool.lbPair.activeId),
-  dlmmPool.clock,
-  dlmmPool.lbPair.rewardInfos,
-  binArrayAccount
-);
+updateBinArray(new BN(dlmmPool.lbPair.activeId), dlmmPool.clock, dlmmPool.lbPair.rewardInfos, binArrayAccount);
 ```
 
 ---
@@ -4756,10 +4718,7 @@ An object with `amount` (the token amount needed) and `isBidSide` (`true` = toke
 ```typescript theme={"system"}
 import { getAutoFillAmountByRebalancedPosition } from '@meteora-ag/dlmm';
 
-const { amount, isBidSide } = getAutoFillAmountByRebalancedPosition(
-  rebalancePos,
-  StrategyType.Spot
-);
+const { amount, isBidSide } = getAutoFillAmountByRebalancedPosition(rebalancePos, StrategyType.Spot);
 
 if (isBidSide) {
   console.log('Need to deposit', amount.toString(), 'of token Y');

@@ -21,6 +21,7 @@ data/
 .idea/
 .vscode/
 .dev
+.kilo
 .kilo/
 repomix-*
-review-me*.kilo
+review-me*
