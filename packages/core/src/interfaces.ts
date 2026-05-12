@@ -50,7 +50,6 @@ export interface IOrchestrator {
   positionId: string;
   strategyId: string;
   mode: AssignmentMode;
-  isExecuting: boolean;
   tick(position: Position, market: MarketSnapshot): Promise<StrategyResult>;
 }
 
@@ -88,6 +87,7 @@ export interface IStore {
   getTasks(): Promise<RebalanceTask[]>;
   saveTask(task: RebalanceTask): Promise<void>;
   deleteTask(id: string): Promise<void>;
+  archiveTask(task: RebalanceTask): Promise<void>;
 }
 
 export interface IPositionStore {
