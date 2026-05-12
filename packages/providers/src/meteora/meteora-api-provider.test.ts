@@ -30,6 +30,35 @@ test('getPositions returns an empty array when API returns no positions (no mock
   }
 });
 
+// ✅ GOOD: Mock at correct level - The Fix
+test('getPositions should handle empty portfolio (GOOD MOCK)', async () => {
+  // Mock only the slow external operation (fetch), preserve behavior test needs
+  const originalFetch = global.fetch;
+
+  try {
+    global.fetch = async (url: any) => {
+      if (url.includes('/portfolio/open')) {
+        return {
+          ok: true,
+          json: async () => [],
+        } as any;
+      }
+      return {
+        ok: true,
+        json: async () => ({ positions: [] }),
+      } as any;
+    };
+
+    const provider = new MeteoraApiProvider('https://dummy-api.meteora.ag');
+    const positions = await provider.getPositions('mock_wallet');
+
+    // Test actual implementation with mocked fetch - passes for right reason ✓
+    assert.strictEqual(positions.length, 0);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
 test('getPosition throws an error when position is not found (no mock fallback)', async () => {
   const originalFetch = global.fetch;
   const originalWallet = process.env.WALLET_PUBKEY;
@@ -207,6 +236,93 @@ test('getPositions propagates error when open portfolio endpoint returns non-ok 
     await assert.rejects(async () => {
       await provider.getPositions('mock_wallet');
     }, /Failed to fetch open portfolio: HTTP 429 Too Many Requests/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});
+
+test('integration: getPositions with real API structure', async () => {
+  const originalFetch = global.fetch;
+  try {
+    global.fetch = async (url: any) => {
+      // Simulate real Meteora API structure
+      if (url.includes('/portfolio/open')) {
+        return {
+          ok: true,
+          json: async () => ({
+            pools: [{ pool_address: 'pool1' }],
+            offset: 0,
+            total: 1,
+          }),
+        } as any;
+      }
+      if (url.includes('/positions/pool1/pnl')) {
+        return {
+          ok: true,
+          json: async () => ({
+            positions: [
+              {
+                position_address: 'pos1',
+                pool_address: 'pool1',
+                lower_bin_id: 100,
+                upper_bin_id: 200,
+                amount_x: '1000',
+                amount_y: '2000',
+                is_in_range: true,
+                opened_at: 1234567890,
+              },
+            ],
+          }),
+        } as any;
+      }
+      if (url.includes('/pools/pool1')) {
+        return {
+          ok: true,
+          json: async () => ({
+            token_x: { decimals: 6, address: 'onChainTokenXMint' },
+            token_y: { decimals: 6, address: 'onChainTokenYMint' },
+          }),
+        } as any;
+      }
+      return { ok: false } as any;
+    };
+
+    const provider = new MeteoraApiProvider('https://dummy-api.meteora.ag');
+    const positions = await provider.getPositions('wallet1');
+    
+    // Assert real integration behavior
+    assert.deepStrictEqual(positions, [
+      {
+        chain: 'solana',
+        id: 'pos1',
+        isInRange: true,
+        lowerBinId: 100,
+        lowerBound: 100,
+        metadata: {
+          feeX: '0',
+          feeY: '0',
+          leverage: 10,
+          strategy: 'trailing-usdc',
+        },
+        openedAt: 1234567890,
+        poolAddress: 'pool1',
+        protocol: 'meteora_dlmm',
+        tokenX: {
+          amount: '1000',
+          decimals: 6,
+          mint: 'onChainTokenXMint',
+          tokenAddress: 'onChainTokenXMint',
+        },
+        tokenY: {
+          amount: '2000',
+          decimals: 6,
+          mint: 'onChainTokenYMint',
+          tokenAddress: 'onChainTokenYMint',
+        },
+        upperBinId: 200,
+        upperBound: 200,
+      },
+    ]);
   } finally {
     global.fetch = originalFetch;
   }
