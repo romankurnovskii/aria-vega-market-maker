@@ -142,11 +142,28 @@ export class SolanaExecutor implements IExecutor {
         newPositionId = positionKeypair.publicKey.toBase58();
         logger.info(`[SolanaExecutor] Generated new position keypair: ${newPositionId}`);
 
+        // Dynamically cap native SOL deposit amount to leave a rent-exempt/gas buffer
+        let finalTokenXAmount = new BN(openParams.tokenXAmount);
+        const dlmm = await this.provider.getDlmmInstance(market.poolAddress);
+        if (dlmm.tokenX.publicKey.toBase58() === 'So11111111111111111111111111111111111111112') {
+          const balance = await this.rpcPool.execute(async (connection) => {
+            return await connection.getBalance(this.keypair.publicKey);
+          });
+          const gasBuffer = 80_000_000; // 0.08 SOL for rent and fees
+          const maxAllowed = balance > gasBuffer ? balance - gasBuffer : 0;
+          if (finalTokenXAmount.gt(new BN(maxAllowed))) {
+            logger.info(
+              `[SolanaExecutor] Native SOL amount ${finalTokenXAmount.toString()} exceeds safe limit considering rent-exempt requirements. Capping to ${maxAllowed}`
+            );
+            finalTokenXAmount = new BN(maxAllowed);
+          }
+        }
+
         // 1. Build add liquidity instructions
         const instructions = await this.provider.buildAddLiquidityInstructions({
           poolAddress: market.poolAddress,
           userWallet: this.keypair.publicKey,
-          tokenXAmount: new BN(openParams.tokenXAmount),
+          tokenXAmount: finalTokenXAmount,
           tokenYAmount: new BN(openParams.tokenYAmount),
           lowerBinId,
           upperBinId,
@@ -463,6 +480,24 @@ export class SolanaExecutor implements IExecutor {
 
           await fetchForProgram(tokenProgramId);
           await fetchForProgram(token2022ProgramId);
+
+          const WSOL_MINT = 'So11111111111111111111111111111111111111112';
+          if (tokenXAddress === WSOL_MINT) {
+            try {
+              const nativeBal = await connection.getBalance(new PublicKey(walletAddress));
+              amountX = nativeBal.toString();
+            } catch (e) {
+              logger.warn(`[SolanaExecutor] Failed to fetch native balance for tokenX: ${e}`);
+            }
+          }
+          if (tokenYAddress === WSOL_MINT) {
+            try {
+              const nativeBal = await connection.getBalance(new PublicKey(walletAddress));
+              amountY = nativeBal.toString();
+            } catch (e) {
+              logger.warn(`[SolanaExecutor] Failed to fetch native balance for tokenY: ${e}`);
+            }
+          }
 
           return { amountX, amountY };
         });

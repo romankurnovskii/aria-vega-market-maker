@@ -49,7 +49,7 @@ export class MeteoraOnChainProvider {
   /**
    * Retrieves a cached DLMM instance or initializes a new one.
    */
-  private async getDlmmInstance(poolAddress: string): Promise<DLMM> {
+  public async getDlmmInstance(poolAddress: string): Promise<DLMM> {
     if (this.dlmmCache.has(poolAddress)) {
       return this.dlmmCache.get(poolAddress)!;
     }

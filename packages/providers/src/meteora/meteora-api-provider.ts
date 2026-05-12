@@ -354,6 +354,10 @@ export class MeteoraApiProvider implements IPositionProvider {
       priceHistory = [{ price: poolData.current_price, timestamp: Date.now() }];
     }
 
+    logger.info(
+      `[MeteoraApiProvider] Assembling Market Snapshot for pool ${poolAddress} - price=${poolData.current_price}, activeBinId=${activeBinId}, feeRate=${feeRate}`
+    );
+
     return {
       poolAddress: poolData.address,
       chain: 'solana',

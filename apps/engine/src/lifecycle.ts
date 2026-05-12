@@ -70,6 +70,24 @@ async function getWalletBalances(
   await fetchForProgram(tokenProgramId);
   await fetchForProgram(token2022ProgramId);
 
+  const WSOL_MINT = 'So11111111111111111111111111111111111111112';
+  if (mintX === WSOL_MINT) {
+    try {
+      const nativeBal = await connection.getBalance(new PublicKey(walletAddress));
+      amountX = nativeBal.toString();
+    } catch (e) {
+      logger.warn(`[getWalletBalances] Failed to fetch native balance for mintX: ${e}`);
+    }
+  }
+  if (mintY === WSOL_MINT) {
+    try {
+      const nativeBal = await connection.getBalance(new PublicKey(walletAddress));
+      amountY = nativeBal.toString();
+    } catch (e) {
+      logger.warn(`[getWalletBalances] Failed to fetch native balance for mintY: ${e}`);
+    }
+  }
+
   return { amountX, amountY };
 }
 /**
@@ -248,7 +266,7 @@ export async function processTasks(
 
   logger.info(`[Execution Monitor] Found ${tasks.length} active task(s) in task store.`);
 
-  const processingPromises = tasks.map(async (task) => {
+  for (const task of [...tasks]) {
     try {
       logger.info(`[Execution Monitor] Processing task ${task.id} (${task.status}) for position ${task.originalPositionId}`);
 
@@ -302,7 +320,7 @@ export async function processTasks(
           logger.warn(`[Execution Monitor] archiveTask not available; deleted stuck task ${task.id} from queue.`);
         }
 
-        return; // Abort processing this task
+        continue; // Abort processing this task, move to next task
       }
 
       if (task.status === 'pending_close') {
@@ -404,7 +422,6 @@ export async function processTasks(
             message: 'Pure close task completed successfully.',
           });
           await tasksStore.saveTask(task);
-          await tasksStore.deleteTask(task.id);
 
           if (cachedPos) {
             cachedPos.state = 'CLOSED';
@@ -416,7 +433,8 @@ export async function processTasks(
               `[Execution Monitor] Pure closed position ${cachedPos.id} archived and pruned from known positions cache.`
             );
           }
-          return;
+          await tasksStore.deleteTask(task.id);
+          continue; // Move to next task
         }
 
         logger.info(`[Execution Monitor] Close transaction completed. Polling balances for settlement...`);
@@ -431,13 +449,17 @@ export async function processTasks(
         const solanaExecutor = executor as unknown as {
           pollBalances?: (tx: string, ty: string, w: string, ix: bigint, iy: bigint) => Promise<void>;
         };
-        if (solanaExecutor.pollBalances) {
+        if (solanaExecutor.pollBalances && record && record.txSignatures && record.txSignatures.length > 0) {
           await solanaExecutor.pollBalances(
             poolInfo.tokenXAddress,
             poolInfo.tokenYAddress,
             walletAddress,
             BigInt(initialBalances.amountX),
             BigInt(initialBalances.amountY)
+          );
+        } else {
+          logger.info(
+            `[Execution Monitor] Skipping balance polling because position was already closed or no transaction signatures were generated.`
           );
         }
 
@@ -452,7 +474,7 @@ export async function processTasks(
         task.evaluatedAt = Date.now();
         await tasksStore.saveTask(task);
         logger.info(`[Execution Monitor] Task ${task.id} transitioned to 'awaiting_settlement'`);
-        return;
+        continue;
       }
 
       if (task.status === 'awaiting_settlement') {
@@ -532,11 +554,21 @@ export async function processTasks(
           const openParams = reEvalResult.action === 'close+open' ? reEvalResult.openParams : reEvalResult.params;
           if (openParams) {
             openParamsToUse = openParams;
-            logger.info(`[Execution Monitor] Strategy re-evaluation successfully recalculated new range bounds.`);
+            logger.info(
+              `[Execution Monitor] Strategy re-evaluation successfully recalculated new range bounds for position ${task.originalPositionId}.`
+            );
           }
-        } else if (orchestrators.length > 0 && reEvalResult.action === 'skip') {
+        } else if (orchestrators.length > 0 && reEvalResult.action === 'close') {
           openParamsToUse = undefined;
-          logger.info(`[Execution Monitor] Strategy re-evaluation recommended 'skip'. Aborting open leg.`);
+          logger.info(
+            `[Execution Monitor] Strategy re-evaluation recommended 'close'. Aborting open leg for position ${task.originalPositionId}.`
+          );
+        } else if (orchestrators.length > 0 && reEvalResult.action === 'skip') {
+          // A 'skip' signal on the synthetic position means the target range is currently in-range
+          // and does not need further rebalancing. We should proceed with opening it.
+          logger.info(
+            `[Execution Monitor] Strategy re-evaluation recommended 'skip', indicating target range is valid for position ${task.originalPositionId}. Proceeding with open leg.`
+          );
         }
 
         if (openParamsToUse) {
@@ -546,7 +578,7 @@ export async function processTasks(
           task.evaluatedAt = Date.now();
           await tasksStore.saveTask(task);
           logger.info(`[Execution Monitor] Task ${task.id} updated with open params (status: pending_open)`);
-          return;
+          // Fall through to execute the open transaction immediately in the same tick cycle
         } else {
           logger.info(
             `[Execution Monitor] No predefined open parameters and strategy re-evaluation recommended 'skip'. Deleting task and unlocking orchestrator.`
@@ -580,7 +612,7 @@ export async function processTasks(
           );
           task.status = 'awaiting_settlement';
           await tasksStore.saveTask(task);
-          return;
+          continue;
         }
 
         logger.info(`[Execution Monitor] Executing OPEN transaction for task ${task.id}...`);
@@ -694,11 +726,12 @@ export async function processTasks(
               `[Execution Monitor] Successfully cached new position ${newPositionId} and pruned old position ${task.originalPositionId}`
             );
           } catch (cacheError) {
-            logger.warn(
+            logger.error(
               `[Execution Monitor] Failed to update positionStore cache immediately for new position ${newPositionId}: ${
                 cacheError instanceof Error ? cacheError.message : String(cacheError)
-              }. It will synchronize on next engine boot.`
+              }. Aborting task deletion.`
             );
+            throw cacheError; // Propagate so task is not deleted
           }
         }
 
@@ -711,9 +744,7 @@ export async function processTasks(
         }`
       );
     }
-  });
-
-  await Promise.all(processingPromises);
+  }
 }
 
 /**
