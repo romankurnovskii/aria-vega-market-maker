@@ -53,6 +53,12 @@ function createMocks() {
         tasks.splice(idx, 1);
       }
     },
+    archiveTask: async (task) => {
+      const idx = tasks.findIndex((t) => t.id === task.id);
+      if (idx >= 0) {
+        tasks.splice(idx, 1);
+      }
+    },
   };
 
   const executor: IExecutor & { pollBalances?: () => Promise<void> } = {
@@ -225,7 +231,6 @@ test('processTasks - Scenario A: Standard rebalance (close+open)', async () => {
     positionId: MOCK_PUBKEY_1,
     strategyId: 'active-restake',
     mode: 'active',
-    isExecuting: true,
     tick: async (): Promise<StrategyResult> => {
       return {
         action: 'open',
@@ -277,7 +282,6 @@ test('processTasks - Scenario A: Standard rebalance (close+open)', async () => {
   assert.ok(task.events?.some((e) => e.stage === 'OPEN_BROADCAST'));
   assert.ok(task.events?.some((e) => e.stage === 'OPEN_CONFIRMED'));
   assert.ok(task.events?.some((e) => e.stage === 'COMPLETED'));
-  assert.strictEqual(mockOrchestrator.isExecuting, false);
 });
 
 test('processTasks - Scenario B: Rebalance with JIT Abort', async () => {
@@ -321,7 +325,6 @@ test('processTasks - Scenario B: Rebalance with JIT Abort', async () => {
     positionId: MOCK_PUBKEY_1,
     strategyId: 'active-restake',
     mode: 'active',
-    isExecuting: true,
     tick: async (): Promise<StrategyResult> => {
       return { action: 'skip' }; // skip signal!
     },
@@ -348,7 +351,6 @@ test('processTasks - Scenario B: Rebalance with JIT Abort', async () => {
   assert.ok(task.events?.some((e) => e.stage === 'JIT_REEVALUATION'));
   assert.ok(task.events?.some((e) => e.stage === 'JIT_SKIPPED'));
   assert.ok(task.events?.some((e) => e.stage === 'COMPLETED'));
-  assert.strictEqual(mockOrchestrator.isExecuting, false);
 });
 
 test('processTasks - Scenario C: Pure Close (close)', async () => {
@@ -379,7 +381,6 @@ test('processTasks - Scenario C: Pure Close (close)', async () => {
     positionId: MOCK_PUBKEY_1,
     strategyId: 'active-restake',
     mode: 'active',
-    isExecuting: true,
     tick: async (): Promise<StrategyResult> => ({ action: 'skip' }),
   };
   m.orchestrators.push(mockOrchestrator);
@@ -391,7 +392,6 @@ test('processTasks - Scenario C: Pure Close (close)', async () => {
   assert.ok(task.events?.some((e) => e.stage === 'CLOSE_CONFIRMED'));
   assert.ok(task.events?.some((e) => e.stage === 'COMPLETED'));
   assert.ok(!task.events?.some((e) => e.stage === 'SETTLEMENT_POLLING'));
-  assert.strictEqual(mockOrchestrator.isExecuting, false);
 });
 
 test('processTasks - Scenario D: Pure Open (open)', async () => {
@@ -429,7 +429,6 @@ test('processTasks - Scenario D: Pure Open (open)', async () => {
     positionId: MOCK_PUBKEY_1,
     strategyId: 'active-restake',
     mode: 'active',
-    isExecuting: true,
     tick: async (): Promise<StrategyResult> => ({ action: 'skip' }),
   };
   m.orchestrators.push(mockOrchestrator);
@@ -441,7 +440,6 @@ test('processTasks - Scenario D: Pure Open (open)', async () => {
   assert.ok(task.events?.some((e) => e.stage === 'OPEN_CONFIRMED'));
   assert.ok(task.events?.some((e) => e.stage === 'COMPLETED'));
   assert.ok(!task.events?.some((e) => e.stage === 'CLOSE_BROADCAST'));
-  assert.strictEqual(mockOrchestrator.isExecuting, false);
 });
 
 test('processTasks - Timeout Scenario', async () => {
@@ -466,10 +464,42 @@ test('processTasks - Timeout Scenario', async () => {
 
   m.tasks.push(task);
 
-  // We only run timeout check and expect TIMEOUT event
+  // Setup active known position to test position auto-heal and archival
+  const mockPosition: Position = {
+    id: MOCK_PUBKEY_1,
+    poolAddress: MOCK_PUBKEY_2,
+    chain: 'solana',
+    protocol: 'meteora_dlmm',
+    lowerBound: 1.0,
+    upperBound: 2.0,
+    tokenX: { tokenAddress: MOCK_PUBKEY_2, mint: MOCK_PUBKEY_2, decimals: 9, amount: '0' },
+    tokenY: { tokenAddress: MOCK_PUBKEY_3, mint: MOCK_PUBKEY_3, decimals: 6, amount: '0' },
+    isInRange: true,
+    openedAt: Date.now() - 6 * 60 * 1000,
+    metadata: {},
+  };
+  m.knownPositions.push(mockPosition);
+
+  let archivedPosition: Position | null = null;
+  m.positionStore.archivePosition = async (pos) => {
+    archivedPosition = pos;
+  };
+
+  // Run processTasks
   await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_PUBKEY_1, m.registry, m.positionStore);
 
+  // 1. The task must have a TIMEOUT event appended
   assert.ok(task.events?.some((e) => e.stage === 'TIMEOUT'));
+
+  // 2. The task must be archived and removed from the active queue
+  assert.strictEqual(m.tasks.length, 0);
+
+  // 3. The associated position must have transitioned to FAILED and been archived
+  assert.ok(archivedPosition);
+  assert.strictEqual((archivedPosition as Position).state, 'FAILED');
+
+  // 4. The position must be removed from the active known positions cache
+  assert.strictEqual(m.knownPositions.length, 0);
 });
 
 test('startDiscovery - Scenario E: Crash Recovery with newPositionId', async () => {
@@ -515,7 +545,6 @@ test('startDiscovery - Scenario E: Crash Recovery with newPositionId', async () 
         positionId: assignment.positionId,
         strategyId: assignment.strategyId,
         mode: assignment.mode,
-        isExecuting: false,
         tick: async () => ({ action: 'skip' }),
       };
       return orchestrator;
@@ -594,7 +623,6 @@ test('startDiscovery - Scenario F: Lock Restoration with Active Task', async () 
         positionId: assignment.positionId,
         strategyId: assignment.strategyId,
         mode: assignment.mode,
-        isExecuting: false,
         tick: async () => ({ action: 'skip' }),
       };
       return orchestrator;
@@ -607,9 +635,6 @@ test('startDiscovery - Scenario F: Lock Restoration with Active Task', async () 
   // Orchestrator must be registered
   const registeredOrchs = m.registry.getForPosition(MOCK_PUBKEY_1);
   assert.strictEqual(registeredOrchs.length, 1);
-
-  // isExecuting lock must be restored to true!
-  assert.strictEqual(registeredOrchs[0].isExecuting, true);
 });
 
 test('processTasks - Scenario G: Seamless Transition with newPositionId', async () => {
@@ -712,7 +737,6 @@ test('processTasks - Scenario G: Seamless Transition with newPositionId', async 
         positionId: assignment.positionId,
         strategyId: assignment.strategyId,
         mode: assignment.mode,
-        isExecuting: false,
         tick: async () => ({ action: 'skip' }),
       };
       return orchestrator;

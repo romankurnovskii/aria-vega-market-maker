@@ -121,7 +121,6 @@ export async function startDiscovery(
 
         // Register the new orchestrator
         const orchestrator = factory.create(matchingAssignment);
-        orchestrator.isExecuting = false;
         registry.register(orchestrator);
       }
 
@@ -166,14 +165,6 @@ export async function startDiscovery(
         orchestrator = factory.create(assignment);
         registry.register(orchestrator);
       }
-
-      // Restore executing lock if this position has an active rebalance task in flight (e.g. pending_close)
-      if (inFlightPositionIds.has(livePos.id)) {
-        orchestrator.isExecuting = true;
-        logger.info(
-          `[Discovery] Position ${livePos.id} is mid-rebalance on boot. Lock isExecuting set to true for orchestrator ${orchestrator.id}`
-        );
-      }
     }
   }
 
@@ -196,18 +187,13 @@ export async function startDiscovery(
       logger.info(
         `[Discovery] Position ${knownPos.id} is not on-chain but has an active rebalance task. Retaining orchestrator and setting state to ${knownPos.state}.`
       );
-      // Ensure orchestrator is registered and marked as executing
+      // Ensure orchestrator is registered
       const activeOrchestrators = registry.getForPosition(knownPos.id);
       if (activeOrchestrators.length === 0) {
         const matchingAssignments = assignments.filter((a) => a.positionId === knownPos.id);
         for (const assignment of matchingAssignments) {
           const orchestrator = factory.create(assignment);
-          orchestrator.isExecuting = true;
           registry.register(orchestrator);
-        }
-      } else {
-        for (const orch of activeOrchestrators) {
-          orch.isExecuting = true;
         }
       }
     }
@@ -271,13 +257,9 @@ export async function processTasks(
         task.events = [];
       }
 
-      // 1. Sync orchestrator isExecuting flag
       const orchestrators = registry.getForPosition(task.originalPositionId);
-      for (const orch of orchestrators) {
-        orch.isExecuting = true;
-      }
 
-      // 2. Timeout check (fail-safe)
+      // 1. Timeout check (fail-safe) with Auto-Heal Timeout Pruning
       const MAX_TASK_AGE_MS = 5 * 60 * 1000; // 5 minutes
       if (Date.now() - task.evaluatedAt > MAX_TASK_AGE_MS) {
         logger.error(
@@ -287,10 +269,40 @@ export async function processTasks(
           task.events.push({
             stage: 'TIMEOUT',
             timestamp: Date.now(),
-            message: `Task has exceeded maximum age of ${MAX_TASK_AGE_MS}ms.`,
+            message: 'Task exceeded maximum age. Auto-heal initiated.',
           });
-          await tasksStore.saveTask(task);
         }
+
+        // Auto-Heal Pruning: Archive the position as FAILED to prevent ghost position leakage
+        const knownPositions = await positionStore.getKnown();
+        const cachedPos = knownPositions.find((p) => p.id === task.originalPositionId);
+        if (cachedPos) {
+          cachedPos.state = 'FAILED';
+          cachedPos.closedAt = Date.now();
+          await positionStore.archivePosition(cachedPos);
+
+          const remaining = knownPositions.filter((p) => p.id !== cachedPos.id);
+          await positionStore.saveKnown(remaining);
+          logger.warn(
+            `[Execution Monitor] Auto-Heal: Archived cached position ${cachedPos.id} as FAILED due to task timeout.`
+          );
+        }
+
+        // Archive the task to the historical tasks history ledger
+        const storeWithArchive = store as unknown as {
+          archiveTask?: (t: RebalanceTask) => Promise<void>;
+          deleteTask: (id: string) => Promise<void>;
+        };
+
+        if (typeof storeWithArchive.archiveTask === 'function') {
+          await storeWithArchive.archiveTask(task);
+          logger.info(`[Execution Monitor] Stuck task ${task.id} archived successfully.`);
+        } else {
+          await storeWithArchive.deleteTask(task.id);
+          logger.warn(`[Execution Monitor] archiveTask not available; deleted stuck task ${task.id} from queue.`);
+        }
+
+        return; // Abort processing this task
       }
 
       if (task.status === 'pending_close') {
@@ -393,9 +405,6 @@ export async function processTasks(
           });
           await tasksStore.saveTask(task);
           await tasksStore.deleteTask(task.id);
-          for (const orch of orchestrators) {
-            orch.isExecuting = false;
-          }
 
           if (cachedPos) {
             cachedPos.state = 'CLOSED';
@@ -555,9 +564,6 @@ export async function processTasks(
           });
           await tasksStore.saveTask(task);
           await tasksStore.deleteTask(task.id);
-          for (const orch of orchestrators) {
-            orch.isExecuting = false;
-          }
         }
       }
 
@@ -661,7 +667,6 @@ export async function processTasks(
             // Register a new orchestrator for the new position ID if factory is available
             if (factory) {
               const newOrch = factory.create(assignment);
-              newOrch.isExecuting = false;
               registry.register(newOrch);
             }
           }
@@ -698,9 +703,6 @@ export async function processTasks(
         }
 
         await tasksStore.deleteTask(task.id);
-        for (const orch of orchestrators) {
-          orch.isExecuting = false;
-        }
       }
     } catch (err: unknown) {
       logger.error(
@@ -766,6 +768,8 @@ export function startTickLoop(
       // 1. Run Execution Monitor to process in-flight stateful tasks first
       await processTasks(store, executor, positionProvider, rpcPool, walletAddress, registry, positionStore, factory);
 
+      const activeTasks = await store.getTasks();
+
       const knownPositions = await positionStore.getKnown();
       const updatedKnownPositions: Position[] = [...knownPositions];
       let storeNeedsUpdate = false;
@@ -782,14 +786,16 @@ export function startTickLoop(
             continue;
           }
 
-          // Fetch orchestrators and check lock before querying RPC to avoid useless RPC workload
-          const orchestrators = registry.getForPosition(position.id);
-          if (orchestrators.some((o) => o.isExecuting)) {
+          // Fetch active tasks from store to check lock before querying RPC to avoid useless RPC workload
+          const isLocked = activeTasks.some((t) => t.originalPositionId === position.id);
+          if (isLocked) {
             logger.info(
               `[Tick Loop] Position ${position.id} is currently locked (active rebalance task in-flight). Skipping evaluation.`
             );
             continue;
           }
+
+          const orchestrators = registry.getForPosition(position.id);
 
           // Fetch fresh status and snapshot
           let freshPosition: Position;
@@ -882,11 +888,6 @@ export function startTickLoop(
             };
 
             await tasksStore.saveTask(task);
-
-            // Set the execution lock on all associated orchestrators
-            for (const orch of orchestrators) {
-              orch.isExecuting = true;
-            }
 
             logger.info(
               `[Tick Loop] Stateful RebalanceTask ${task.id} created successfully on disk. Triggering Execution Monitor...`
