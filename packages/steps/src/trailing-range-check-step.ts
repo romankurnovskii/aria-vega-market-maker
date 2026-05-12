@@ -36,8 +36,7 @@ export class TrailingRangeCheckStep implements IStep {
     }
 
     const isActiveBoundInRange =
-      context.market.activeBound >= context.position.lowerBound &&
-      context.market.activeBound <= context.position.upperBound;
+      context.market.activeBound >= context.position.lowerBound && context.market.activeBound <= context.position.upperBound;
 
     if (!isActiveBoundInRange) {
       logger.warn(
