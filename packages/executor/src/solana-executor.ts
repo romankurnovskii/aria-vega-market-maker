@@ -11,14 +11,7 @@
  * @dependencies IRpcProvider, IExecutor, MeteoraOnChainProvider, Keypair, Connection, Transaction
  * @sideEffects Submits and actively rebroadcasts transactions to the Solana network
  */
-import {
-  IExecutor,
-  Decision,
-  MarketSnapshot,
-  ExecutionRecord,
-  StrategyResult,
-  IRpcProvider,
-} from '@lp-system/core';
+import { IExecutor, Decision, MarketSnapshot, ExecutionRecord, StrategyResult, IRpcProvider } from '@lp-system/core';
 import { Connection, Keypair, PublicKey, Transaction } from '@solana/web3.js';
 import { MeteoraOnChainProvider } from '@lp-system/providers';
 import { getLogger } from '@lp-system/logger';
@@ -82,24 +75,17 @@ export class SolanaExecutor implements IExecutor {
     reEvaluate?: (positionId: string) => Promise<StrategyResult>
   ): Promise<ExecutionRecord> {
     const callback = reEvaluate || this.reEvaluateCallback;
-    logger.info(
-      `[SolanaExecutor] Applying decision '${decision.action}' on position ${decision.positionId}`
-    );
+    logger.info(`[SolanaExecutor] Applying decision '${decision.action}' on position ${decision.positionId}`);
 
     const txSignatures: string[] = [];
     const executionId = `exec_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
     try {
       if (decision.action === 'close') {
-        logger.info(
-          `[SolanaExecutor] Creating CLOSE transaction for position ${decision.positionId}`
-        );
+        logger.info(`[SolanaExecutor] Creating CLOSE transaction for position ${decision.positionId}`);
 
         // 1. Fetch on-chain positions to find active range bins
-        const activePositions = await this.provider.getOnChainPositions(
-          this.walletAddress,
-          market.poolAddress
-        );
+        const activePositions = await this.provider.getOnChainPositions(this.walletAddress, market.poolAddress);
         const onChainPos = activePositions[decision.positionId];
         if (!onChainPos) {
           throw new Error(
@@ -132,9 +118,7 @@ export class SolanaExecutor implements IExecutor {
 
         // 4. Submit and confirm each transaction sequentially
         for (let i = 0; i < closeTxs.length; i++) {
-          logger.info(
-            `[SolanaExecutor] Executing close transaction chunk ${i + 1}/${closeTxs.length}...`
-          );
+          logger.info(`[SolanaExecutor] Executing close transaction chunk ${i + 1}/${closeTxs.length}...`);
           const sig = await this.executeTx(closeTxs[i]);
           txSignatures.push(sig);
         }
@@ -153,6 +137,9 @@ export class SolanaExecutor implements IExecutor {
 
         const slippageTolerance = (openParams.metadata?.slippageTolerance as number) ?? 1;
 
+        const positionKeypair = Keypair.generate();
+        logger.info(`[SolanaExecutor] Generated new position keypair: ${positionKeypair.publicKey.toBase58()}`);
+
         // 1. Build add liquidity instructions
         const instructions = await this.provider.buildAddLiquidityInstructions({
           poolAddress: market.poolAddress,
@@ -162,22 +149,20 @@ export class SolanaExecutor implements IExecutor {
           lowerBinId,
           upperBinId,
           slippageTolerance,
+          positionPubKey: positionKeypair.publicKey,
         });
 
         // 2. Bundle instructions into a new Transaction
         const openTx = new Transaction().add(...instructions);
 
-        // 3. Submit and confirm
-        const openSig = await this.executeTx(openTx);
+        // 3. Submit and confirm with custom position signer
+        const openSig = await this.executeTx(openTx, [positionKeypair]);
         txSignatures.push(openSig);
       } else if (decision.action === 'close+open') {
         logger.info(`[SolanaExecutor] Step 1/3: Closing old position ${decision.positionId}`);
 
         // 1. Close the current position on-chain
-        const activePositions = await this.provider.getOnChainPositions(
-          this.walletAddress,
-          market.poolAddress
-        );
+        const activePositions = await this.provider.getOnChainPositions(this.walletAddress, market.poolAddress);
         const onChainPos = activePositions[decision.positionId];
         if (!onChainPos) {
           throw new Error(
@@ -203,9 +188,7 @@ export class SolanaExecutor implements IExecutor {
         });
 
         for (let i = 0; i < closeTxs.length; i++) {
-          logger.info(
-            `[SolanaExecutor] Executing close transaction chunk ${i + 1}/${closeTxs.length}...`
-          );
+          logger.info(`[SolanaExecutor] Executing close transaction chunk ${i + 1}/${closeTxs.length}...`);
           const sig = await this.executeTx(closeTxs[i]);
           txSignatures.push(sig);
         }
@@ -215,15 +198,10 @@ export class SolanaExecutor implements IExecutor {
         let balancesSettled = false;
 
         for (let attempt = 0; attempt < 15; attempt++) {
-          const currentPositions = await this.provider.getOnChainPositions(
-            this.walletAddress,
-            market.poolAddress
-          );
+          const currentPositions = await this.provider.getOnChainPositions(this.walletAddress, market.poolAddress);
 
           if (!currentPositions[decision.positionId]) {
-            logger.info(
-              `[SolanaExecutor] Position PDA deleted. Applying 2-second buffer for RPC global state sync...`
-            );
+            logger.info(`[SolanaExecutor] Position PDA deleted. Applying 2-second buffer for RPC global state sync...`);
 
             // Wait an additional 2 seconds AFTER the PDA is confirmed deleted.
             // This guarantees that when the Strategy queries the token balances in the next step,
@@ -234,9 +212,7 @@ export class SolanaExecutor implements IExecutor {
             break;
           }
 
-          logger.info(
-            `[SolanaExecutor] Position is still active (attempt ${attempt + 1}/15). Waiting 1.5s...`
-          );
+          logger.info(`[SolanaExecutor] Position is still active (attempt ${attempt + 1}/15). Waiting 1.5s...`);
           await new Promise((resolve) => setTimeout(resolve, 1500));
         }
 
@@ -247,28 +223,19 @@ export class SolanaExecutor implements IExecutor {
         }
 
         if (!callback) {
-          throw new Error(
-            'Cannot execute compound close+open rebalance without an injected re-evaluation callback'
-          );
+          throw new Error('Cannot execute compound close+open rebalance without an injected re-evaluation callback');
         }
 
         // Explicit 2-second sleep to prevent balance synchronization race condition
-        logger.info(
-          `[SolanaExecutor] Sleeping 2s to allow RPC nodes to synchronize token balance indices...`
-        );
+        logger.info(`[SolanaExecutor] Sleeping 2s to allow RPC nodes to synchronize token balance indices...`);
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
         // 3. Trigger re-evaluation with the guaranteed fresh on-chain balance state
-        logger.info(
-          `[SolanaExecutor] Step 2/3: Invoking re-evaluation callback for position ${decision.positionId}`
-        );
+        logger.info(`[SolanaExecutor] Step 2/3: Invoking re-evaluation callback for position ${decision.positionId}`);
         const reEvalResult = await callback(decision.positionId);
 
         if (reEvalResult.action === 'open' || reEvalResult.action === 'close+open') {
-          const openParams =
-            reEvalResult.action === 'close+open'
-              ? reEvalResult.openParams
-              : reEvalResult.params;
+          const openParams = reEvalResult.action === 'close+open' ? reEvalResult.openParams : reEvalResult.params;
 
           if (!openParams) {
             throw new Error('Re-evaluation returned OPEN action but openParams are missing');
@@ -283,6 +250,11 @@ export class SolanaExecutor implements IExecutor {
 
           const slippageTolerance = (openParams.metadata?.slippageTolerance as number) ?? 1;
 
+          const positionKeypair = Keypair.generate();
+          logger.info(
+            `[SolanaExecutor] Generated new position keypair for rebalance open: ${positionKeypair.publicKey.toBase58()}`
+          );
+
           const instructions = await this.provider.buildAddLiquidityInstructions({
             poolAddress: market.poolAddress,
             userWallet: this.keypair.publicKey,
@@ -291,10 +263,11 @@ export class SolanaExecutor implements IExecutor {
             lowerBinId: newLowerBinId,
             upperBinId: newUpperBinId,
             slippageTolerance,
+            positionPubKey: positionKeypair.publicKey,
           });
 
           const openTx = new Transaction().add(...instructions);
-          const openSig = await this.executeTx(openTx);
+          const openSig = await this.executeTx(openTx, [positionKeypair]);
           txSignatures.push(openSig);
         } else {
           logger.info(
@@ -303,9 +276,7 @@ export class SolanaExecutor implements IExecutor {
         }
       }
 
-      logger.info(
-        `[SolanaExecutor] Execution sequence succeeded. Transactions: ${txSignatures.join(', ')}`
-      );
+      logger.info(`[SolanaExecutor] Execution sequence succeeded. Transactions: ${txSignatures.join(', ')}`);
 
       return {
         id: executionId,
@@ -316,9 +287,7 @@ export class SolanaExecutor implements IExecutor {
       };
     } catch (error: unknown) {
       const err = error as Error;
-      logger.error(
-        `[SolanaExecutor] Execution sequence failed: ${err.message || String(error)}`
-      );
+      logger.error(`[SolanaExecutor] Execution sequence failed: ${err.message || String(error)}`);
       return {
         id: executionId,
         decision,
@@ -337,7 +306,7 @@ export class SolanaExecutor implements IExecutor {
    * @param {Transaction} tx - Transaction containing original instructions.
    * @returns {Promise<string>} Confirmed transaction signature.
    */
-  private async executeTx(tx: Transaction): Promise<string> {
+  private async executeTx(tx: Transaction, additionalSigners: Keypair[] = []): Promise<string> {
     return await this.rpcPool.execute(async (connection: Connection) => {
       // 1. Fetch blockhash first
       const { blockhash } = await connection.getLatestBlockhash('confirmed');
@@ -348,7 +317,7 @@ export class SolanaExecutor implements IExecutor {
       // on the Meteora SDK's default Compute Budget instructions for now.
 
       // 2. Sign and serialize the transaction
-      tx.sign(this.keypair);
+      tx.sign(this.keypair, ...additionalSigners);
       const rawTx = tx.serialize();
 
       // 3. The Active Rebroadcast "Spam Loop" (UDP Delivery Assurance)
@@ -363,9 +332,7 @@ export class SolanaExecutor implements IExecutor {
       while (!confirmed && Date.now() - startTime < timeoutMs) {
         attempt++;
         const elapsed = Date.now() - startTime;
-        logger.info(
-          `[SolanaExecutor] executeTx attempt #${attempt}. Elapsed: ${elapsed}ms. Timeout limit: ${timeoutMs}ms.`
-        );
+        logger.info(`[SolanaExecutor] executeTx attempt #${attempt}. Elapsed: ${elapsed}ms. Timeout limit: ${timeoutMs}ms.`);
 
         try {
           // Send with skipPreflight: true to bypass local node simulation bottlenecks
@@ -385,23 +352,17 @@ export class SolanaExecutor implements IExecutor {
 
           if (status && status.value && status.value.confirmationStatus) {
             if (status.value.err) {
-              throw new Error(
-                `Transaction failed on-chain: ${JSON.stringify(status.value.err)}`
-              );
+              throw new Error(`Transaction failed on-chain: ${JSON.stringify(status.value.err)}`);
             }
 
             const confStatus = status.value.confirmationStatus;
-            logger.info(
-              `[SolanaExecutor] Signature ${signature} status: ${confStatus || 'unknown'}`
-            );
+            logger.info(`[SolanaExecutor] Signature ${signature} status: ${confStatus || 'unknown'}`);
             if (confStatus === 'confirmed' || confStatus === 'finalized') {
               confirmed = true;
               break;
             }
           } else {
-            logger.info(
-              `[SolanaExecutor] Signature status not found yet for signature ${signature}`
-            );
+            logger.info(`[SolanaExecutor] Signature status not found yet for signature ${signature}`);
           }
         } catch (err: unknown) {
           const errMsg = (err as Error).message || String(err);
@@ -410,8 +371,7 @@ export class SolanaExecutor implements IExecutor {
             errMsg.toLowerCase().includes('too many requests') ||
             errMsg.toLowerCase().includes('rate limit');
           const isSendError =
-            (err as { name?: string }).name === 'SendTransactionError' ||
-            errMsg.includes('Transaction simulation failed');
+            (err as { name?: string }).name === 'SendTransactionError' || errMsg.includes('Transaction simulation failed');
 
           if (
             isSendError ||
@@ -436,14 +396,10 @@ export class SolanaExecutor implements IExecutor {
       }
 
       if (!confirmed) {
-        throw new Error(
-          `Transaction ${signature || '(not sent)'} timed out after ${timeoutMs}ms without confirmation.`
-        );
+        throw new Error(`Transaction ${signature || '(not sent)'} timed out after ${timeoutMs}ms without confirmation.`);
       }
 
-      logger.info(
-        `[SolanaExecutor] Transaction successfully confirmed on-chain: ${signature}`
-      );
+      logger.info(`[SolanaExecutor] Transaction successfully confirmed on-chain: ${signature}`);
       return signature;
     });
   }
@@ -476,15 +432,10 @@ export class SolanaExecutor implements IExecutor {
           let amountY = '0';
 
           const tokenProgramId = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
-          const token2022ProgramId = new PublicKey(
-            'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'
-          );
+          const token2022ProgramId = new PublicKey('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb');
 
           const fetchForProgram = async (programId: PublicKey) => {
-            const response = await connection.getParsedTokenAccountsByOwner(
-              new PublicKey(walletAddress),
-              { programId }
-            );
+            const response = await connection.getParsedTokenAccountsByOwner(new PublicKey(walletAddress), { programId });
             for (const account of response.value) {
               const info = account.account.data.parsed.info;
               const mint = info.mint;
@@ -518,16 +469,12 @@ export class SolanaExecutor implements IExecutor {
           `[SolanaExecutor] No balance increase yet. X: ${currentX} (init: ${initialX}), Y: ${currentY} (init: ${initialY}). Waiting 2s...`
         );
       } catch (err: unknown) {
-        logger.warn(
-          `[SolanaExecutor] Error polling balances: ${(err as Error).message || String(err)}`
-        );
+        logger.warn(`[SolanaExecutor] Error polling balances: ${(err as Error).message || String(err)}`);
       }
 
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
 
-    logger.warn(
-      `[SolanaExecutor] Balance polling timed out after ${timeoutMs}ms without increase. Proceeding anyway.`
-    );
+    logger.warn(`[SolanaExecutor] Balance polling timed out after ${timeoutMs}ms without increase. Proceeding anyway.`);
   }
 }
