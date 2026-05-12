@@ -15,6 +15,16 @@ import { StrategyAction } from './enums';
 import { Position, OpenParams } from './position';
 import { MarketSnapshot } from './market';
 
+export interface CalculatedPrices {
+  lowerPrice: number;
+  upperPrice: number;
+  midPrice: number;
+  geometricAverage: number;
+  spotAverage: number;
+  convexityBenefit: number;
+  effectiveBreakEven?: number;
+}
+
 export interface StepContext {
   position: Position;
   market: MarketSnapshot;
@@ -22,6 +32,7 @@ export interface StepContext {
   signal?: StrategyAction | 'skip' | 'close' | 'open' | 'close+open'; // Accept both enums and literal values
   openParams?: OpenParams;
   reason?: string;
+  calculations?: CalculatedPrices;
 }
 
 export type StrategyResult =
