@@ -20,7 +20,7 @@ import {
 } from '@lp-system/providers';
 import { Keypair } from '@solana/web3.js';
 import { JsonFileStore, JsonPositionStore } from '@lp-system/persistence';
-import { TrailingUsdcStrategy } from '@lp-system/strategy';
+import { TrailingUsdcStrategy, ExperimentalRestakeStrategy } from '@lp-system/strategy';
 import {
   OrchestratorRegistry,
   OrchestratorFactory,
@@ -136,11 +136,15 @@ async function main() {
 
   // 3. Strategy initialization
   const trailingUsdcStrategy = new TrailingUsdcStrategy({ rangePercent: 20 });
+  const experimentalRestakeStrategy = new ExperimentalRestakeStrategy();
 
   // 4. Orchestration Layer initialization
   const registry = new OrchestratorRegistry();
   const factory = new OrchestratorFactory(
-    { 'trailing-usdc': trailingUsdcStrategy }, // Maps strategy ID to strategy instance
+    {
+      'trailing-usdc': trailingUsdcStrategy,
+      'experimental-restake': experimentalRestakeStrategy,
+    }, // Maps strategy ID to strategy instance
     { rangePercent: 20 }
   );
   const executionGate = new ExecutionGate();
