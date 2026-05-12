@@ -13,6 +13,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "tsc && node --test dist/**/*.test.js",
+    "test:coverage": "tsc && node --experimental-test-coverage --test dist/**/*.test.js"
   }
 }
