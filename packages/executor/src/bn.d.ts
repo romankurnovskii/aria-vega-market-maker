@@ -1,12 +1,8 @@
 declare module 'bn.js' {
   import { Buffer } from 'buffer';
   export default class BN {
-    constructor(
-      number: number | string | number[] | Uint8Array | Buffer | BN,
-      base?: number | 'hex',
-      endian?: 'le' | 'be'
-    );
-    static isBN(b: any): b is BN;
+    constructor(number: number | string | number[] | Uint8Array | Buffer | BN, base?: number | 'hex', endian?: 'le' | 'be');
+    static isBN(b: unknown): b is BN;
     toNumber(): number;
     toString(base?: number | 'hex', length?: number): string;
     toArray(endian?: 'le' | 'be', length?: number): number[];
