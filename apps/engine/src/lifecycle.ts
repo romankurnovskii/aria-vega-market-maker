@@ -26,6 +26,8 @@ import {
   RebalanceTask,
   StrategyResult,
   ExecutionRecord,
+  Assignment,
+  IOrchestrator,
 } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
@@ -33,6 +35,8 @@ import { getLogger } from '@lp-system/logger';
 import { isDeepStrictEqual } from 'node:util';
 
 const logger = getLogger('lifecycle');
+
+let tickLoopRunning = false;
 
 import { PublicKey, Connection } from '@solana/web3.js';
 
@@ -258,6 +262,7 @@ export async function processTasks(
     getTasks: () => Promise<RebalanceTask[]>;
     saveTask: (t: RebalanceTask) => Promise<void>;
     deleteTask: (id: string) => Promise<void>;
+    getAssignments: () => Promise<Assignment[]>;
   };
   if (typeof tasksStore.getTasks !== 'function') return;
 
@@ -534,12 +539,36 @@ export async function processTasks(
 
         logger.info(`[Execution Monitor] Re-evaluating strategy using synthetic position...`);
         let reEvalResult: StrategyResult = { action: 'skip' };
+        let hasActiveOrchestrator = false;
+
         try {
-          for (const orch of orchestrators) {
-            const res = await orch.tick(syntheticPos, market);
-            if (res.action !== 'skip') {
-              reEvalResult = res;
-              break;
+          let strategyOrchestrator: IOrchestrator | undefined;
+
+          // 1. Decoupled JIT: Attempt to instantiate strategy from the task assignment directly
+          if (factory && task.assignmentId) {
+            if (typeof tasksStore.getAssignments === 'function') {
+              const assignments = await tasksStore.getAssignments();
+              const assignment = assignments.find((a) => a.id === task.assignmentId);
+              if (assignment) {
+                strategyOrchestrator = factory.create(assignment);
+                hasActiveOrchestrator = true;
+              } else {
+                logger.warn(`[Execution Monitor] Assignment ${task.assignmentId} not found in store for JIT evaluation.`);
+              }
+            }
+          }
+
+          if (strategyOrchestrator) {
+            reEvalResult = await strategyOrchestrator.tick(syntheticPos, market);
+          } else {
+            // 2. Fallback to registry if factory isn't available
+            for (const orch of orchestrators) {
+              hasActiveOrchestrator = true;
+              const res = await orch.tick(syntheticPos, market);
+              if (res.action !== 'skip') {
+                reEvalResult = res;
+                break;
+              }
             }
           }
         } catch (err) {
@@ -558,12 +587,12 @@ export async function processTasks(
               `[Execution Monitor] Strategy re-evaluation successfully recalculated new range bounds for position ${task.originalPositionId}.`
             );
           }
-        } else if (orchestrators.length > 0 && reEvalResult.action === 'close') {
+        } else if (hasActiveOrchestrator && reEvalResult.action === 'close') {
           openParamsToUse = undefined;
           logger.info(
             `[Execution Monitor] Strategy re-evaluation recommended 'close'. Aborting open leg for position ${task.originalPositionId}.`
           );
-        } else if (orchestrators.length > 0 && reEvalResult.action === 'skip') {
+        } else if (hasActiveOrchestrator && reEvalResult.action === 'skip') {
           // A 'skip' signal on the synthetic position means the target range is currently in-range
           // and does not need further rebalancing. We should proceed with opening it.
           logger.info(
@@ -604,8 +633,8 @@ export async function processTasks(
         const poolInfo = await positionProvider.getPoolInfo(poolAddress);
         const market = await positionProvider.getMarketSnapshot(poolInfo.poolAddress);
 
-        // JIT Signal Validation: check if signal is stale (e.g., > 10,000ms)
-        const MAX_SIGNAL_AGE_MS = 10000;
+        // JIT Signal Validation: check if signal is stale (e.g., > 180,000ms)
+        const MAX_SIGNAL_AGE_MS = 180000;
         if (Date.now() - task.evaluatedAt > MAX_SIGNAL_AGE_MS) {
           logger.warn(
             `[Execution Monitor] Signal for task ${task.id} is stale (${Date.now() - task.evaluatedAt}ms). Re-triggering re-evaluation...`
@@ -705,26 +734,36 @@ export async function processTasks(
 
           // Fetch the fresh position and update positionStore cache seamlessly
           try {
-            const freshNewPos = await positionProvider.getPosition(newPositionId, poolInfo.poolAddress);
-            freshNewPos.state = 'OPEN';
-
-            const knownPositions = await positionStore.getKnown();
-            const filteredKnown = knownPositions.filter((p) => p.id !== task.originalPositionId);
-
-            // Archive old position as CLOSED
-            const oldPos = knownPositions.find((p) => p.id === task.originalPositionId);
-            if (oldPos) {
-              oldPos.state = 'CLOSED';
-              oldPos.closedAt = Date.now();
-              await positionStore.archivePosition(oldPos);
-              logger.info(`[Execution Monitor] Rebalanced old position ${oldPos.id} archived as CLOSED.`);
+            let freshNewPos: Position | undefined;
+            try {
+              freshNewPos = await positionProvider.getPosition(newPositionId, poolInfo.poolAddress);
+            } catch {
+              logger.warn(
+                `[Execution Monitor] Position ${newPositionId} not yet indexed by API. Deferring cache update to discovery.`
+              );
             }
 
-            filteredKnown.push(freshNewPos);
-            await positionStore.saveKnown(filteredKnown);
-            logger.info(
-              `[Execution Monitor] Successfully cached new position ${newPositionId} and pruned old position ${task.originalPositionId}`
-            );
+            if (freshNewPos) {
+              freshNewPos.state = 'OPEN';
+
+              const knownPositions = await positionStore.getKnown();
+              const filteredKnown = knownPositions.filter((p) => p.id !== task.originalPositionId);
+
+              // Archive old position as CLOSED
+              const oldPos = knownPositions.find((p) => p.id === task.originalPositionId);
+              if (oldPos) {
+                oldPos.state = 'CLOSED';
+                oldPos.closedAt = Date.now();
+                await positionStore.archivePosition(oldPos);
+                logger.info(`[Execution Monitor] Rebalanced old position ${oldPos.id} archived as CLOSED.`);
+              }
+
+              filteredKnown.push(freshNewPos);
+              await positionStore.saveKnown(filteredKnown);
+              logger.info(
+                `[Execution Monitor] Successfully cached new position ${newPositionId} and pruned old position ${task.originalPositionId}`
+              );
+            }
           } catch (cacheError) {
             logger.error(
               `[Execution Monitor] Failed to update positionStore cache immediately for new position ${newPositionId}: ${
@@ -776,10 +815,8 @@ export function startTickLoop(
     `[Tick Loop] Launching continuous evaluation tick loop for wallet ${walletAddress}. Interval: ${intervalMs}ms`
   );
 
-  let isRunning = false;
-
   const runCycle = async () => {
-    if (isRunning) {
+    if (tickLoopRunning) {
       let activeTasksInfo = '';
       try {
         const tasks = await store.getTasks();
@@ -792,12 +829,16 @@ export function startTickLoop(
       logger.info(`[Tick Loop] Previous execution cycle is still active. Skipping overlapping tick loop.${activeTasksInfo}`);
       return;
     }
-    isRunning = true;
+    tickLoopRunning = true;
     try {
       logger.info('[Tick Loop] Starting tick execution cycle...');
 
       // 1. Run Execution Monitor to process in-flight stateful tasks first
-      await processTasks(store, executor, positionProvider, rpcPool, walletAddress, registry, positionStore, factory);
+      await processTasks(store, executor, positionProvider, rpcPool, walletAddress, registry, positionStore, factory).catch(
+        (err) => {
+          logger.error(`[Tick Loop] Error in processTasks: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      );
 
       const activeTasks = await store.getTasks();
 
@@ -925,7 +966,20 @@ export function startTickLoop(
             );
 
             // Run Task Monitor immediately to begin execution without waiting for next tick interval
-            await processTasks(store, executor, positionProvider, rpcPool, walletAddress, registry, positionStore, factory);
+            await processTasks(
+              store,
+              executor,
+              positionProvider,
+              rpcPool,
+              walletAddress,
+              registry,
+              positionStore,
+              factory
+            ).catch((err) => {
+              logger.error(
+                `[Tick Loop] Error in post-decision processTasks: ${err instanceof Error ? err.message : String(err)}`
+              );
+            });
           } else {
             logger.info(`[Tick Loop] No execution required for position ${position.id}`);
           }
@@ -947,7 +1001,7 @@ export function startTickLoop(
         `[Tick Loop] Fatal error during tick execution cycle: ${error instanceof Error ? error.message : String(error)}`
       );
     } finally {
-      isRunning = false;
+      tickLoopRunning = false;
     }
   };
 
@@ -959,4 +1013,12 @@ export function startTickLoop(
 
   const loop = setInterval(runCycle, intervalMs);
   return loop;
+}
+
+/**
+ * Resets the module-level tick loop running state.
+ * Useful for test teardown to prevent sequential tests from skipping.
+ */
+export function resetTickLoopState(): void {
+  tickLoopRunning = false;
 }
