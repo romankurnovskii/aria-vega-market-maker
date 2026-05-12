@@ -37,6 +37,7 @@ function getShortWallet(wallet: string): string {
  */
 export class JsonPositionStore implements IPositionStore {
   private knownPositionsPath: string;
+  private archivePositionsPath: string;
 
   /**
    * Constructs the store with a directory path and optional namespacing options.
@@ -57,6 +58,9 @@ export class JsonPositionStore implements IPositionStore {
     }
     const filename = parts.length > 0 ? `${parts.join('_')}_positions.json` : 'known_positions.json';
     this.knownPositionsPath = path.join(directoryPath, filename);
+
+    const archiveFilename = parts.length > 0 ? `${parts.join('_')}_position_history.json` : 'position_history.json';
+    this.archivePositionsPath = path.join(directoryPath, archiveFilename);
   }
 
   /**
@@ -94,9 +98,59 @@ export class JsonPositionStore implements IPositionStore {
    * @param {Position[]} positions - Full list of currently tracked positions.
    */
   public async saveKnown(positions: Position[]): Promise<void> {
+    const activeStates = ['OPEN', 'CREATING', 'REBALANCING', 'CLOSING'];
+    const activePositions = positions.filter((p) => !p.state || activeStates.includes(p.state));
     await this.ensureDirectory();
     await fileMutex.runExclusive(this.knownPositionsPath, async () => {
-      await fs.writeFile(this.knownPositionsPath, JSON.stringify(positions, null, 2), 'utf-8');
+      await fs.writeFile(this.knownPositionsPath, JSON.stringify(activePositions, null, 2), 'utf-8');
+    });
+  }
+
+  /**
+   * Appends or updates a terminal position in the archived positions ledger under lock.
+   *
+   * @param {Position} position - Position object to archive.
+   */
+  public async archivePosition(position: Position): Promise<void> {
+    await this.ensureDirectory();
+    await fileMutex.runExclusive(this.archivePositionsPath, async () => {
+      let archived: Position[] = [];
+      try {
+        const data = await fs.readFile(this.archivePositionsPath, 'utf-8');
+        archived = JSON.parse(data) as Position[];
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'code' in error && error.code !== 'ENOENT') {
+          throw error;
+        }
+      }
+
+      const index = archived.findIndex((p) => p.id === position.id);
+      if (index >= 0) {
+        archived[index] = position;
+      } else {
+        archived.push(position);
+      }
+      await fs.writeFile(this.archivePositionsPath, JSON.stringify(archived, null, 2), 'utf-8');
+    });
+  }
+
+  /**
+   * Reads all archived positions from disk under lock.
+   * Returns [] if the file does not exist.
+   *
+   * @returns {Promise<Position[]>} Array of archived Position objects.
+   */
+  public async getArchived(): Promise<Position[]> {
+    return fileMutex.runExclusive(this.archivePositionsPath, async () => {
+      try {
+        const data = await fs.readFile(this.archivePositionsPath, 'utf-8');
+        return JSON.parse(data) as Position[];
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+          return [];
+        }
+        throw error;
+      }
     });
   }
 }

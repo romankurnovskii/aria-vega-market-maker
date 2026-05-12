@@ -71,6 +71,7 @@ test('JsonFileStore - concurrent saveTask updates are atomic and no updates are 
       evaluatedAt: Date.now(),
     },
     evaluatedAt: Date.now(),
+    events: [],
   }));
 
   await Promise.all(tasks.map((task) => store.saveTask(task)));
