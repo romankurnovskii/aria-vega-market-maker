@@ -1,18 +1,15 @@
 /**
  * @file json-position-store.ts
- * @description JSON file-based implementation of IPositionStore for persisting known positions.
+ * @description JSON file-based implementation of IPositionStore with file-path scoped async mutex protection.
  *
  * @features
  * - Loads/saves Position[] to known_positions.json in the configured directory
- * - Creates directory automatically on write; returns [] on missing file
- * - Simple disk-based cache for position discovery diffing
- *
- * @dependencies IPositionStore, Position (from @lp-system/core), fs/promises, path
- * @sideEffects Writes to ./data/{prefix}positions.json on saveKnown()
+ * - Thread-safe atomic file writing and reading using path-scoped AsyncFileMutex singleton `fileMutex`
  */
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { IPositionStore, Position } from '@lp-system/core';
+import { fileMutex } from './mutex.js';
 
 /**
  * Options for configuring namespaced storage files.
@@ -35,8 +32,8 @@ function getShortWallet(wallet: string): string {
 }
 
 /**
- * JsonPositionStore: persists known positions to a local JSON file.
- * Used by the discovery loop to track which positions are currently tracked vs newly closed.
+ * JsonPositionStore: persists known positions to a local JSON file under lock.
+ * Ensures concurrent calls do not overlap.
  */
 export class JsonPositionStore implements IPositionStore {
   private knownPositionsPath: string;
@@ -58,8 +55,7 @@ export class JsonPositionStore implements IPositionStore {
     if (options?.env) {
       parts.push(options.env);
     }
-    const filename =
-      parts.length > 0 ? `${parts.join('_')}_positions.json` : 'known_positions.json';
+    const filename = parts.length > 0 ? `${parts.join('_')}_positions.json` : 'known_positions.json';
     this.knownPositionsPath = path.join(directoryPath, filename);
   }
 
@@ -73,30 +69,34 @@ export class JsonPositionStore implements IPositionStore {
   }
 
   /**
-   * Reads all known positions from disk.
+   * Reads all known positions from disk under lock.
    * Returns [] if the file does not exist.
    *
    * @returns {Promise<Position[]>} Array of persisted Position objects.
    */
   public async getKnown(): Promise<Position[]> {
-    try {
-      const data = await fs.readFile(this.knownPositionsPath, 'utf-8');
-      return JSON.parse(data) as Position[];
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
-        return [];
+    return fileMutex.runExclusive(this.knownPositionsPath, async () => {
+      try {
+        const data = await fs.readFile(this.knownPositionsPath, 'utf-8');
+        return JSON.parse(data) as Position[];
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+          return [];
+        }
+        throw error;
       }
-      throw error;
-    }
+    });
   }
 
   /**
-   * Serializes and writes the entire known positions list to disk.
+   * Serializes and writes the entire known positions list to disk under lock.
    *
    * @param {Position[]} positions - Full list of currently tracked positions.
    */
   public async saveKnown(positions: Position[]): Promise<void> {
     await this.ensureDirectory();
-    await fs.writeFile(this.knownPositionsPath, JSON.stringify(positions, null, 2), 'utf-8');
+    await fileMutex.runExclusive(this.knownPositionsPath, async () => {
+      await fs.writeFile(this.knownPositionsPath, JSON.stringify(positions, null, 2), 'utf-8');
+    });
   }
 }

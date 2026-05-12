@@ -1,19 +1,17 @@
 /**
  * @file json-file-store.ts
- * @description JSON file-based implementation of IStore for assignments and execution records.
+ * @description JSON file-based implementation of IStore with file-path scoped async mutex protection.
  *
  * @features
- * - get/save/delete operations for Assignment entities
- * - get/save operations for ExecutionRecord history
- * - Auto-creates data directory; returns [] on missing files
- * - Uses in-memory array merge for assignment upserts
- *
- * @dependencies IStore, Assignment, ExecutionRecord (from @lp-system/core), fs/promises, path
- * @sideEffects Writes to ./data/{prefix}assignments.json and ./data/{prefix}executions.json
+ * - Thread-safe atomic read-modify-write operations for Assignment entities
+ * - Thread-safe atomic append operations for ExecutionRecord history
+ * - Thread-safe atomic read-modify-write operations for RebalanceTask queue
+ * - Uses shared AsyncFileMutex singleton `fileMutex` to serialize same-file disk accesses.
  */
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { IStore, Assignment, ExecutionRecord, RebalanceTask } from '@lp-system/core';
+import { fileMutex } from './mutex.js';
 
 /**
  * Options for configuring namespaced storage files.
@@ -36,8 +34,8 @@ function getShortWallet(wallet: string): string {
 }
 
 /**
- * JsonFileStore: file-system backed store for assignments and execution records.
- * Used by the engine lifecycle and HTTP server endpoints.
+ * JsonFileStore: file-system backed store for assignments, execution records, and tasks.
+ * Uses path-scoped mutex locks to protect against concurrent modification race conditions.
  */
 export class JsonFileStore implements IStore {
   private assignmentsPath: string;
@@ -77,98 +75,124 @@ export class JsonFileStore implements IStore {
   }
 
   /**
-   * Reads the assignments array from disk. Returns [] if file is missing.
+   * Reads the assignments array from disk under a sequential file lock.
    *
    * @returns {Promise<Assignment[]>} All persisted assignments.
    */
   public async getAssignments(): Promise<Assignment[]> {
-    try {
-      const data = await fs.readFile(this.assignmentsPath, 'utf-8');
-      return JSON.parse(data) as Assignment[];
-    } catch (error: unknown) {
-      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
-        return [];
+    return fileMutex.runExclusive(this.assignmentsPath, async () => {
+      try {
+        const data = await fs.readFile(this.assignmentsPath, 'utf-8');
+        return JSON.parse(data) as Assignment[];
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+          return [];
+        }
+        throw error;
       }
-      throw error;
-    }
+    });
   }
 
   /**
-   * Inserts or updates an assignment in the persistent store.
+   * Inserts or updates an assignment in the persistent store under a sequential file lock.
    *
    * @param {Assignment} assignment - The assignment to persist (matches by ID).
    */
   public async saveAssignment(assignment: Assignment): Promise<void> {
     await this.ensureDirectory();
-    const assignments = await this.getAssignments();
-    const index = assignments.findIndex((a) => a.id === assignment.id);
-    if (index >= 0) {
-      assignments[index] = assignment;
-    } else {
-      assignments.push(assignment);
-    }
-    await fs.writeFile(this.assignmentsPath, JSON.stringify(assignments, null, 2), 'utf-8');
+    await fileMutex.runExclusive(this.assignmentsPath, async () => {
+      let assignments: Assignment[] = [];
+      try {
+        const data = await fs.readFile(this.assignmentsPath, 'utf-8');
+        assignments = JSON.parse(data) as Assignment[];
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'code' in error && error.code !== 'ENOENT') {
+          throw error;
+        }
+      }
+
+      const index = assignments.findIndex((a) => a.id === assignment.id);
+      if (index >= 0) {
+        assignments[index] = assignment;
+      } else {
+        assignments.push(assignment);
+      }
+      await fs.writeFile(this.assignmentsPath, JSON.stringify(assignments, null, 2), 'utf-8');
+    });
   }
 
   /**
-   * Removes an assignment by ID.
+   * Removes an assignment by ID under a sequential file lock.
    *
    * @param {string} id - Assignment identifier to delete.
    */
   public async deleteAssignment(id: string): Promise<void> {
     await this.ensureDirectory();
-    const assignments = await this.getAssignments();
-    const filtered = assignments.filter((a) => a.id !== id);
-    await fs.writeFile(this.assignmentsPath, JSON.stringify(filtered, null, 2), 'utf-8');
+    await fileMutex.runExclusive(this.assignmentsPath, async () => {
+      let assignments: Assignment[] = [];
+      try {
+        const data = await fs.readFile(this.assignmentsPath, 'utf-8');
+        assignments = JSON.parse(data) as Assignment[];
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'code' in error && error.code !== 'ENOENT') {
+          throw error;
+        }
+      }
+
+      const filtered = assignments.filter((a) => a.id !== id);
+      await fs.writeFile(this.assignmentsPath, JSON.stringify(filtered, null, 2), 'utf-8');
+    });
   }
 
   /**
-   * Reads all execution records from disk. Returns [] if file is missing.
+   * Reads all execution records from disk under a sequential file lock.
    *
    * @returns {Promise<ExecutionRecord[]>} Full execution history.
    */
   public async getExecutionRecords(): Promise<ExecutionRecord[]> {
-    try {
-      const data = await fs.readFile(this.executionsPath, 'utf-8');
-      return JSON.parse(data) as ExecutionRecord[];
-    } catch (error: unknown) {
-      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
-        return [];
+    return fileMutex.runExclusive(this.executionsPath, async () => {
+      try {
+        const data = await fs.readFile(this.executionsPath, 'utf-8');
+        return JSON.parse(data) as ExecutionRecord[];
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+          return [];
+        }
+        throw error;
       }
-      throw error;
-    }
+    });
   }
 
   /**
-   * Appends a single execution record to the history file.
+   * Appends a single execution record to the history file under a sequential file lock.
    *
    * @param {ExecutionRecord} record - Execution outcome to persist.
    */
   public async saveExecutionRecord(record: ExecutionRecord): Promise<void> {
     await this.ensureDirectory();
-    const records = await this.getExecutionRecords();
-    records.push(record);
-    await fs.writeFile(this.executionsPath, JSON.stringify(records, null, 2), 'utf-8');
+    await fileMutex.runExclusive(this.executionsPath, async () => {
+      let records: ExecutionRecord[] = [];
+      try {
+        const data = await fs.readFile(this.executionsPath, 'utf-8');
+        records = JSON.parse(data) as ExecutionRecord[];
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'code' in error && error.code !== 'ENOENT') {
+          throw error;
+        }
+      }
+
+      records.push(record);
+      await fs.writeFile(this.executionsPath, JSON.stringify(records, null, 2), 'utf-8');
+    });
   }
 
-  private taskMutex: Promise<unknown> = Promise.resolve();
-
   /**
-   * Helper to serialize file access for tasks.
-   */
-  private async runTaskLocked<T>(fn: () => Promise<T>): Promise<T> {
-    const next = this.taskMutex.then(fn);
-    this.taskMutex = next.catch(() => {});
-    return next;
-  }
-
-  /**
-   * Reads all tasks from disk. Returns [] if file is missing.
+   * Reads all tasks from disk under a sequential file lock.
    *
    * @returns {Promise<RebalanceTask[]>} All persisted tasks.
    */
   public async getTasks(): Promise<RebalanceTask[]> {
-    return this.runTaskLocked(async () => {
+    return fileMutex.runExclusive(this.tasksPath, async () => {
       try {
         const data = await fs.readFile(this.tasksPath, 'utf-8');
         return JSON.parse(data) as RebalanceTask[];
@@ -182,13 +206,13 @@ export class JsonFileStore implements IStore {
   }
 
   /**
-   * Inserts or updates a task in the persistent store.
+   * Inserts or updates a task in the persistent store under a sequential file lock.
    *
    * @param {RebalanceTask} task - The task to persist.
    */
   public async saveTask(task: RebalanceTask): Promise<void> {
-    await this.runTaskLocked(async () => {
-      await this.ensureDirectory();
+    await this.ensureDirectory();
+    await fileMutex.runExclusive(this.tasksPath, async () => {
       let tasks: RebalanceTask[] = [];
       try {
         const data = await fs.readFile(this.tasksPath, 'utf-8');
@@ -210,13 +234,13 @@ export class JsonFileStore implements IStore {
   }
 
   /**
-   * Removes a task by ID.
+   * Removes a task by ID under a sequential file lock.
    *
    * @param {string} id - Task identifier to delete.
    */
   public async deleteTask(id: string): Promise<void> {
-    await this.runTaskLocked(async () => {
-      await this.ensureDirectory();
+    await this.ensureDirectory();
+    await fileMutex.runExclusive(this.tasksPath, async () => {
       let tasks: RebalanceTask[] = [];
       try {
         const data = await fs.readFile(this.tasksPath, 'utf-8');
