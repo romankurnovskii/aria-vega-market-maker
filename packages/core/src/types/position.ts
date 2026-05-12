@@ -32,6 +32,14 @@ export interface OpenParams {
   upperBinId?: number;
 }
 
+export type PositionState =
+  | 'CREATING' // Initial deployment broadcasted, waiting for confirmation
+  | 'OPEN' // Active and healthy on-chain
+  | 'REBALANCING' // Currently locked by an active RebalanceTask (close+open)
+  | 'CLOSING' // Final exit broadcasted, waiting for confirmation
+  | 'CLOSED' // Successfully removed from chain (Terminal)
+  | 'FAILED'; // Creation or Rebalance fatally failed, requiring manual intervention
+
 export interface Position {
   id: string; // on-chain identifier (pubkey on Solana, NFT id on EVM)
   poolAddress: string;
@@ -44,6 +52,8 @@ export interface Position {
   isInRange: boolean;
   openedAt: number; // timestamp
   metadata: Record<string, unknown>;
+  state?: PositionState; // <-- New explicit state tracking
+  closedAt?: number; // <-- Timestamp when transition to CLOSED/FAILED occurred
 
   /**
    * @deprecated Use `lowerBound` instead. Kept for legacy Solana/Meteora support.
