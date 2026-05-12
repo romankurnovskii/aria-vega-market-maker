@@ -88,9 +88,7 @@ export class MeteoraApiProvider implements IPositionProvider {
    * @returns {Promise<Position[]>} Array of position objects.
    */
   public async getPositions(walletAddress: string, poolAddress?: string): Promise<Position[]> {
-    logger.info(
-      `[MeteoraApiProvider] Querying positions for wallet ${walletAddress} from API: ${this.apiUrl}`
-    );
+    logger.info(`[MeteoraApiProvider] Querying positions for wallet ${walletAddress} from API: ${this.apiUrl}`);
 
     const poolsToQuery: string[] = [];
 
@@ -114,9 +112,7 @@ export class MeteoraApiProvider implements IPositionProvider {
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const portfolioData = (await portfolioResponse.json()) as any;
-      const pools = Array.isArray(portfolioData)
-        ? portfolioData
-        : portfolioData.data || portfolioData.pools || [];
+      const pools = Array.isArray(portfolioData) ? portfolioData : portfolioData.data || portfolioData.pools || [];
 
       for (const p of pools) {
         const addr = typeof p === 'string' ? p : p.address || p.pool_address || p.poolAddress;
@@ -146,15 +142,12 @@ export class MeteoraApiProvider implements IPositionProvider {
       }
 
       const result = (await response.json()) as PositionsPnlResponse;
-      const { decimalsX, decimalsY, tokenXMint, tokenYMint } =
-        await this.getPoolTokenMetadata(pool);
+      const { decimalsX, decimalsY, tokenXMint, tokenYMint } = await this.getPoolTokenMetadata(pool);
 
       if (result && Array.isArray(result.positions)) {
         for (const pos of result.positions) {
-          const lowerBinId =
-            pos.lower_bin_id !== undefined ? pos.lower_bin_id : (pos.lowerBinId ?? 0);
-          const upperBinId =
-            pos.upper_bin_id !== undefined ? pos.upper_bin_id : (pos.upperBinId ?? 0);
+          const lowerBinId = pos.lower_bin_id !== undefined ? pos.lower_bin_id : (pos.lowerBinId ?? 0);
+          const upperBinId = pos.upper_bin_id !== undefined ? pos.upper_bin_id : (pos.upperBinId ?? 0);
           const isInRange =
             pos.is_in_range !== undefined
               ? pos.is_in_range
@@ -163,10 +156,7 @@ export class MeteoraApiProvider implements IPositionProvider {
                 : pos.isOutOfRange !== undefined
                   ? !pos.isOutOfRange
                   : true;
-          const openedAt =
-            pos.opened_at ||
-            (pos.createdAt ? pos.createdAt * 1000 : undefined) ||
-            Date.now() - 3600000;
+          const openedAt = pos.opened_at || (pos.createdAt ? pos.createdAt * 1000 : undefined) || Date.now() - 3600000;
 
           const positionId = pos.address || pos.positionAddress || pos.position_address || '';
 
@@ -215,6 +205,8 @@ export class MeteoraApiProvider implements IPositionProvider {
             metadata: {
               strategy: 'trailing-usdc',
               leverage: 10,
+              feeX: pos.fee_x || '0',
+              feeY: pos.fee_y || '0',
             },
           });
         }
@@ -281,8 +273,7 @@ export class MeteoraApiProvider implements IPositionProvider {
       data.token_y.decimals
     );
 
-    const feeRate =
-      data.dynamic_fee_pct > 0 ? data.dynamic_fee_pct : data.pool_config.base_fee_pct / 100;
+    const feeRate = data.dynamic_fee_pct > 0 ? data.dynamic_fee_pct : data.pool_config.base_fee_pct / 100;
 
     return {
       poolAddress: data.address,
@@ -317,9 +308,7 @@ export class MeteoraApiProvider implements IPositionProvider {
     });
 
     if (!poolResponse.ok) {
-      throw new Error(
-        `Failed to fetch pool info for market snapshot: ${poolResponse.status} ${poolResponse.statusText}`
-      );
+      throw new Error(`Failed to fetch pool info for market snapshot: ${poolResponse.status} ${poolResponse.statusText}`);
     }
 
     const poolData = (await poolResponse.json()) as PoolResponse;
@@ -331,10 +320,7 @@ export class MeteoraApiProvider implements IPositionProvider {
       poolData.token_y.decimals
     );
 
-    const feeRate =
-      poolData.dynamic_fee_pct > 0
-        ? poolData.dynamic_fee_pct
-        : poolData.pool_config.base_fee_pct / 100;
+    const feeRate = poolData.dynamic_fee_pct > 0 ? poolData.dynamic_fee_pct : poolData.pool_config.base_fee_pct / 100;
 
     const ohlcvUrl = `${this.apiUrl}/pools/${poolAddress}/ohlcv?timeframe=1h`;
     const ohlcvResponse = await fetch(ohlcvUrl, {
@@ -358,14 +344,10 @@ export class MeteoraApiProvider implements IPositionProvider {
             .slice(-24);
         }
       } catch (err) {
-        logger.warn(
-          `[MeteoraApiProvider] Failed to parse OHLCV data for pool ${poolAddress}: ${err}`
-        );
+        logger.warn(`[MeteoraApiProvider] Failed to parse OHLCV data for pool ${poolAddress}: ${err}`);
       }
     } else {
-      logger.warn(
-        `[MeteoraApiProvider] Failed to fetch OHLCV data: ${ohlcvResponse.status} ${ohlcvResponse.statusText}`
-      );
+      logger.warn(`[MeteoraApiProvider] Failed to fetch OHLCV data: ${ohlcvResponse.status} ${ohlcvResponse.statusText}`);
     }
 
     if (priceHistory.length === 0) {

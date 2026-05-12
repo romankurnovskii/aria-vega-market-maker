@@ -13,3 +13,9 @@ export { MeteoraOnChainProvider } from './meteora/meteora-onchain-provider.js';
 export { SolanaRpcProvider } from './rpc/provider.base.js';
 export { HeliusRpcProvider } from './rpc/provider.helius.js';
 export { RpcPool } from './rpc/rpc-pool.js';
+export {
+  getBinIdFromPrice,
+  getPriceFromBinId,
+  calculateConcentratedLiquidityPrices,
+  parseDecimalToRaw,
+} from './meteora/meteora.utils.js';
