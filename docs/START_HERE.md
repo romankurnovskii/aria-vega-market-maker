@@ -5,7 +5,7 @@ Start here. Every doc in this directory is listed below.
 ## Architecture
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — high-level design, components, and core data flow
-- [INTERFACES.md](INTERFACES.md) — detailed interface contracts and type definitions
+- [INTERFACES.md](INTERFACES.md) — core domain models, business logic boundaries, and structural contracts
 
 ## Decisions
 

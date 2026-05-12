@@ -1759,3 +1759,81 @@ market-maker-1  | 19:58:41.153 [solana-executor] INFO: "[SolanaExecutor] Applyin
 ```text
 market-maker-1  | 19:58:41.153 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position 9FjHXYCcjNP1BHzfEsQvys1J8CBkiyivxqCWEyHzQNMY"
 ```
+
+### Update: Tue May 12 23:40:12 IDT 2026
+
+```text
+market-maker-1  | 19:58:41.153 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position 9FjHXYCcjNP1BHzfEsQvys1J8CBkiyivxqCWEyHzQNMY"
+```
+
+### Update: Tue May 12 23:41:12 IDT 2026
+
+```text
+market-maker-1  | 19:58:41.153 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position 9FjHXYCcjNP1BHzfEsQvys1J8CBkiyivxqCWEyHzQNMY"
+```
+
+### Update: Tue May 12 23:42:12 IDT 2026
+
+```text
+market-maker-1  | 19:58:41.153 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position 9FjHXYCcjNP1BHzfEsQvys1J8CBkiyivxqCWEyHzQNMY"
+```
+
+### Update: Tue May 12 23:43:12 IDT 2026
+
+```text
+market-maker-1  | 19:58:41.153 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position 9FjHXYCcjNP1BHzfEsQvys1J8CBkiyivxqCWEyHzQNMY"
+```
+
+### Update: Tue May 12 23:44:12 IDT 2026
+
+```text
+market-maker-1  | 19:58:41.153 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position 9FjHXYCcjNP1BHzfEsQvys1J8CBkiyivxqCWEyHzQNMY"
+```
+
+### Update: Tue May 12 23:45:12 IDT 2026
+
+```text
+market-maker-1  | 19:58:41.153 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position 9FjHXYCcjNP1BHzfEsQvys1J8CBkiyivxqCWEyHzQNMY"
+```
+
+### Update: Tue May 12 23:46:12 IDT 2026
+
+```text
+market-maker-1  | 19:58:41.153 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position 9FjHXYCcjNP1BHzfEsQvys1J8CBkiyivxqCWEyHzQNMY"
+```
+
+### Update: Tue May 12 23:47:13 IDT 2026
+
+```text
+market-maker-1  | 19:58:41.153 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position 9FjHXYCcjNP1BHzfEsQvys1J8CBkiyivxqCWEyHzQNMY"
+```
+
+### Update: Tue May 12 23:48:13 IDT 2026
+
+```text
+market-maker-1  | 19:58:41.153 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position 9FjHXYCcjNP1BHzfEsQvys1J8CBkiyivxqCWEyHzQNMY"
+```
+
+### Update: Tue May 12 23:49:13 IDT 2026
+
+```text
+market-maker-1  | 19:58:41.153 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position 9FjHXYCcjNP1BHzfEsQvys1J8CBkiyivxqCWEyHzQNMY"
+```
+
+### Update: Tue May 12 23:50:13 IDT 2026
+
+```text
+market-maker-1  | 19:58:41.153 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position 9FjHXYCcjNP1BHzfEsQvys1J8CBkiyivxqCWEyHzQNMY"
+```
+
+### Update: Tue May 12 23:51:13 IDT 2026
+
+```text
+market-maker-1  | 19:58:41.153 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position 9FjHXYCcjNP1BHzfEsQvys1J8CBkiyivxqCWEyHzQNMY"
+```
+
+### Update: Tue May 12 23:52:13 IDT 2026
+
+```text
+market-maker-1  | 19:58:41.153 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position 9FjHXYCcjNP1BHzfEsQvys1J8CBkiyivxqCWEyHzQNMY"
+```
