@@ -41,6 +41,12 @@ export interface ClaimFeesParams {
   positionPubkey: PublicKey;
 }
 
+export interface ClosePositionParams {
+  poolAddress: string;
+  userWallet: PublicKey;
+  positionPubkey: PublicKey;
+}
+
 export class MeteoraOnChainProvider {
   private dlmmCache = new Map<string, DLMM>();
 
@@ -175,6 +181,36 @@ export class MeteoraOnChainProvider {
       });
 
       return removeLiquidityTxs;
+    });
+  }
+
+  /**
+   * Builds the transaction to close an empty position account and reclaim its rent.
+   * Note: This MUST be called after all liquidity has been removed and fees claimed.
+   */
+  public async buildClosePositionTransaction(params: ClosePositionParams): Promise<Transaction[]> {
+    const dlmm = await this.getDlmmInstance(params.poolAddress);
+
+    logger.info(
+      `[MeteoraOnChain] Building ClosePosition Tx for position ${params.positionPubkey.toBase58()} in pool ${params.poolAddress}`
+    );
+
+    return await this.rpcProvider.execute(async () => {
+      const { userPositions } = await dlmm.getPositionsByUserAndLbPair(params.userWallet);
+      const targetPosition = userPositions.find((pos) => pos.publicKey.equals(params.positionPubkey));
+
+      if (!targetPosition) {
+        // If it's already missing, it might have been closed, or it doesn't exist.
+        logger.warn(`[MeteoraOnChain] Position ${params.positionPubkey.toBase58()} not found. It may be already closed.`);
+        return [];
+      }
+
+      const closeTx = await dlmm.closePosition({
+        owner: params.userWallet,
+        position: targetPosition,
+      });
+
+      return Array.isArray(closeTx) ? closeTx : [closeTx];
     });
   }
 }

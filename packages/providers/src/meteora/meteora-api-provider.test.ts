@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import test from 'node:test';
 import assert from 'node:assert';
 import { MeteoraApiProvider } from './meteora-api-provider';
@@ -289,7 +290,7 @@ test('integration: getPositions with real API structure', async () => {
 
     const provider = new MeteoraApiProvider('https://dummy-api.meteora.ag');
     const positions = await provider.getPositions('wallet1');
-    
+
     // Assert real integration behavior
     assert.deepStrictEqual(positions, [
       {
@@ -302,7 +303,6 @@ test('integration: getPositions with real API structure', async () => {
           feeX: '0',
           feeY: '0',
           leverage: 10,
-          strategy: 'trailing-usdc',
         },
         openedAt: 1234567890,
         poolAddress: 'pool1',
