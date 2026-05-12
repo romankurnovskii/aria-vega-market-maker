@@ -38,6 +38,7 @@ export interface ExecutionRecord {
   status: 'success' | 'failed';
   error?: string;
   executedAt: number;
+  newPositionId?: string;
 }
 
 export type RebalanceTaskStatus = 'pending_close' | 'awaiting_settlement' | 'pending_open';
@@ -80,7 +81,8 @@ export interface RebalanceTask {
   assignmentId: string;
   status: RebalanceTaskStatus;
   originalPositionId: string;
+  newPositionId?: string;
   intent: Decision;
   evaluatedAt: number;
-  events?: TaskEvent[];
+  events: TaskEvent[];
 }

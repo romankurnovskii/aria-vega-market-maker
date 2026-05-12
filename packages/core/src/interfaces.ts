@@ -93,6 +93,8 @@ export interface IStore {
 export interface IPositionStore {
   getKnown(): Promise<Position[]>;
   saveKnown(positions: Position[]): Promise<void>;
+  archivePosition(position: Position): Promise<void>;
+  getArchived(): Promise<Position[]>;
 }
 
 export interface IOrchestratorRegistry {
