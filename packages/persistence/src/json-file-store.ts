@@ -41,6 +41,7 @@ export class JsonFileStore implements IStore {
   private assignmentsPath: string;
   private executionsPath: string;
   private tasksPath: string;
+  private tasksHistoryPath: string;
 
   /**
    * Constructs the store with a directory path and optional namespacing options.
@@ -63,6 +64,7 @@ export class JsonFileStore implements IStore {
     this.assignmentsPath = path.join(directoryPath, `${prefix}assignments.json`);
     this.executionsPath = path.join(directoryPath, `${prefix}executions.json`);
     this.tasksPath = path.join(directoryPath, `${prefix}tasks.json`);
+    this.tasksHistoryPath = path.join(directoryPath, `${prefix}tasks_history.json`);
   }
 
   /**
@@ -254,5 +256,30 @@ export class JsonFileStore implements IStore {
       const filtered = tasks.filter((t) => t.id !== id);
       await fs.writeFile(this.tasksPath, JSON.stringify(filtered, null, 2), 'utf-8');
     });
+  }
+
+  /**
+   * Archives a completed or failed task to task_history.json and removes it from active queue.
+   *
+   * @param {RebalanceTask} task - Task to archive.
+   */
+  public async archiveTask(task: RebalanceTask): Promise<void> {
+    await this.ensureDirectory();
+    await fileMutex.runExclusive(this.tasksHistoryPath, async () => {
+      let history: RebalanceTask[] = [];
+      try {
+        const data = await fs.readFile(this.tasksHistoryPath, 'utf-8');
+        history = JSON.parse(data) as RebalanceTask[];
+      } catch (error: unknown) {
+        if (error && typeof error === 'object' && 'code' in error && error.code !== 'ENOENT') {
+          throw error;
+        }
+      }
+
+      history.push(task);
+      await fs.writeFile(this.tasksHistoryPath, JSON.stringify(history, null, 2), 'utf-8');
+    });
+
+    await this.deleteTask(task.id);
   }
 }
