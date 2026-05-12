@@ -31,6 +31,39 @@ All types are defined in `packages/core/src/types/`:
 ```typescript
 export type RebalanceTaskStatus = 'pending_close' | 'awaiting_settlement' | 'pending_open';
 
+export type TaskEventStage =
+  // 1. Universal Start
+  | 'INIT'
+
+  // 2. The Close Leg (Used by 'close' and 'close+open')
+  | 'CLOSE_BROADCAST'
+  | 'CLOSE_CONFIRMED'
+
+  // 3. The Settlement Buffer (Used by 'close+open')
+  | 'SETTLEMENT_POLLING'
+  | 'SETTLEMENT_DETECTED'
+
+  // 4. The Strategy Check (Used by 'close+open')
+  | 'JIT_REEVALUATION'
+  | 'JIT_SKIPPED' // Used if JIT evaluation says "market is too volatile, do not open"
+
+  // 5. The Open Leg (Used by 'open' and 'close+open')
+  | 'OPEN_BROADCAST'
+  | 'OPEN_CONFIRMED' // Added for symmetry with close
+
+  // 6. Terminal States (Universal End)
+  | 'COMPLETED'
+  | 'ERROR'
+  | 'TIMEOUT'; // Used if the Execution Monitor catches a dead task
+
+export interface TaskEvent {
+  stage: TaskEventStage;
+  timestamp: number;
+  message?: string;
+  txSignature?: string;
+  error?: string;
+}
+
 export interface RebalanceTask {
   id: string; // Unique task UUID
   assignmentId: string; // Link to active strategy assignment
@@ -44,6 +77,7 @@ export interface RebalanceTask {
   evaluatedAt: number; // Epoch ms timestamp of strategy evaluation. Used by the
   // JIT staleness check: if Date.now() - evaluatedAt > MAX_SIGNAL_AGE_MS
   // the signal is stale and the task re-enters awaiting_settlement.
+  events?: TaskEvent[]; // List of events logged during task processing
 }
 ```
 
