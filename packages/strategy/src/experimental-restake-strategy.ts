@@ -56,8 +56,9 @@ export class ExperimentalRestakeStrategy implements IStrategy {
         `[ExperimentalRestakeStrategy] Price (${market.activeBound}) is above position upperBound (${position.upperBound}). Triggering close+open rebalance.`
       );
 
-      // Default binStep is 100 if not available (0.01%)
-      const binStep = (position.metadata?.binStep as number) || 100;
+      // Default binStep is 4 if not available (0.04% for SOL-USDC pool)
+      const binStep =
+        (position.metadata?.binStep as number) || (mergedParams.binStep as number) || 4;
       const decimalsX = position.tokenX.decimals;
       const decimalsY = position.tokenY.decimals;
 
