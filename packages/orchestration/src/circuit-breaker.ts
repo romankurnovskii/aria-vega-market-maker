@@ -32,16 +32,13 @@ export class CircuitBreaker {
    *
    * @param {any} error - The error that occurred (logged for observability).
    */
-  public recordFailure(error: any): void {
+  public recordFailure(error: unknown): void {
     this.consecutiveFailures++;
-    logger.error(
-      `[CircuitBreaker] Failure recorded: ${error?.message || error}. Consecutive count: ${this.consecutiveFailures}`
-    );
+    const errMsg = error instanceof Error ? error.message : String(error);
+    logger.error(`[CircuitBreaker] Failure recorded: ${errMsg}. Consecutive count: ${this.consecutiveFailures}`);
     if (this.consecutiveFailures >= this.maxConsecutiveFailures) {
       this.tripped = true;
-      logger.error(
-        `[CircuitBreaker] TRIPPED! Maximum consecutive failures exceeded. System halted.`
-      );
+      logger.error(`[CircuitBreaker] TRIPPED! Maximum consecutive failures exceeded. System halted.`);
     }
   }
 

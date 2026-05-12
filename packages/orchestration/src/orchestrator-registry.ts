@@ -41,9 +41,7 @@ export class OrchestratorRegistry implements IOrchestratorRegistry {
   public deregister(id: string): void {
     const existing = this.registry.get(id);
     if (existing) {
-      logger.info(
-        `[OrchestratorRegistry] Deregistering orchestrator ${id} from position ${existing.positionId}`
-      );
+      logger.info(`[OrchestratorRegistry] Deregistering orchestrator ${id} from position ${existing.positionId}`);
       this.registry.delete(id);
     }
   }
@@ -63,9 +61,7 @@ export class OrchestratorRegistry implements IOrchestratorRegistry {
         return;
       }
     }
-    logger.warn(
-      `[OrchestratorRegistry] No registered orchestrator found for assignmentId ${assignmentId}`
-    );
+    logger.warn(`[OrchestratorRegistry] No registered orchestrator found for assignmentId ${assignmentId}`);
   }
 
   /**
