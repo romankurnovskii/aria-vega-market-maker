@@ -137,19 +137,7 @@ export class ExperimentalRestakeStep implements IStep {
         logger.info(`[${this.name}] Using configured restakeAmountSol from parameters: ${amountNum} SOL`);
       } else {
         const rawAmount = BigInt(context.position.tokenX.amount);
-        // Enforce a rent-exempt/gas buffer of 0.08 SOL (~80,000,000 lamports) to allow position account rent fee
-        const gasBuffer = BigInt(80_000_000);
-        if (rawAmount > gasBuffer) {
-          solAmount = (rawAmount - gasBuffer).toString();
-          logger.info(
-            `[${this.name}] Enforcing gas/rent buffer of 0.08 SOL. Reduced deposit SOL amount from ${rawAmount.toString()} to ${solAmount}`
-          );
-        } else {
-          solAmount = rawAmount.toString();
-          logger.info(
-            `[${this.name}] SOL amount ${rawAmount.toString()} is already below gas buffer. Depositing full amount.`
-          );
-        }
+        solAmount = rawAmount.toString();
       }
 
       const openParams = {
