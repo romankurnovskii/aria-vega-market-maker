@@ -1,109 +1,134 @@
-# Core Interfaces and Type Models
+# Core Domain Models and Structural Contracts
 
-This document lists the formal models and contracts shared across all packages in the monorepo workspace.
+This document establishes the conceptual domain models, state machines, and interface contracts that govern the LP strategy system. Instead of hardcoding transient TypeScript types, it describes the **high-level business rules, responsibilities, and structural boundaries** between modules.
 
 ---
 
-## 1. Type Definitions
+## 1. Domain Entities and Conceptual Models
 
-All types are defined in `packages/core/src/types/`:
+The system is organized around distinct conceptual domain entities that represent market state, investment positions, and planned operational intent.
 
-| Type                  | Source File                                                             | Description                                                                                  |
-| :-------------------- | :---------------------------------------------------------------------- | :------------------------------------------------------------------------------------------- |
-| `TokenAmount`         | [`types/token.ts`](../packages/core/src/types/token.ts)                 | Representation of a token amount with decimals and address.                                  |
-| `OpenParams`          | [`types/position.ts`](../packages/core/src/types/position.ts)           | Parameters needed to open a CLMM position (bounds, amounts).                                 |
-| `Position`            | [`types/position.ts`](../packages/core/src/types/position.ts)           | Complete on-chain position state.                                                            |
-| `PricePoint`          | [`types/market.ts`](../packages/core/src/types/market.ts)               | Timestamped on-chain price data point.                                                       |
-| `MarketSnapshot`      | [`types/market.ts`](../packages/core/src/types/market.ts)               | Complete snapshot of pool state and history.                                                 |
-| `PoolInfo`            | [`types/market.ts`](../packages/core/src/types/market.ts)               | Immutable pool configuration metadata.                                                       |
-| `StepContext`         | [`types/strategy.ts`](../packages/core/src/types/strategy.ts)           | Context pipeline shared across execution steps.                                              |
-| `StrategyResult`      | [`types/strategy.ts`](../packages/core/src/types/strategy.ts)           | Output recommendation of a strategy execution.                                               |
-| `Recommendation`      | [`types/strategy.ts`](../packages/core/src/types/strategy.ts)           | Recommendation bound to a specific assignment.                                               |
-| `LPEvent`             | [`types/strategy.ts`](../packages/core/src/types/strategy.ts)           | Representation of liquidity events.                                                          |
-| `Assignment`          | [`types/orchestration.ts`](../packages/core/src/types/orchestration.ts) | Config binding between a strategy and position.                                              |
-| `Decision`            | [`types/orchestration.ts`](../packages/core/src/types/orchestration.ts) | Gated decision dispatched for execution.                                                     |
-| `ExecutionRecord`     | [`types/orchestration.ts`](../packages/core/src/types/orchestration.ts) | On-chain execution outcome and signatures log.                                               |
-| `RebalanceTask`       | [`types/orchestration.ts`](../packages/core/src/types/orchestration.ts) | Persistent write-ahead rebalance task tracker.                                               |
-| `RebalanceTaskStatus` | [`types/orchestration.ts`](../packages/core/src/types/orchestration.ts) | Union type for rebalance phases: `pending_close` \| `awaiting_settlement` \| `pending_open`. |
+```mermaid
+classDiagram
+    class MarketSnapshot {
+        +PoolMetadata pool
+        +PricePoint currentPrice
+        +HistoricalData metrics
+    }
+    class Position {
+        +Id positionId
+        +Range boundaries
+        +TokenAmount liquidity
+    }
+    class Decision {
+        +Action type
+        +OpenParams params
+        +Metadata auditLog
+    }
+    class RebalanceTask {
+        +Id taskId
+        +Status phase
+        +Position originalPosition
+        +Balances closeBalances
+        +Decision intent
+        +Timeline eventLog
+    }
 
-### `RebalanceTask` Schema Contract
-
-```typescript
-export type RebalanceTaskStatus = 'pending_close' | 'awaiting_settlement' | 'pending_open';
-
-export type TaskEventStage =
-  // 1. Universal Start
-  | 'INIT'
-
-  // 2. The Close Leg (Used by 'close' and 'close+open')
-  | 'CLOSE_BROADCAST'
-  | 'CLOSE_CONFIRMED'
-
-  // 3. The Settlement Buffer (Used by 'close+open')
-  | 'SETTLEMENT_POLLING'
-  | 'SETTLEMENT_DETECTED'
-
-  // 4. The Strategy Check (Used by 'close+open')
-  | 'JIT_REEVALUATION'
-  | 'JIT_SKIPPED' // Used if JIT evaluation says "market is too volatile, do not open"
-
-  // 5. The Open Leg (Used by 'open' and 'close+open')
-  | 'OPEN_BROADCAST'
-  | 'OPEN_CONFIRMED' // Added for symmetry with close
-
-  // 6. Terminal States (Universal End)
-  | 'COMPLETED'
-  | 'ERROR'
-  | 'TIMEOUT'; // Used if the Execution Monitor catches a dead task
-
-export interface TaskEvent {
-  stage: TaskEventStage;
-  timestamp: number;
-  message?: string;
-  txSignature?: string;
-  error?: string;
-}
-
-export interface RebalanceTask {
-  id: string; // Unique task UUID
-  assignmentId: string; // Link to active strategy assignment
-  status: RebalanceTaskStatus; // Current rebalance phase
-  originalPositionId: string; // Position ID of the closed position (PDA deleted on-chain)
-  newPositionId?: string; // Position ID of the newly opened position. Null until the
-  // open transaction confirms. Set by the executor on success.
-  // Used by the discovery loop on recovery to register the new
-  // orchestrator without waiting for the next chain poll.
-  intent: Decision; // Gated decision being executed, including range and metadata
-  evaluatedAt: number; // Epoch ms timestamp of strategy evaluation. Used by the
-  // JIT staleness check: if Date.now() - evaluatedAt > MAX_SIGNAL_AGE_MS
-  // the signal is stale and the task re-enters awaiting_settlement.
-  events: TaskEvent[]; // List of events logged during task processing
-}
+    MarketSnapshot --> Position : Evaluated Together
+    Position --> Decision : Input to Strategy
+    Decision --> RebalanceTask : Written as Intent
 ```
 
-**Field notes:**
+### A. Asset and Liquidity Models
 
-`newPositionId` is `undefined` through the `pending_close` and `awaiting_settlement` phases. The executor sets it immediately after the open transaction confirms, before calling `deleteTask`. On crash recovery during `awaiting_settlement`, it will always be `undefined` — which is the correct signal that the open leg has not yet run.
+- **Token Quantities & Decimals**: Every asset holds precise, decimal-adjusted balance and precision metadata, ensuring that on-chain calculations are mapped cleanly to user-friendly values.
+- **CLMM Bounds and Ranges**: Position configurations are described using price ratios, tick indices, and pool-specific constraints.
+- **Position State**: The absolute on-chain state of liquidity accounts, active ranges, and ownership associations.
 
-`evaluatedAt` records when the strategy produced the `Decision` stored in `intent`, not when the task was created. These can differ if the task was created with a slightly delayed write. The JIT check compares this timestamp against the moment the executor is about to sign the open transaction.
+### B. Strategy Recommendations and Decisions
+
+- **Recommendations**: Structural proposals generated by strategies (e.g., maintaining position, widening range, closing). They contain the raw calculated boundaries and funding allocations.
+- **Decisions**: Evaluated, authorized, and gated recommendations ready to be serialized and dispatched as execution intents.
+
+### C. The Rebalance Task (Write-Ahead Intent Schema)
+
+The `RebalanceTask` is the ultimate persistent anchor that guarantees system integrity across crashes. It tracks:
+
+- **Unique Identification**: Mapping the operational lifecycle to a unique workspace assignment.
+- **Task Phase**: The progression from `pending_close` to `awaiting_settlement` and finally `pending_open`.
+- **Identity Retention**: Holding the unique ID of the closed position to bridge state blindness.
+- **Attributable Balance Snapshots**: Capturing exact token balances immediately following the `close` confirmation. This prevents collision during multi-position settlement tracking.
+- **Intent Anchoring**: Storing the precise boundaries and allocations of the target position to prevent signal drift.
+- **Audit Trails**: A sequence of timestamped event stages (`INIT`, `CLOSE_BROADCAST`, `SETTLEMENT_POLLING`, `JIT_REEVALUATION`, `OPEN_CONFIRMED`, etc.) for real-time observation.
 
 ---
 
-## 2. Core Interfaces
+## 2. Core Architectural Contracts: Roles and Responsibilities
 
-All interfaces are defined in `packages/core/src/interfaces.ts`:
+Each subsystem in the monorepo corresponds to a specific architectural role defined by a strict boundary contract.
 
-| Interface               | Description                                                               | Key methods / properties                                                                                                                                   |
-| :---------------------- | :------------------------------------------------------------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `IStep`                 | Pipeline step with context transformation                                 | `execute(context): Promise<StepContext>`                                                                                                                   |
-| `IStrategy`             | Evaluates trading rules against a position                                | `execute(position, market, params): Promise<StrategyResult>`                                                                                               |
-| `IOrchestrator`         | Per-position strategy runtime manager                                     | `tick(position, market): Promise<StrategyResult>`, `isExecuting: boolean`                                                                                  |
-| `IExecutionGate`        | Filters and prioritizes recommendations into decisions                    | `consider(recommendations, positionId): Decision \| null`                                                                                                  |
-| `IExecutor`             | Handles stateful on-chain transaction execution                           | `apply(decision, market, reEvaluate): Promise<ExecutionRecord>`                                                                                            |
-| `IPositionProvider`     | Queries live positions and market snapshots                               | `getPositions()`, `getPosition()`, `getPoolInfo()`, `getMarketSnapshot()`                                                                                  |
-| `IRpcProvider`          | Abstracts Solana Connection with retry and rate-limit handling            | `getConnection()`, `execute(fn)`                                                                                                                           |
-| `IStore`                | Persistence layer for assignments, execution records, and rebalance tasks | `getAssignments()`, `saveAssignment()`, `deleteAssignment()`, `getExecutionRecords()`, `saveExecutionRecord()`, `getTasks()`, `saveTask()`, `deleteTask()` |
-| `IPositionStore`        | Local cache of known on-chain positions for discovery diffing             | `getKnown()`, `saveKnown(positions)`                                                                                                                       |
-| `IOrchestratorRegistry` | In-memory runtime index of active orchestrators                           | `register(orch)`, `deregister(id)`, `getForPosition(posId)`, `getAll()`                                                                                    |
+### A. Stateless Pipeline Components
 
-See [`interfaces.ts`](../packages/core/src/interfaces.ts) for full interface declarations.
+- **`IStep` (Execution Pipeline Step)**:
+  - _Role_: Executes a single, stateless unit of calculation or data enrichment within a workflow (e.g., computing range width or determining coin distribution).
+  - _Responsibility_: Receives execution context and outputs an enriched or modified context. It possesses zero side-effects and zero in-memory persistence.
+- **`IStrategy` (Trading Strategy)**:
+  - _Role_: Translates market conditions and active positions into actionable trading recommendations.
+  - _Responsibility_: Runs a composable sequence of `IStep` elements. It is purely deterministic and does not make on-chain calls or mutate files directly.
+
+### B. Stateful Coordination and Safety Gates
+
+- **`IOrchestrator` (Position Runtime Coordinator)**:
+  - _Role_: Manages the active tick evaluation loop for a specific position.
+  - _Responsibility_: Coordinates data collection, evaluates strategy recommendations, and triggers rebalances when thresholds are breached. It owns the `isExecuting` lock to prevent overlapping ticks during in-flight operations.
+- **`IExecutionGate` (Safety Filter)**:
+  - _Role_: Filters and inspects recommendations before allowing them to mutate system state.
+  - _Responsibility_: Enforces volatility limits, gas fee constraints, and absolute risk caps. It acts as the final gatekeeper that converts raw recommendations into signed `Decisions`.
+
+### C. Transaction Dispatch and Infrastructure Adapters
+
+- **`IExecutor` (Lifecycle & Transaction Manager)**:
+  - _Role_: Handles the sequential execution of gated decisions, dynamic rent checks, and in-flight recoveries.
+  - _Responsibility_: Manages the complex multi-leg `close+open` lifecycle. It conducts JIT staleness assessments, polls token accounts for settlement based on the `closeBalances` snapshot, and orchestrates on-chain confirmations.
+- **Providers (IO Interfaces)**:
+  - _Role_: Abstracts the specific details of external APIs, Solana RPC clients, and rate-limiting load balancers.
+  - _Responsibility_: Queries blockchain data, returns formatted pool shapes, and manages transaction broadcasting.
+- **Stores (Persistence Interfaces)**:
+  - _Role_: Provides clean read/write boundaries for persistent task states, local caches, and execution audit trails.
+  - _Responsibility_: Saves and deletes configurations, tasks, and historical logs, utilizing per-file mutex locks to ensure thread-safe concurrency.
+
+---
+
+## 3. The Integration Pipeline
+
+Below is the conceptual sequence showing how these contracts interact to execute a secure, atomic rebalance:
+
+```mermaid
+sequenceDiagram
+    participant TickLoop as Tick Loop (Orchestrator)
+    participant Strategy as Strategy Workflow
+    participant Gate as Execution Gate
+    participant Executor as Solana Executor
+    participant Tasks as Task Store (Persistence)
+
+    TickLoop->>Strategy: Evaluate (Position, Market)
+    Strategy-->>TickLoop: Recommend (Close + Open)
+    TickLoop->>Gate: Filter Recommendation
+    Gate-->>TickLoop: Authorize (Decision / Intent)
+
+    TickLoop->>Tasks: Write Task (Status: pending_close, isExecuting: true)
+    TickLoop->>Executor: Execute Decision
+
+    Executor->>Executor: Leg 1: Close Position & Close PDA
+    Executor->>Tasks: Update Task (Status: awaiting_settlement, closeBalances: Snapshot)
+
+    loop Attributable Settlement Polling
+        Executor->>Executor: Wallet Balances > closeBalances Delta
+    end
+
+    Executor->>Executor: Leg 2: JIT Evaluation (Staleness & Intent Anchor Check)
+    Executor->>Executor: Leg 3: Dynamic Rent Calculation & Open Position
+
+    Executor->>Tasks: Delete Task (Cleanup)
+    Executor->>TickLoop: Release isExecuting Lock
+```
