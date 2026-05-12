@@ -30,6 +30,8 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "start": "node dist/main.js"
+    "start": "node dist/main.js",
+    "test": "tsc && node --test dist/**/*.test.js",
+    "test:coverage": "tsc && node --experimental-test-coverage --test dist/**/*.test.js"
   }
 }

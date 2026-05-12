@@ -21,11 +21,7 @@ import {
 import { Keypair } from '@solana/web3.js';
 import { JsonFileStore, JsonPositionStore } from '@lp-system/persistence';
 import { TrailingUsdcStrategy, ExperimentalRestakeStrategy } from '@lp-system/strategy';
-import {
-  OrchestratorRegistry,
-  OrchestratorFactory,
-  ExecutionGate,
-} from '@lp-system/orchestration';
+import { OrchestratorRegistry, OrchestratorFactory, ExecutionGate } from '@lp-system/orchestration';
 import { SolanaExecutor } from '@lp-system/executor';
 import { getLogger } from '@lp-system/logger';
 import { startDiscovery, startTickLoop } from './lifecycle.js';
@@ -57,17 +53,13 @@ async function main() {
 
   if (isProduction) {
     if (!privateKeyBase64) {
-      logger.error(
-        `[Keypair] FATAL: PRIVATE_KEY_BASE64 is missing in production. Crashing to prevent silent failures.`
-      );
+      logger.error(`[Keypair] FATAL: PRIVATE_KEY_BASE64 is missing in production. Crashing to prevent silent failures.`);
       process.exit(1);
     }
     try {
       const secretKey = Buffer.from(privateKeyBase64, 'base64');
       keypair = Keypair.fromSecretKey(secretKey);
-      logger.info(
-        `[Keypair] Successfully loaded signing wallet keypair. PublicKey: ${keypair.publicKey.toBase58()}`
-      );
+      logger.info(`[Keypair] Successfully loaded signing wallet keypair. PublicKey: ${keypair.publicKey.toBase58()}`);
     } catch (error: unknown) {
       logger.error(
         `[Keypair] FATAL: Invalid private key configured in production. Crashing to prevent silent failures. Error: ${
@@ -81,22 +73,16 @@ async function main() {
       try {
         const secretKey = Buffer.from(privateKeyBase64, 'base64');
         keypair = Keypair.fromSecretKey(secretKey);
-        logger.info(
-          `[Keypair] Successfully loaded signing wallet keypair. PublicKey: ${keypair.publicKey.toBase58()}`
-        );
+        logger.info(`[Keypair] Successfully loaded signing wallet keypair. PublicKey: ${keypair.publicKey.toBase58()}`);
       } catch (error: unknown) {
         logger.error(
-          `[Keypair] Failed to parse private key from Base64: ${
-            error instanceof Error ? error.message : String(error)
-          }`
+          `[Keypair] Failed to parse private key from Base64: ${error instanceof Error ? error.message : String(error)}`
         );
         logger.info(`[Keypair] Falling back to a random keypair for simulation/development.`);
         keypair = Keypair.generate();
       }
     } else {
-      logger.warn(
-        `[Keypair] PRIVATE_KEY_BASE64 is empty. Generating a random keypair for simulation/development.`
-      );
+      logger.warn(`[Keypair] PRIVATE_KEY_BASE64 is empty. Generating a random keypair for simulation/development.`);
       keypair = Keypair.generate();
     }
   }
@@ -155,14 +141,7 @@ async function main() {
   });
 
   // 6. Core Loops & Web Control Plane Activation
-  await startDiscovery(
-    walletAddress,
-    positionProvider,
-    positionStore,
-    factory,
-    store,
-    registry
-  );
+  await startDiscovery(walletAddress, positionProvider, positionStore, factory, store, registry);
 
   startTickLoop(
     TICK_INTERVAL_MS,

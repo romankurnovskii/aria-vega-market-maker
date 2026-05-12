@@ -36,12 +36,7 @@ export function createIntrospectionRouter(factory: OrchestratorFactory): Router 
   router.get('/steps', (_req, res) => {
     try {
       res.json({
-        availableSteps: [
-          'InitializationCheckStep',
-          'TrailingRangeCheckStep',
-          'RangeCalculatorStep',
-          'AmountCalculatorStep',
-        ],
+        availableSteps: ['InitializationCheckStep', 'TrailingRangeCheckStep', 'RangeCalculatorStep', 'AmountCalculatorStep'],
         documentation: 'Steps are atomic logical units combined to form strategy workflows.',
       });
     } catch (error: any) {

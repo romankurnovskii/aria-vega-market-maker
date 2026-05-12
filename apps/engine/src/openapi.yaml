@@ -28,7 +28,7 @@ paths:
                 properties:
                   status:
                     type: string
-                    example: "healthy"
+                    example: 'healthy'
                   timestamp:
                     type: integer
                     format: int64
@@ -62,10 +62,10 @@ paths:
                       properties:
                         id:
                           type: string
-                          example: "trailing-usdc"
+                          example: 'trailing-usdc'
                         description:
                           type: string
-                          example: "Dynamic range trailing for USDC pairs using DLMM"
+                          example: 'Dynamic range trailing for USDC pairs using DLMM'
 
   /steps:
     get:
@@ -86,14 +86,14 @@ paths:
                     type: array
                     items:
                       type: string
-                    example: 
-                      - "InitializationCheckStep"
-                      - "TrailingRangeCheckStep"
-                      - "RangeCalculatorStep"
-                      - "AmountCalculatorStep"
+                    example:
+                      - 'InitializationCheckStep'
+                      - 'TrailingRangeCheckStep'
+                      - 'RangeCalculatorStep'
+                      - 'AmountCalculatorStep'
                   documentation:
                     type: string
-                    example: "Steps are atomic logical units combined to form strategy workflows."
+                    example: 'Steps are atomic logical units combined to form strategy workflows.'
 
   /positions:
     get:
@@ -113,16 +113,16 @@ paths:
                 properties:
                   wallet:
                     type: string
-                    example: "HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTYUQh"
+                    example: 'HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTYUQh'
                   count:
                     type: integer
                     example: 2
                   positions:
                     type: array
                     items:
-                      $ref: "#/components/schemas/Position"
+                      $ref: '#/components/schemas/Position'
         '500':
-          $ref: "#/components/responses/InternalServerError"
+          $ref: '#/components/responses/InternalServerError'
 
   /assignments:
     get:
@@ -136,9 +136,9 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Assignment"
+                  $ref: '#/components/schemas/Assignment'
         '500':
-          $ref: "#/components/responses/InternalServerError"
+          $ref: '#/components/responses/InternalServerError'
 
     post:
       summary: Create Position Assignment
@@ -158,20 +158,20 @@ paths:
                 id:
                   type: string
                   description: A unique assignment identifier.
-                  example: "asg_12345abcde"
+                  example: 'asg_12345abcde'
                 positionId:
                   type: string
                   description: The public key of the Meteora DLMM position.
-                  example: "9tA6m91FvP35G9A7eS982Yhd6pE35Z678WjLmoB67Pqr"
+                  example: '9tA6m91FvP35G9A7eS982Yhd6pE35Z678WjLmoB67Pqr'
                 strategyId:
                   type: string
                   description: The ID of the strategy to apply.
-                  example: "trailing-usdc"
+                  example: 'trailing-usdc'
                 mode:
                   type: string
                   enum: [active, monitoring]
                   description: Whether the bot should execute trades or just log intended decisions.
-                  example: "active"
+                  example: 'active'
       responses:
         '201':
           description: Assignment successfully created and persisted.
@@ -185,17 +185,17 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: "Assignment registered successfully"
+                    example: 'Assignment registered successfully'
                   assignment:
-                    $ref: "#/components/schemas/Assignment"
+                    $ref: '#/components/schemas/Assignment'
         '400':
           description: Invalid request payload or missing required parameters.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
-          $ref: "#/components/responses/InternalServerError"
+          $ref: '#/components/responses/InternalServerError'
 
   /assignments/{id}:
     delete:
@@ -208,7 +208,7 @@ paths:
           schema:
             type: string
           description: The unique identifier of the assignment to remove.
-          example: "asg_12345abcde"
+          example: 'asg_12345abcde'
       responses:
         '200':
           description: Assignment successfully deleted and orchestrator deregistered.
@@ -221,9 +221,9 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: "Assignment asg_12345abcde removed successfully"
+                    example: 'Assignment asg_12345abcde removed successfully'
         '500':
-          $ref: "#/components/responses/InternalServerError"
+          $ref: '#/components/responses/InternalServerError'
 
   /strategies/{id}/evaluate:
     post:
@@ -236,7 +236,7 @@ paths:
           schema:
             type: string
           description: The ID of the strategy to evaluate.
-          example: "trailing-usdc"
+          example: 'trailing-usdc'
       requestBody:
         required: true
         content:
@@ -249,11 +249,11 @@ paths:
                 positionId:
                   type: string
                   description: The on-chain identifier/pubkey of the position to evaluate.
-                  example: "9tA6m91FvP35G9A7eS982Yhd6pE35Z678WjLmoB67Pqr"
+                  example: '9tA6m91FvP35G9A7eS982Yhd6pE35Z678WjLmoB67Pqr'
                 poolAddress:
                   type: string
                   description: Optional pool address if required by the provider.
-                  example: "5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6"
+                  example: '5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6'
       responses:
         '200':
           description: Ad-hoc strategy evaluation executed successfully.
@@ -267,23 +267,23 @@ paths:
                 properties:
                   status:
                     type: string
-                    example: "success"
+                    example: 'success'
                   result:
-                    $ref: "#/components/schemas/StrategyResult"
+                    $ref: '#/components/schemas/StrategyResult'
         '400':
           description: Missing or invalid request parameters.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
         '404':
           description: No active orchestrator for the specified strategy and position was found in the registry.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
-          $ref: "#/components/responses/InternalServerError"
+          $ref: '#/components/responses/InternalServerError'
 
 components:
   schemas:
@@ -298,17 +298,17 @@ components:
       properties:
         id:
           type: string
-          example: "asg_12345abcde"
+          example: 'asg_12345abcde'
         strategyId:
           type: string
-          example: "trailing-usdc"
+          example: 'trailing-usdc'
         positionId:
           type: string
-          example: "9tA6m91FvP35G9A7eS982Yhd6pE35Z678WjLmoB67Pqr"
+          example: '9tA6m91FvP35G9A7eS982Yhd6pE35Z678WjLmoB67Pqr'
         mode:
           type: string
           enum: [active, monitoring]
-          example: "active"
+          example: 'active'
         createdAt:
           type: integer
           format: int64
@@ -322,7 +322,7 @@ components:
       properties:
         error:
           type: string
-          example: "An error occurred during processing."
+          example: 'An error occurred during processing.'
 
     StrategyResult:
       type: object
@@ -335,7 +335,7 @@ components:
             action:
               type: string
               enum: [skip, close]
-              example: "skip"
+              example: 'skip'
         - type: object
           required:
             - action
@@ -344,9 +344,9 @@ components:
             action:
               type: string
               enum: [open]
-              example: "open"
+              example: 'open'
             params:
-              $ref: "#/components/schemas/OpenParams"
+              $ref: '#/components/schemas/OpenParams'
         - type: object
           required:
             - action
@@ -355,9 +355,9 @@ components:
             action:
               type: string
               enum: [close+open]
-              example: "close+open"
+              example: 'close+open'
             openParams:
-              $ref: "#/components/schemas/OpenParams"
+              $ref: '#/components/schemas/OpenParams'
 
     OpenParams:
       type: object
@@ -370,7 +370,7 @@ components:
       properties:
         poolAddress:
           type: string
-          example: "5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6"
+          example: '5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6'
         lowerBound:
           type: number
           description: Agnostic boundary (lowerBinId on Solana/Meteora, lowerTick on EVM)
@@ -382,11 +382,11 @@ components:
         tokenXAmount:
           type: string
           description: Raw token X amount to deposit
-          example: "15000000"
+          example: '15000000'
         tokenYAmount:
           type: string
           description: Raw token Y amount to deposit
-          example: "12000000"
+          example: '12000000'
         metadata:
           type: object
           additionalProperties: true
@@ -408,46 +408,46 @@ components:
       properties:
         id:
           type: string
-          description: "Unique on-chain identifier (e.g., Solana account public key or EVM NFT ID)."
-          example: "77aEZeqjbhYG784TB2foz8rv58bPsqLVCB2mGhNFBGfj"
+          description: 'Unique on-chain identifier (e.g., Solana account public key or EVM NFT ID).'
+          example: '77aEZeqjbhYG784TB2foz8rv58bPsqLVCB2mGhNFBGfj'
         poolAddress:
           type: string
-          description: "On-chain contract/mint address of the associated CLMM pool."
-          example: "5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6"
+          description: 'On-chain contract/mint address of the associated CLMM pool.'
+          example: '5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6'
         chain:
           type: string
           enum: [solana, arbitrum]
-          example: "solana"
+          example: 'solana'
         protocol:
           type: string
           enum: [meteora_dlmm, uniswap_v3]
-          example: "meteora_dlmm"
+          example: 'meteora_dlmm'
         lowerBound:
           type: number
-          description: "Agnostic boundary representing the lower limit (lowerBinId on Meteora, lowerTick on Uniswap)."
+          description: 'Agnostic boundary representing the lower limit (lowerBinId on Meteora, lowerTick on Uniswap).'
           example: 837500
         upperBound:
           type: number
-          description: "Agnostic boundary representing the upper limit (upperBinId on Meteora, upperTick on Uniswap)."
+          description: 'Agnostic boundary representing the upper limit (upperBinId on Meteora, upperTick on Uniswap).'
           example: 837600
         tokenX:
-          $ref: "#/components/schemas/TokenAmount"
+          $ref: '#/components/schemas/TokenAmount'
         tokenY:
-          $ref: "#/components/schemas/TokenAmount"
+          $ref: '#/components/schemas/TokenAmount'
         isInRange:
           type: boolean
-          description: "Indicates whether the current price falls within the lower and upper bounds of this position."
+          description: 'Indicates whether the current price falls within the lower and upper bounds of this position.'
           example: true
         openedAt:
           type: integer
           format: int64
-          description: "Epoch timestamp in milliseconds when this position was opened."
+          description: 'Epoch timestamp in milliseconds when this position was opened.'
           example: 1715456789000
         metadata:
           type: object
           additionalProperties: true
           example:
-            strategy: "trailing-usdc"
+            strategy: 'trailing-usdc'
             leverage: 10
 
     TokenAmount:
@@ -459,16 +459,16 @@ components:
       properties:
         amount:
           type: string
-          description: "Raw integer token amount as a string to preserve high precision."
-          example: "15000000"
+          description: 'Raw integer token amount as a string to preserve high precision.'
+          example: '15000000'
         decimals:
           type: integer
-          description: "Decimals precision of the underlying token."
+          description: 'Decimals precision of the underlying token.'
           example: 6
         tokenAddress:
           type: string
-          description: "Agnostic address or mint address of the token."
-          example: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+          description: 'Agnostic address or mint address of the token.'
+          example: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
 
   responses:
     InternalServerError:
@@ -476,4 +476,4 @@ components:
       content:
         application/json:
           schema:
-            $ref: "#/components/schemas/ErrorResponse"
+            $ref: '#/components/schemas/ErrorResponse'
