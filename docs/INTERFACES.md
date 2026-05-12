@@ -77,7 +77,7 @@ export interface RebalanceTask {
   evaluatedAt: number; // Epoch ms timestamp of strategy evaluation. Used by the
   // JIT staleness check: if Date.now() - evaluatedAt > MAX_SIGNAL_AGE_MS
   // the signal is stale and the task re-enters awaiting_settlement.
-  events?: TaskEvent[]; // List of events logged during task processing
+  events: TaskEvent[]; // List of events logged during task processing
 }
 ```
 

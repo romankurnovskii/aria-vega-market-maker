@@ -9,7 +9,7 @@ Start here. Every doc in this directory is listed below.
 
 ## Decisions
 
-<!-- ADRs go here -->
+- [decisions_position_lifecycle.md](decisions_position_lifecycle.md) — Design and state rules for the Position Lifecycle State Machine.
 
 ## Q&A
 
