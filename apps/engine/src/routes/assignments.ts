@@ -23,9 +23,7 @@ export function createAssignmentsRouter(
       const { id, strategyId, positionId, mode } = req.body;
 
       if (!id || !strategyId || !positionId || !mode) {
-        res
-          .status(400)
-          .json({ error: 'Missing required parameters: id, strategyId, positionId, mode' });
+        res.status(400).json({ error: 'Missing required parameters: id, strategyId, positionId, mode' });
         return;
       }
 

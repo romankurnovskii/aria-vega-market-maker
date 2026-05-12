@@ -4,10 +4,7 @@ import { getLogger } from '@lp-system/logger';
 
 const logger = getLogger('server');
 
-export function createStrategiesRouter(
-  registry: IOrchestratorRegistry,
-  positionProvider: IPositionProvider
-): Router {
+export function createStrategiesRouter(registry: IOrchestratorRegistry, positionProvider: IPositionProvider): Router {
   const router = Router();
 
   router.post('/:id/evaluate', async (req, res) => {
@@ -20,9 +17,7 @@ export function createStrategiesRouter(
         return;
       }
 
-      logger.info(
-        `[HTTP Server] Triggering manual ad-hoc strategy evaluation for ${strategyId} on position ${positionId}`
-      );
+      logger.info(`[HTTP Server] Triggering manual ad-hoc strategy evaluation for ${strategyId} on position ${positionId}`);
 
       const position = await positionProvider.getPosition(positionId, poolAddress);
       const market = await positionProvider.getMarketSnapshot(position.poolAddress);

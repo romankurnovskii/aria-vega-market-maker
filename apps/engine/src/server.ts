@@ -22,11 +22,7 @@ import path, { dirname } from 'path';
 import { IStore, IOrchestratorRegistry, IExecutor, IPositionProvider } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
-import {
-  createAssignmentsRouter,
-  createStrategiesRouter,
-  createIntrospectionRouter,
-} from './routes/index.js';
+import { createAssignmentsRouter, createStrategiesRouter, createIntrospectionRouter } from './routes/index.js';
 
 const logger = getLogger('server');
 
@@ -57,7 +53,6 @@ export function startHttpServer(
 
   const PORT = process.env.PORT || 3000;
 
-
   app.use('/assignments', createAssignmentsRouter(store, registry, factory));
   app.use('/strategies', createStrategiesRouter(registry, positionProvider));
   app.use('/', createIntrospectionRouter(factory));
@@ -83,9 +78,7 @@ export function startHttpServer(
   });
 
   app.listen(PORT, () => {
-    logger.info(
-      `[HTTP Server] Operational and listening on port ${PORT} (loaded: ${executor.constructor.name})`
-    );
+    logger.info(`[HTTP Server] Operational and listening on port ${PORT} (loaded: ${executor.constructor.name})`);
   });
 
   return app;
