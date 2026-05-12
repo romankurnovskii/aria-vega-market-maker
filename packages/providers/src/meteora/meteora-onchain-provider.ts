@@ -23,6 +23,7 @@ export interface AddLiquidityParams {
   lowerBinId: number;
   upperBinId: number;
   slippageTolerance: number; // e.g., 1 for 1% (Calculated by the Decision Step)
+  positionPubKey: PublicKey; // Position account public key to initialize
 }
 
 export interface RemoveLiquidityParams {
@@ -66,10 +67,7 @@ export class MeteoraOnChainProvider {
    * Fetches the absolute truth of user positions directly from the blockchain.
    * Use this before execution to prevent operating on stale API data.
    */
-  public async getOnChainPositions(
-    walletAddress: string,
-    poolAddress: string
-  ): Promise<Record<string, LbPosition>> {
+  public async getOnChainPositions(walletAddress: string, poolAddress: string): Promise<Record<string, LbPosition>> {
     const dlmm = await this.getDlmmInstance(poolAddress);
     const userWallet = new PublicKey(walletAddress);
 
@@ -101,9 +99,7 @@ export class MeteoraOnChainProvider {
       const { userPositions } = await dlmm.getPositionsByUserAndLbPair(params.userWallet);
 
       // Find the specific position we want to claim from
-      const targetPosition = userPositions.find((pos) =>
-        pos.publicKey.equals(params.positionPubkey)
-      );
+      const targetPosition = userPositions.find((pos) => pos.publicKey.equals(params.positionPubkey));
 
       if (!targetPosition) {
         throw new Error(
@@ -128,18 +124,16 @@ export class MeteoraOnChainProvider {
    * Builds the transaction instructions to open a new position or add liquidity.
    * Uses Spot strategy for uniform distribution across the specified bins.
    */
-  public async buildAddLiquidityInstructions(
-    params: AddLiquidityParams
-  ): Promise<TransactionInstruction[]> {
+  public async buildAddLiquidityInstructions(params: AddLiquidityParams): Promise<TransactionInstruction[]> {
     const dlmm = await this.getDlmmInstance(params.poolAddress);
 
     logger.info(
-      `[MeteoraOnChain] Building AddLiquidity Tx: Pool ${params.poolAddress}, Bins [${params.lowerBinId}, ${params.upperBinId}]`
+      `[MeteoraOnChain] Building AddLiquidity Tx: Pool ${params.poolAddress}, Bins [${params.lowerBinId}, ${params.upperBinId}], PositionPubKey: ${params.positionPubKey.toBase58()}`
     );
 
     return await this.rpcProvider.execute(async () => {
-      const addLiquidityTx = await dlmm.addLiquidityByStrategy({
-        positionPubKey: new PublicKey(params.poolAddress), // Usually pair pubkey if creating new
+      const addLiquidityTx = await dlmm.initializePositionAndAddLiquidityByStrategy({
+        positionPubKey: params.positionPubKey,
         user: params.userWallet,
         totalXAmount: params.tokenXAmount,
         totalYAmount: params.tokenYAmount,
@@ -163,9 +157,7 @@ export class MeteoraOnChainProvider {
    * range of bins can exceed Solana's transaction size limits. The Meteora SDK
    * automatically chunks the instructions into multiple transactions.
    */
-  public async buildRemoveLiquidityTransactions(
-    params: RemoveLiquidityParams
-  ): Promise<Transaction[]> {
+  public async buildRemoveLiquidityTransactions(params: RemoveLiquidityParams): Promise<Transaction[]> {
     const dlmm = await this.getDlmmInstance(params.poolAddress);
 
     logger.info(
