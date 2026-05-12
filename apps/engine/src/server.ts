@@ -19,7 +19,7 @@ import YAML from 'yamljs';
 import { fileURLToPath } from 'url';
 import path, { dirname } from 'path';
 
-import { IStore, IOrchestratorRegistry, IExecutor, IPositionProvider } from '@lp-system/core';
+import { IStore, IOrchestratorRegistry, IExecutor, IPositionProvider, IPositionStore, Position } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
 import { createAssignmentsRouter, createStrategiesRouter, createIntrospectionRouter } from './routes/index.js';
@@ -37,6 +37,8 @@ const __dirname = dirname(__filename);
  * @param {IExecutor} executor - Transaction executor.
  * @param {OrchestratorFactory} factory - Creates orchestrators for new assignments.
  * @param {IPositionProvider} positionProvider - On-chain data source for ad-hoc evaluation.
+ * @param {string} walletAddress - Active wallet address.
+ * @param {IPositionStore} [positionStore] - Optional persistent position cache containing active/failed states.
  * @returns {express.Application} Configured Express app instance (also starts listening).
  */
 export function startHttpServer(
@@ -45,7 +47,8 @@ export function startHttpServer(
   executor: IExecutor,
   factory: OrchestratorFactory,
   positionProvider: IPositionProvider,
-  walletAddress: string
+  walletAddress: string,
+  positionStore?: IPositionStore
 ): express.Application {
   const app = express();
   app.use(cors());
@@ -59,14 +62,37 @@ export function startHttpServer(
 
   app.get('/positions', async (_req, res) => {
     try {
-      const positions = await positionProvider.getPositions(walletAddress);
+      let positions: Position[];
+      if (positionStore) {
+        positions = await positionStore.getKnown();
+      } else {
+        positions = await positionProvider.getPositions(walletAddress);
+      }
       res.json({
         wallet: walletAddress,
         count: positions.length,
         positions,
       });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || String(error) });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: msg });
+    }
+  });
+
+  app.get('/positions/history', async (_req, res) => {
+    try {
+      let positions: Position[] = [];
+      if (positionStore) {
+        positions = await positionStore.getArchived();
+      }
+      res.json({
+        wallet: walletAddress,
+        count: positions.length,
+        positions,
+      });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: msg });
     }
   });
 
