@@ -79,6 +79,7 @@ export class SolanaExecutor implements IExecutor {
 
     const txSignatures: string[] = [];
     const executionId = `exec_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    let newPositionId: string | undefined = undefined;
 
     try {
       if (decision.action === 'close') {
@@ -138,7 +139,8 @@ export class SolanaExecutor implements IExecutor {
         const slippageTolerance = (openParams.metadata?.slippageTolerance as number) ?? 1;
 
         const positionKeypair = Keypair.generate();
-        logger.info(`[SolanaExecutor] Generated new position keypair: ${positionKeypair.publicKey.toBase58()}`);
+        newPositionId = positionKeypair.publicKey.toBase58();
+        logger.info(`[SolanaExecutor] Generated new position keypair: ${newPositionId}`);
 
         // 1. Build add liquidity instructions
         const instructions = await this.provider.buildAddLiquidityInstructions({
@@ -251,9 +253,8 @@ export class SolanaExecutor implements IExecutor {
           const slippageTolerance = (openParams.metadata?.slippageTolerance as number) ?? 1;
 
           const positionKeypair = Keypair.generate();
-          logger.info(
-            `[SolanaExecutor] Generated new position keypair for rebalance open: ${positionKeypair.publicKey.toBase58()}`
-          );
+          newPositionId = positionKeypair.publicKey.toBase58();
+          logger.info(`[SolanaExecutor] Generated new position keypair for rebalance open: ${newPositionId}`);
 
           const instructions = await this.provider.buildAddLiquidityInstructions({
             poolAddress: market.poolAddress,
@@ -284,6 +285,7 @@ export class SolanaExecutor implements IExecutor {
         txSignatures,
         status: 'success',
         executedAt: Date.now(),
+        newPositionId,
       };
     } catch (error: unknown) {
       const err = error as Error;
