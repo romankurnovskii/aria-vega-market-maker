@@ -41,8 +41,6 @@ export class StrategyOrchestrator implements IOrchestrator {
     this.id = `orch_${assignmentId}`;
   }
 
-  public isExecuting = false;
-
   private isBusy = false;
 
   /**
