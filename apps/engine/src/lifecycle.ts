@@ -118,14 +118,24 @@ export async function startDiscovery(
       .map((t: RebalanceTask) => t.originalPositionId)
   );
 
-  // 2. Identify new positions
+  // 2. Identify live positions and ensure their orchestrators are registered
   for (const livePos of livePositions) {
-    if (!knownIds.has(livePos.id)) {
+    const isNew = !knownIds.has(livePos.id);
+    if (isNew) {
       logger.info(`[Discovery] Discovered new live position: ${livePos.id}`);
+    } else {
+      logger.info(`[Discovery] Active known position verified on-chain: ${livePos.id}`);
+    }
 
-      // Match with stored assignments
-      const matchingAssignments = assignments.filter((a) => a.positionId === livePos.id);
-      for (const assignment of matchingAssignments) {
+    // Always ensure matching assignments have a registered orchestrator in runtime registry on boot
+    const matchingAssignments = assignments.filter((a) => a.positionId === livePos.id);
+    const existingOrchs = registry.getForPosition(livePos.id);
+
+    for (const assignment of matchingAssignments) {
+      if (!existingOrchs.some((o) => o.id === assignment.id)) {
+        logger.info(
+          `[Discovery] Registering orchestrator on startup for assignment ${assignment.id} (strategy: ${assignment.strategyId}) targeting position ${livePos.id}`
+        );
         const orchestrator = factory.create(assignment);
         registry.register(orchestrator);
       }
