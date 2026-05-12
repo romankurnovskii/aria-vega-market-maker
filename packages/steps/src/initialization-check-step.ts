@@ -39,7 +39,7 @@ export class InitializationCheckStep implements IStep {
       };
     }
 
-    logger.info(`[${this.name}] Position is initialized and active.`);
+    logger.info(`[${this.name}] Position ${context.position.id} is initialized and active.`);
     return context;
   }
 }

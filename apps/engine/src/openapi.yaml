@@ -400,6 +400,9 @@ components:
         - protocol
         - lowerBound
         - upperBound
+        - lowerPrice
+        - upperPrice
+        - currentPrice
         - tokenX
         - tokenY
         - isInRange
@@ -430,6 +433,20 @@ components:
           type: number
           description: 'Agnostic boundary representing the upper limit (upperBinId on Meteora, upperTick on Uniswap).'
           example: 837600
+        lowerPrice:
+          type: number
+          description: 'Price in USD at the lower boundary of the position range.'
+          example: 0.95
+        upperPrice:
+          type: number
+          description: 'Price in USD at the upper boundary of the position range.'
+          example: 1.05
+        currentPrice:
+          type: number
+          description: 'Current pool price in USD.'
+          example: 1.00
+        pnl:
+          $ref: '#/components/schemas/PnL'
         tokenX:
           $ref: '#/components/schemas/TokenAmount'
         tokenY:
@@ -469,6 +486,21 @@ components:
           type: string
           description: 'Agnostic address or mint address of the token.'
           example: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
+
+    PnL:
+      type: object
+      required:
+        - unrealized
+        - realized
+      properties:
+        unrealized:
+          type: number
+          description: 'Unrealized profit/loss in USD.'
+          example: 125.50
+        realized:
+          type: number
+          description: 'Realized profit/loss in USD from closed positions.'
+          example: 0.0
 
   responses:
     InternalServerError:

@@ -51,6 +51,11 @@ export class ClmmPricingStep implements IStep {
     // Save calculations to context for downstream steps
     context.calculations = calculations;
 
+    // Structured one-line log for grep parsing
+    logger.info(
+      `[${this.name}] positionId=${context.position.id} lowerBound=${context.position.lowerBound} upperBound=${context.position.upperBound} midPrice=${calculations.midPrice.toFixed(4)} geometricAverage=${calculations.geometricAverage.toFixed(4)} effectiveBreakEven=${calculations.effectiveBreakEven !== undefined ? calculations.effectiveBreakEven.toFixed(4) : 'N/A'}`
+    );
+
     // Premium, structured console visualization of the pricing metrics
     logger.info(
       `\n┌────────────────────────────────────────────────────────┐\n` +

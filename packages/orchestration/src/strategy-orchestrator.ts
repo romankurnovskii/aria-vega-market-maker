@@ -59,7 +59,7 @@ export class StrategyOrchestrator implements IOrchestrator {
     try {
       this.isBusy = true;
       logger.info(
-        `[StrategyOrchestrator] Ticking orchestrator ${this.id} for position ${this.positionId}. Mode: ${this.mode}`
+        `[StrategyOrchestrator] Ticking orchestrator ${this.id} for position ${this.positionId} [strategyId=${this.strategyId}]. Mode: ${this.mode}`
       );
       return await this.strategy.execute(position, market, this.params);
     } finally {

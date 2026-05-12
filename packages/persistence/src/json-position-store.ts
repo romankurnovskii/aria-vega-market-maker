@@ -98,7 +98,7 @@ export class JsonPositionStore implements IPositionStore {
    * @param {Position[]} positions - Full list of currently tracked positions.
    */
   public async saveKnown(positions: Position[]): Promise<void> {
-    const activeStates = ['OPEN', 'CREATING', 'REBALANCING', 'CLOSING'];
+    const activeStates = ['OPEN', 'CREATING', 'REBALANCING', 'CLOSING', 'CLOSED', 'FAILED'];
     const activePositions = positions.filter((p) => !p.state || activeStates.includes(p.state));
     await this.ensureDirectory();
     await fileMutex.runExclusive(this.knownPositionsPath, async () => {

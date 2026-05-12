@@ -32,7 +32,7 @@ export class Workflow {
   public async run(initialContext: StepContext): Promise<StepContext> {
     let context = { ...initialContext };
     for (const step of this.steps) {
-      logger.info(`[Workflow] Running step: ${step.name}`);
+      logger.info(`[Workflow] Running step: ${step.name} [positionId=${initialContext.position.id}]`);
       context = await step.execute(context);
     }
     return context;
