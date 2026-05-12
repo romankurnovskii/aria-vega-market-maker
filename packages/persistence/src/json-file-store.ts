@@ -12,6 +12,9 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { IStore, Assignment, ExecutionRecord, RebalanceTask } from '@lp-system/core';
 import { fileMutex } from './mutex.js';
+import { getLogger } from '@lp-system/logger';
+
+const logger = getLogger('json-file-store');
 
 /**
  * Options for configuring namespaced storage files.
@@ -87,6 +90,10 @@ export class JsonFileStore implements IStore {
         const data = await fs.readFile(this.assignmentsPath, 'utf-8');
         return JSON.parse(data) as Assignment[];
       } catch (error: unknown) {
+        if (error instanceof SyntaxError) {
+          logger.warn(`[JsonFileStore] JSON parsing failed for assignments. Auto-recovering with empty array.`);
+          return [];
+        }
         if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
           return [];
         }
@@ -157,6 +164,10 @@ export class JsonFileStore implements IStore {
         const data = await fs.readFile(this.executionsPath, 'utf-8');
         return JSON.parse(data) as ExecutionRecord[];
       } catch (error: unknown) {
+        if (error instanceof SyntaxError) {
+          logger.warn(`[JsonFileStore] JSON parsing failed for executions. Auto-recovering with empty array.`);
+          return [];
+        }
         if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
           return [];
         }
@@ -199,6 +210,12 @@ export class JsonFileStore implements IStore {
         const data = await fs.readFile(this.tasksPath, 'utf-8');
         return JSON.parse(data) as RebalanceTask[];
       } catch (error: unknown) {
+        if (error instanceof SyntaxError) {
+          logger.error(
+            `[JsonFileStore] [ALERT] JSON parsing failed for tasks queue. Tasks dropped! Auto-recovering with empty array.`
+          );
+          return [];
+        }
         if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
           return [];
         }
@@ -265,21 +282,37 @@ export class JsonFileStore implements IStore {
    */
   public async archiveTask(task: RebalanceTask): Promise<void> {
     await this.ensureDirectory();
-    await fileMutex.runExclusive(this.tasksHistoryPath, async () => {
-      let history: RebalanceTask[] = [];
+    await fileMutex.runExclusive(this.tasksPath, async () => {
+      // 1. Write to history
+      await fileMutex.runExclusive(this.tasksHistoryPath, async () => {
+        let history: RebalanceTask[] = [];
+        try {
+          const data = await fs.readFile(this.tasksHistoryPath, 'utf-8');
+          history = JSON.parse(data) as RebalanceTask[];
+        } catch (error: unknown) {
+          if (error && typeof error === 'object' && 'code' in error && error.code !== 'ENOENT') {
+            throw error;
+          }
+        }
+        history.push(task);
+        await fs.writeFile(this.tasksHistoryPath, JSON.stringify(history, null, 2), 'utf-8');
+      });
+
+      // 2. Delete from active
+      // NOTE: Do NOT call this.deleteTask() here — it would attempt to re-acquire
+      // the tasksPath mutex while we already hold it (deadlock). Perform the
+      // delete inline below.
+      let tasks: RebalanceTask[] = [];
       try {
-        const data = await fs.readFile(this.tasksHistoryPath, 'utf-8');
-        history = JSON.parse(data) as RebalanceTask[];
+        const data = await fs.readFile(this.tasksPath, 'utf-8');
+        tasks = JSON.parse(data) as RebalanceTask[];
       } catch (error: unknown) {
         if (error && typeof error === 'object' && 'code' in error && error.code !== 'ENOENT') {
           throw error;
         }
       }
-
-      history.push(task);
-      await fs.writeFile(this.tasksHistoryPath, JSON.stringify(history, null, 2), 'utf-8');
+      const filtered = tasks.filter((t) => t.id !== task.id);
+      await fs.writeFile(this.tasksPath, JSON.stringify(filtered, null, 2), 'utf-8');
     });
-
-    await this.deleteTask(task.id);
   }
 }
