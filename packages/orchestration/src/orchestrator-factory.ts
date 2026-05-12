@@ -39,15 +39,10 @@ export class OrchestratorFactory {
    * @returns {IOrchestrator} Configured orchestrator ready to tick.
    * @throws {Error} If assignment.strategyId is not in the strategies registry.
    */
-  public create(
-    assignment: Assignment,
-    customParams: Record<string, unknown> = {}
-  ): IOrchestrator {
+  public create(assignment: Assignment, customParams: Record<string, unknown> = {}): IOrchestrator {
     const strategy = this.strategies[assignment.strategyId];
     if (!strategy) {
-      throw new Error(
-        `Strategy with ID '${assignment.strategyId}' is not registered in this factory`
-      );
+      throw new Error(`Strategy with ID '${assignment.strategyId}' is not registered in this factory`);
     }
 
     const mergedParams = {

@@ -11,13 +11,7 @@
  * @dependencies IStrategy interface, Workflow (pipeline orchestration), all step classes from @lp-system/steps
  * @sideEffects None — pure computation, recommendations passed to ExecutionGate for dispatch
  */
-import {
-  IStrategy,
-  Position,
-  MarketSnapshot,
-  StrategyResult,
-  StepContext,
-} from '@lp-system/core';
+import { IStrategy, Position, MarketSnapshot, StrategyResult, StepContext } from '@lp-system/core';
 import {
   InitializationCheckStep,
   TrailingRangeCheckStep,
@@ -67,9 +61,7 @@ export class TrailingUsdcStrategy implements IStrategy {
     market: MarketSnapshot,
     params: Record<string, unknown>
   ): Promise<StrategyResult> {
-    logger.info(
-      `[TrailingUsdcStrategy] Initiating strategy evaluation for position: ${position.id}`
-    );
+    logger.info(`[TrailingUsdcStrategy] Initiating strategy evaluation for position: ${position.id}`);
 
     const mergedParams = {
       ...this.defaultParams,

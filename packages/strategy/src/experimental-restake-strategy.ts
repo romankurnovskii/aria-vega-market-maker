@@ -1,116 +1,81 @@
-import {
-  IStrategy,
-  Position,
-  MarketSnapshot,
-  StrategyResult,
-  OpenParams,
-} from '@lp-system/core';
+import { IStrategy, Position, MarketSnapshot, StrategyResult, StepContext } from '@lp-system/core';
+import { InitializationCheckStep, ClmmPricingStep, ExperimentalRestakeStep } from '@lp-system/steps';
 import { getLogger } from '@lp-system/logger';
+import { Workflow } from './workflow.js';
 
 const logger = getLogger('experimental-restake-strategy');
 
-function getBinIdFromPrice(
-  price: number,
-  binStep: number,
-  decimalsX: number,
-  decimalsY: number
-): number {
-  if (!price || price <= 0) {
-    return 8388608;
-  }
-  const decimalFactor = Math.pow(10, decimalsY - decimalsX);
-  const ratio = price / decimalFactor;
-  const binStepFactor = 1 + binStep / 10000;
-  const binOffset = Math.log(ratio) / Math.log(binStepFactor);
-  return Math.round(8388608 + binOffset);
-}
-
 export class ExperimentalRestakeStrategy implements IStrategy {
   public id = 'experimental-restake';
-  public description =
-    'Experimental strategy to restake on price above range with 0.8 USDC single-direction';
+  public description = 'Experimental strategy to restake on price above range with configurable single-direction USDC';
+  private workflow: Workflow;
 
-  constructor(private defaultParams: Record<string, unknown> = {}) {}
+  constructor(private defaultParams: Record<string, unknown> = {}) {
+    // Construct the sequential pipeline workflow following standard architecture
+    this.workflow = new Workflow([new InitializationCheckStep(), new ClmmPricingStep(), new ExperimentalRestakeStep()]);
+  }
 
+  /**
+   * Sequential execution pipeline for evaluating rebalance decisions.
+   *
+   * @param {Position} position - Current active on-chain position context.
+   * @param {MarketSnapshot} market - Current active pool market data snapshot.
+   * @param {Record<string, unknown>} params - Overriding configuration parameters for evaluation.
+   * @returns {Promise<StrategyResult>} Standardized action (skip/close/open/close+open) and params.
+   */
   public async execute(
     position: Position,
     market: MarketSnapshot,
     params: Record<string, unknown>
   ): Promise<StrategyResult> {
+    logger.info(`[ExperimentalRestakeStrategy] Initiating strategy evaluation for position: ${position.id}`);
+
     const mergedParams = {
       ...this.defaultParams,
       ...params,
     };
 
-    logger.info(
-      `[ExperimentalRestakeStrategy] Evaluating position: ${position.id} with params: ${JSON.stringify(mergedParams)}`
-    );
+    const initialContext: StepContext = {
+      position,
+      market,
+      params: mergedParams,
+    };
 
     logger.info(
-      `[ExperimentalRestakeStrategy] Market - Price: ${market.price}, Active Bound: ${market.activeBound}, Position range: [${position.lowerBound}, ${position.upperBound}]`
+      `[ExperimentalRestakeStrategy] Market snapshot - active bound: ${market.activeBound}, position range: [${position.lowerBound}, ${position.upperBound}]`
     );
 
-    // 1. If price is above current range:
-    if (market.activeBound > position.upperBound) {
-      logger.info(
-        `[ExperimentalRestakeStrategy] Price (${market.activeBound}) is above position upperBound (${position.upperBound}). Triggering close+open rebalance.`
-      );
+    // Run the step-based workflow pipeline
+    const finalContext = await this.workflow.run(initialContext);
 
-      // Default binStep is 4 if not available (0.04% for SOL-USDC pool)
-      const binStep =
-        (position.metadata?.binStep as number) || (mergedParams.binStep as number) || 4;
-      const decimalsX = position.tokenX.decimals;
-      const decimalsY = position.tokenY.decimals;
+    logger.info(
+      `[ExperimentalRestakeStrategy] Workflow evaluation complete. Signal: ${finalContext.signal || 'none'}, Reason: ${finalContext.reason || 'none'}`
+    );
 
-      // Price range in percent: 0 to -0.15% from active price
-      // upperBound price is the active price
-      // lowerBound price is active price * (1 - 0.0015)
-      const upperBoundPrice = market.price;
-      const lowerBoundPrice = market.price * (1 - 0.0015);
-
-      const upperBinId = getBinIdFromPrice(upperBoundPrice, binStep, decimalsX, decimalsY);
-      const lowerBinId = getBinIdFromPrice(lowerBoundPrice, binStep, decimalsX, decimalsY);
-
-      // Amount: restake 0.8 USDC (micro-units based on decimalsY)
-      const usdcAmount = (0.8 * Math.pow(10, decimalsY)).toFixed(0);
-
-      const openParams: OpenParams = {
-        poolAddress: position.poolAddress,
-        lowerBound: lowerBinId,
-        upperBound: upperBinId,
-        lowerBinId,
-        upperBinId,
-        tokenXAmount: '0', // single direction usdc only
-        tokenYAmount: usdcAmount,
-      };
-
-      logger.info(
-        `[ExperimentalRestakeStrategy] Computed rebalance parameters: ` +
-          `LowerBin: ${lowerBinId} (Price: ${lowerBoundPrice.toFixed(6)}), ` +
-          `UpperBin: ${upperBinId} (Price: ${upperBoundPrice.toFixed(6)}), ` +
-          `Amounts - Token X: 0, Token Y: ${usdcAmount}`
-      );
-
+    if (finalContext.signal === 'close+open' && finalContext.openParams) {
+      logger.info(`[ExperimentalRestakeStrategy] Decision: close+open with params`);
       return {
         action: 'close+open',
-        openParams,
+        openParams: finalContext.openParams,
       };
     }
 
-    // 2. If price is lower than range:
-    if (market.activeBound < position.lowerBound) {
-      logger.info(
-        `[ExperimentalRestakeStrategy] SKIP evaluation. Reason: Price (${market.activeBound}) is below position lowerBound (${position.lowerBound}). Skipping for now.`
-      );
+    if (finalContext.signal === 'close') {
+      logger.info(`[ExperimentalRestakeStrategy] Decision: close`);
       return {
-        action: 'skip',
+        action: 'close',
       };
     }
 
-    // Else:
-    logger.info(
-      `[ExperimentalRestakeStrategy] SKIP evaluation. Reason: Price is within position bounds.`
-    );
+    if (finalContext.signal === 'open' && finalContext.openParams) {
+      logger.info(`[ExperimentalRestakeStrategy] Decision: open with params`);
+      return {
+        action: 'open',
+        params: finalContext.openParams,
+      };
+    }
+
+    logger.info(`[ExperimentalRestakeStrategy] Decision: skip`);
     return {
       action: 'skip',
     };

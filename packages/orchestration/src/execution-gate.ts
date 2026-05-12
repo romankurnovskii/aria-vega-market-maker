@@ -33,9 +33,7 @@ export class ExecutionGate implements IExecutionGate {
       return null;
     }
 
-    logger.info(
-      `[ExecutionGate] Evaluating ${recommendations.length} recommendations for position ${positionId}`
-    );
+    logger.info(`[ExecutionGate] Evaluating ${recommendations.length} recommendations for position ${positionId}`);
 
     // Prioritize rebalance signals ('close+open'), then 'close', then 'open'
     const actionablePriorities = ['close+open', 'close', 'open'] as const;
@@ -51,9 +49,7 @@ export class ExecutionGate implements IExecutionGate {
               ? match.result.params
               : undefined;
 
-        logger.info(
-          `[ExecutionGate] Decision Gated: Approved '${action}' triggered by assignment ${match.assignmentId}`
-        );
+        logger.info(`[ExecutionGate] Decision Gated: Approved '${action}' triggered by assignment ${match.assignmentId}`);
 
         return {
           positionId,
