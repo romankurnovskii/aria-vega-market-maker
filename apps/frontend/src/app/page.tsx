@@ -88,9 +88,10 @@ export default function AriaVegaTerminal() {
       const mappedPositions = (positionsRes.positions || []).map((pos: any) => ({
         id: pos.id,
         pool: pos.poolAddress,
-        minBin: pos.lowerBinId,
-        maxBin: pos.upperBinId,
+        minBin: pos.lowerBinId !== undefined ? pos.lowerBinId : (pos.lowerBound !== undefined ? pos.lowerBound : 0),
+        maxBin: pos.upperBinId !== undefined ? pos.upperBinId : (pos.upperBound !== undefined ? pos.upperBound : 0),
         status: pos.isInRange ? 'In Range' : 'Out of Range',
+        state: pos.state || 'OPEN',
         tokenX: pos.tokenX,
         tokenY: pos.tokenY,
         raw: pos,
@@ -403,9 +404,19 @@ function PositionsView({ positions, assignments, strategies, events, onAssign, o
                     >
                       <td className="py-2 px-3 border-r border-gray-200 font-bold flex items-center gap-2">
                         {isSelected && <ChevronRight size={12} className="text-[#FF4500]" />}
-                        <span className="truncate max-w-[150px]" title={pos.id}>
+                        <span className="truncate max-w-[120px]" title={pos.id}>
                           {pos.id}
                         </span>
+                        {pos.state && pos.state !== 'OPEN' && (
+                          <span className={`text-[8px] px-1 py-0.5 border scale-90 tracking-wide font-mono ${
+                            pos.state === 'REBALANCING' ? 'border-yellow-500 text-yellow-600 animate-pulse bg-yellow-50' :
+                            pos.state === 'CLOSING' ? 'border-orange-500 text-orange-600 animate-pulse bg-orange-50' :
+                            pos.state === 'CREATING' ? 'border-blue-500 text-blue-600 bg-blue-50' :
+                            'border-red-500 text-red-600 bg-red-50'
+                          }`}>
+                            {pos.state}
+                          </span>
+                        )}
                       </td>
                       <td
                         className="py-2 px-3 border-r border-gray-200 truncate max-w-[120px] text-gray-600"
@@ -443,6 +454,19 @@ function PositionsView({ positions, assignments, strategies, events, onAssign, o
                   Pool:{' '}
                   <span className="font-mono text-[10px]" title={selectedPos.pool}>
                     {selectedPos.pool}
+                  </span>
+                </div>
+                {/* State machine premium badge */}
+                <div className="mt-2 flex items-center">
+                  <span className={`px-2 py-0.5 text-[9px] font-bold border uppercase tracking-widest font-mono-jb ${
+                    selectedPos.state === 'OPEN' ? 'border-green-500 text-green-600 bg-green-50' :
+                    selectedPos.state === 'CREATING' ? 'border-blue-500 text-blue-600 bg-blue-50 animate-pulse' :
+                    selectedPos.state === 'REBALANCING' ? 'border-yellow-500 text-yellow-600 bg-yellow-50 animate-pulse' :
+                    selectedPos.state === 'CLOSING' ? 'border-orange-500 text-orange-600 bg-orange-50 animate-pulse' :
+                    selectedPos.state === 'CLOSED' ? 'border-gray-500 text-gray-600 bg-gray-50' :
+                    'border-[#FF4500] text-[#FF4500] bg-red-50'
+                  }`}>
+                    {selectedPos.state}
                   </span>
                 </div>
               </div>
