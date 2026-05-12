@@ -1,12 +1,7 @@
 import path from 'node:path';
 import process from 'node:process';
 import fs from 'node:fs';
-import {
-  createLogger as winstonCreateLogger,
-  format,
-  transports,
-  Logger as LoggerWinston,
-} from 'winston';
+import { createLogger as winstonCreateLogger, format, transports, Logger as LoggerWinston } from 'winston';
 import dotenv from 'dotenv';
 import { LOCAL_DB_LOGS_PATH, PROJECT_ROOT_PATH } from '@lp-system/config';
 import { stringify } from './helpers.js';
@@ -15,10 +10,7 @@ import { stringify } from './helpers.js';
 try {
   fs.mkdirSync(LOCAL_DB_LOGS_PATH, { recursive: true });
 } catch (error) {
-  console.error(
-    `[logger-init] Failed to create logs directory at ${LOCAL_DB_LOGS_PATH}:`,
-    error
-  );
+  console.error(`[logger-init] Failed to create logs directory at ${LOCAL_DB_LOGS_PATH}:`, error);
 }
 
 const isDocker = (process.env.DOCKER_ENV || 'false').toLowerCase() === 'true';
@@ -80,11 +72,7 @@ export const LOG_FILE_LEVEL = process.env.LOG_FILE_LEVEL || 'debug';
 export const getLogger = (serviceName: string): LoggerWinston => {
   const logger = winstonCreateLogger({
     level: LOG_LEVEL,
-    format: format.combine(
-      format.label({ label: serviceName }),
-      format.timestamp({ format: 'HH:mm:ss.SSS' }),
-      customFormat
-    ),
+    format: format.combine(format.label({ label: serviceName }), format.timestamp({ format: 'HH:mm:ss.SSS' }), customFormat),
     transports: [
       new transports.Console({ level: LOG_LEVEL }),
       new transports.File({
@@ -99,12 +87,7 @@ export const getLogger = (serviceName: string): LoggerWinston => {
   });
 
   // Override leveled methods to handle multiple arguments seamlessly
-  const levels: Array<'info' | 'warn' | 'error' | 'debug'> = [
-    'info',
-    'warn',
-    'error',
-    'debug',
-  ];
+  const levels: Array<'info' | 'warn' | 'error' | 'debug'> = ['info', 'warn', 'error', 'debug'];
   for (const level of levels) {
     const originalMethod = logger[level].bind(logger);
     logger[level] = (...arguments_: unknown[]) => {
