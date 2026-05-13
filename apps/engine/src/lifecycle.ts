@@ -739,8 +739,46 @@ export async function processTasks(
               freshNewPos = await positionProvider.getPosition(newPositionId, poolInfo.poolAddress);
             } catch {
               logger.warn(
-                `[Execution Monitor] Position ${newPositionId} not yet indexed by API. Deferring cache update to discovery.`
+                `[Execution Monitor] Position ${newPositionId} not yet indexed by API. Synthesizing temporary position to prevent blind rebalances.`
               );
+              const openParams = task.intent.openParams;
+              if (openParams) {
+                const lowerBinId =
+                  openParams.lowerBinId !== undefined ? openParams.lowerBinId : (openParams.lowerBound ?? 0);
+                const upperBoundId =
+                  openParams.upperBinId !== undefined ? openParams.upperBinId : (openParams.upperBound ?? 0);
+                const decimalsX = poolInfo.tokenXAddress === 'So11111111111111111111111111111111111111112' ? 9 : 6;
+                const decimalsY = poolInfo.tokenYAddress === 'So11111111111111111111111111111111111111112' ? 9 : 6;
+                freshNewPos = {
+                  id: newPositionId,
+                  poolAddress: poolInfo.poolAddress,
+                  chain: 'solana',
+                  protocol: 'meteora_dlmm',
+                  lowerBound: lowerBinId,
+                  upperBound: upperBoundId,
+                  lowerBinId,
+                  upperBinId: upperBoundId,
+                  tokenX: {
+                    amount: openParams.tokenXAmount || '0',
+                    decimals: decimalsX,
+                    mint: poolInfo.tokenXAddress || '',
+                    tokenAddress: poolInfo.tokenXAddress || '',
+                  },
+                  tokenY: {
+                    amount: openParams.tokenYAmount || '0',
+                    decimals: decimalsY,
+                    mint: poolInfo.tokenYAddress || '',
+                    tokenAddress: poolInfo.tokenYAddress || '',
+                  },
+                  isInRange: true,
+                  openedAt: Date.now(),
+                  metadata: {
+                    leverage: 10,
+                    feeX: '0',
+                    feeY: '0',
+                  },
+                };
+              }
             }
 
             if (freshNewPos) {
@@ -878,6 +916,15 @@ export function startTickLoop(
             }
           } catch (getPosError: unknown) {
             if (getPosError instanceof Error && getPosError.message.includes('not found')) {
+              const ageMs = Date.now() - (position.openedAt || 0);
+              const INDEXING_GRACE_PERIOD_MS = 15 * 60 * 1000; // 15-minute grace period
+              if (ageMs < INDEXING_GRACE_PERIOD_MS) {
+                logger.warn(
+                  `[Tick Loop] Position ${position.id} not found by API, but was opened recently (${Math.floor(ageMs / 1000)}s ago). Skipping evaluation during indexing grace period.`
+                );
+                continue;
+              }
+
               logger.warn(`[Tick Loop] Position ${position.id} was not found on-chain. Marking as CLOSED and archiving.`);
 
               position.state = 'CLOSED';
