@@ -55,6 +55,12 @@ export interface Position {
   state?: PositionState; // <-- New explicit state tracking
   closedAt?: number; // <-- Timestamp when transition to CLOSED/FAILED occurred
 
+  lowerBoundPrice?: number;
+  upperBoundPrice?: number;
+  activeBin?: number;
+  binCount?: number;
+  rangePercent?: number;
+
   /**
    * @deprecated Use `lowerBound` instead. Kept for legacy Solana/Meteora support.
    */

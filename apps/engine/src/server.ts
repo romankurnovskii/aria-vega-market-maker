@@ -23,6 +23,7 @@ import { IStore, IOrchestratorRegistry, IExecutor, IPositionProvider, IPositionS
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
 import { createAssignmentsRouter, createStrategiesRouter, createIntrospectionRouter } from './routes/index.js';
+import { getPriceFromBinId } from '@lp-system/providers';
 
 const logger = getLogger('server');
 
@@ -68,10 +69,49 @@ export function startHttpServer(
       } else {
         positions = await positionProvider.getPositions(walletAddress);
       }
+
+      // Fetch and enrich positions with price/range data
+      const positionsWithPriceData = await Promise.all(
+        positions.map(async (pos) => {
+          try {
+            const poolInfo = await positionProvider.getPoolInfo(pos.poolAddress);
+            const market = await positionProvider.getMarketSnapshot(pos.poolAddress);
+
+            const lowerBoundPrice = getPriceFromBinId(
+              pos.lowerBound,
+              poolInfo.feeRate,
+              pos.tokenX.decimals,
+              pos.tokenY.decimals
+            );
+            const upperBoundPrice = getPriceFromBinId(
+              pos.upperBound,
+              poolInfo.feeRate,
+              pos.tokenX.decimals,
+              pos.tokenY.decimals
+            );
+
+            const binCount = pos.upperBound - pos.lowerBound + 1;
+            const rangePercent = ((upperBoundPrice - lowerBoundPrice) / lowerBoundPrice) * 100;
+
+            return {
+              ...pos,
+              lowerBoundPrice,
+              upperBoundPrice,
+              activeBin: market.activeBound,
+              binCount,
+              rangePercent,
+            };
+          } catch (e) {
+            logger.warn(`Failed to enrich position ${pos.id} with price data: ${e}`);
+            return pos;
+          }
+        })
+      );
+
       res.json({
         wallet: walletAddress,
-        count: positions.length,
-        positions,
+        count: positionsWithPriceData.length,
+        positions: positionsWithPriceData,
       });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
