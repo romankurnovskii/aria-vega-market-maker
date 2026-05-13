@@ -94,7 +94,7 @@ describe('ISSUE #12: SolanaExecutor.close fee claim behavior', () => {
     } catch (_e) {}
 
     const claimCalls = provider.calls.filter(c => c.method === 'buildClaimFeesTransactions');
-    const removeCalls = provider.calls.filter(c => c.method === 'buildRemoveLiquidityTransactions');
+
 
     assert.strictEqual(
       claimCalls.length > 0,
@@ -163,7 +163,11 @@ describe('ISSUE #12: SolanaExecutor.close fee claim behavior', () => {
     let errorMessage = '';
 
     try {
-      await executor.apply(decision, market as any);
+      const res = await executor.apply(decision, market as any);
+      if (res.status === 'failed') {
+        errorThrown = true;
+        errorMessage = res.error || '';
+      }
     } catch (e: any) {
       errorThrown = true;
       errorMessage = e.message;
@@ -186,7 +190,7 @@ describe('ISSUE #12: SolanaExecutor.close fee claim behavior', () => {
     const mockKeypair = { publicKey: { toBase58: () => MOCK_WALLET_ADDRESS } };
 
     const SolanaExecutor = (await import('@lp-system/executor')).SolanaExecutor;
-    const executor = new SolanaExecutor(mockRpcPool as any, mockKeypair as any, provider as any);
+
 
     const decision = {
       positionId: MOCK_POSITION_ID,
@@ -210,7 +214,8 @@ describe('ISSUE #12: SolanaExecutor.close fee claim behavior', () => {
       },
     };
 
-    await executor.apply(decision, market as any);
+    const executorWithFlag = new SolanaExecutor(rpcPoolWithFlag as any, mockKeypair as any, provider as any);
+    await executorWithFlag.apply(decision, market as any);
 
     assert.ok(
       executionSucceeded,
