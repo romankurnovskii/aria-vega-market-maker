@@ -103,7 +103,32 @@ export class SolanaExecutor implements IExecutor {
           `[SolanaExecutor] Found position ${decision.positionId} on-chain in bin range [${lowerBinId}, ${upperBinId}]. Building removal transactions...`
         );
 
-        // 3. Build remove liquidity transactions (automatic chunking by SDK)
+        // 3. Build claim fee transactions (Meteora best practice: claim before remove)
+        try {
+          logger.info(`[SolanaExecutor] Building claim transactions for position ${decision.positionId}...`);
+          const claimTxs = await this.provider.buildClaimFeesTransactions({
+            poolAddress: market.poolAddress,
+            userWallet: this.keypair.publicKey,
+            positionPubkey: new PublicKey(decision.positionId),
+          });
+          for (let i = 0; i < claimTxs.length; i++) {
+            logger.info(`[SolanaExecutor] Executing claim transaction chunk ${i + 1}/${claimTxs.length}...`);
+            const sig = await this.executeTx(claimTxs[i], [], {
+              positionId: decision.positionId,
+              action: 'close',
+              maxAttempts: 15,
+            });
+            txSignatures.push(sig);
+          }
+        } catch (claimErr) {
+          logger.warn(
+            `[SolanaExecutor] Claim fees transaction failed or no fees to claim: ${
+              claimErr instanceof Error ? claimErr.message : String(claimErr)
+            }`
+          );
+        }
+
+        // 4. Build remove liquidity transactions (automatic chunking by SDK)
         const closeTxs = await this.provider.buildRemoveLiquidityTransactions({
           poolAddress: market.poolAddress,
           userWallet: this.keypair.publicKey,
@@ -113,7 +138,7 @@ export class SolanaExecutor implements IExecutor {
           shouldClaimAndClose: false,
         });
 
-        // 4. Submit and confirm each transaction sequentially
+        // 5. Submit and confirm each transaction sequentially
         for (let i = 0; i < closeTxs.length; i++) {
           logger.info(`[SolanaExecutor] Executing close transaction chunk ${i + 1}/${closeTxs.length}...`);
           const sig = await this.executeTx(closeTxs[i], [], {
@@ -124,7 +149,7 @@ export class SolanaExecutor implements IExecutor {
           txSignatures.push(sig);
         }
 
-        // 5. Build and execute reclaim transaction AFTER liquidity has been removed on-chain
+        // 6. Build and execute reclaim transaction AFTER liquidity has been removed on-chain
         try {
           logger.info(`[SolanaExecutor] Building reclaim/close transaction for empty position ${decision.positionId}...`);
           const reclaimTxs = await this.provider.buildClosePositionTransaction({
