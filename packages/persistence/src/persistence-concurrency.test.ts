@@ -71,6 +71,7 @@ test('JsonFileStore - concurrent saveTask updates are atomic and no updates are 
       evaluatedAt: Date.now(),
     },
     evaluatedAt: Date.now(),
+    createdAt: Date.now(),
     events: [],
   }));
 
@@ -100,6 +101,7 @@ test('JsonFileStore - concurrent saveTask for same position rejects with Atomici
       evaluatedAt: Date.now(),
     },
     evaluatedAt: Date.now(),
+    createdAt: Date.now(),
     events: [],
   };
 
@@ -115,6 +117,7 @@ test('JsonFileStore - concurrent saveTask for same position rejects with Atomici
       evaluatedAt: Date.now(),
     },
     evaluatedAt: Date.now(),
+    createdAt: Date.now(),
     events: [],
   };
 
@@ -143,6 +146,7 @@ test('JsonFileStore - RebalanceTask balance snapshot fields and timestamps seria
       evaluatedAt: 1234567890,
     },
     evaluatedAt: 1234567890,
+    createdAt: 1234567890,
     events: [],
     preCloseBalances: { tokenX: '1000', tokenY: '2000', timestamp: 1234567800 },
     postCloseBalances: { tokenX: '1500', tokenY: '2500', timestamp: 1234567850 },

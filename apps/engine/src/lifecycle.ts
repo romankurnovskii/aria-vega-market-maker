@@ -284,7 +284,7 @@ export async function processTasks(
 
       // 1. Timeout check (fail-safe) with Auto-Heal Timeout Pruning
       const MAX_TASK_AGE_MS = 5 * 60 * 1000; // 5 minutes
-      if (Date.now() - task.evaluatedAt > MAX_TASK_AGE_MS) {
+      if (Date.now() - (task.createdAt || task.evaluatedAt) > MAX_TASK_AGE_MS) {
         logger.error(
           `[Execution Monitor] [ALERT] RebalanceTask ${task.id} has been active for over 5 minutes. Idle capital warning!`
         );
@@ -635,13 +635,65 @@ export async function processTasks(
 
         // JIT Signal Validation: check if signal is stale (e.g., > 180,000ms)
         const MAX_SIGNAL_AGE_MS = 180000;
-        if (Date.now() - task.evaluatedAt > MAX_SIGNAL_AGE_MS) {
-          logger.warn(
-            `[Execution Monitor] Signal for task ${task.id} is stale (${Date.now() - task.evaluatedAt}ms). Re-triggering re-evaluation...`
-          );
-          task.status = 'awaiting_settlement';
-          await tasksStore.saveTask(task);
-          continue;
+        const signalAge = Date.now() - task.evaluatedAt;
+        const isStale = signalAge > MAX_SIGNAL_AGE_MS;
+
+        // JIT Circuit Breaker: bounded retry with exponential backoff
+        const MAX_JIT_ATTEMPTS = 5;
+        const INITIAL_BACKOFF = 10; // seconds
+        const MAX_BACKOFF = 300; // 5 minutes
+
+        if (isStale) {
+          // Check if we've exceeded retry attempts
+          if (task.jitAttempts && task.jitAttempts >= MAX_JIT_ATTEMPTS) {
+            logger.warn(
+              `[Execution Monitor] JIT retry limit exceeded for task ${task.id}. Forcing execution with stale signal as last resort.`
+            );
+            // Fall through to execute with stale signal
+          } else {
+            // Apply backoff if needed
+            if (task.jitBackoffSeconds) {
+              const timeSinceLastAttempt = Date.now() - (task.lastJitAttempt || 0);
+              const backoffMs = task.jitBackoffSeconds * 1000;
+
+              if (timeSinceLastAttempt < backoffMs) {
+                logger.info('JIT backoff active', {
+                  taskId: task.id,
+                  waitSeconds: (backoffMs - timeSinceLastAttempt) / 1000,
+                });
+
+                // Wait remaining backoff time
+                await new Promise((resolve) => setTimeout(resolve, backoffMs - timeSinceLastAttempt));
+              }
+            }
+
+            // Increment attempt counter
+            if (!task.jitAttempts) {
+              task.jitAttempts = 1;
+            } else {
+              task.jitAttempts += 1;
+            }
+            task.lastJitAttempt = Date.now();
+
+            // Apply exponential backoff
+            if (!task.jitBackoffSeconds) {
+              task.jitBackoffSeconds = INITIAL_BACKOFF;
+            } else {
+              task.jitBackoffSeconds = Math.min(task.jitBackoffSeconds * 2, MAX_BACKOFF);
+            }
+
+            await tasksStore.saveTask(task);
+
+            logger.info('JIT re-evaluation triggered', {
+              taskId: task.id,
+              attempt: task.jitAttempts,
+              nextBackoff: task.jitBackoffSeconds,
+            });
+
+            task.status = 'awaiting_settlement';
+            await tasksStore.saveTask(task);
+            continue;
+          }
         }
 
         logger.info(`[Execution Monitor] Executing OPEN transaction for task ${task.id}...`);
@@ -997,6 +1049,7 @@ export function startTickLoop(
               originalPositionId: decision.positionId,
               intent: decision,
               evaluatedAt: decision.evaluatedAt || Date.now(),
+              createdAt: Date.now(),
               events: [
                 {
                   stage: 'INIT',

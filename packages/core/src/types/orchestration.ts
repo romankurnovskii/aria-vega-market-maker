@@ -84,9 +84,13 @@ export interface RebalanceTask {
   newPositionId?: string;
   intent: Decision;
   evaluatedAt: number;
+  createdAt?: number;
   events: TaskEvent[];
   lockedAt?: number;
   preCloseBalances?: { tokenX: string; tokenY: string; timestamp: number };
   postCloseBalances?: { tokenX: string; tokenY: string; timestamp: number };
   recoveredFunds?: { tokenX: string; tokenY: string };
+  jitAttempts?: number;
+  jitBackoffSeconds?: number;
+  lastJitAttempt?: number;
 }
