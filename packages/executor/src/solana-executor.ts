@@ -110,15 +110,8 @@ export class SolanaExecutor implements IExecutor {
           positionPubkey: new PublicKey(decision.positionId),
           lowerBinId,
           upperBinId,
-          shouldClaimAndClose: true,
+          shouldClaimAndClose: false,
         });
-
-        const reclaimTxs = await this.provider.buildClosePositionTransaction({
-          poolAddress: market.poolAddress,
-          userWallet: this.keypair.publicKey,
-          positionPubkey: new PublicKey(decision.positionId),
-        });
-        closeTxs.push(...reclaimTxs);
 
         // 4. Submit and confirm each transaction sequentially
         for (let i = 0; i < closeTxs.length; i++) {
@@ -129,6 +122,31 @@ export class SolanaExecutor implements IExecutor {
             maxAttempts: 15,
           });
           txSignatures.push(sig);
+        }
+
+        // 5. Build and execute reclaim transaction AFTER liquidity has been removed on-chain
+        try {
+          logger.info(`[SolanaExecutor] Building reclaim/close transaction for empty position ${decision.positionId}...`);
+          const reclaimTxs = await this.provider.buildClosePositionTransaction({
+            poolAddress: market.poolAddress,
+            userWallet: this.keypair.publicKey,
+            positionPubkey: new PublicKey(decision.positionId),
+          });
+          for (let i = 0; i < reclaimTxs.length; i++) {
+            logger.info(`[SolanaExecutor] Executing reclaim transaction chunk ${i + 1}/${reclaimTxs.length}...`);
+            const sig = await this.executeTx(reclaimTxs[i], [], {
+              positionId: decision.positionId,
+              action: 'close',
+              maxAttempts: 15,
+            });
+            txSignatures.push(sig);
+          }
+        } catch (reclaimErr) {
+          logger.warn(
+            `[SolanaExecutor] Reclaim/close transaction failed or position already closed: ${
+              reclaimErr instanceof Error ? reclaimErr.message : String(reclaimErr)
+            }`
+          );
         }
       } else if (decision.action === 'open') {
         const openParams = decision.openParams;
