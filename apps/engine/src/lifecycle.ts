@@ -1006,7 +1006,18 @@ export function startTickLoop(
               ],
             };
 
-            await tasksStore.saveTask(task);
+            try {
+              await tasksStore.saveTask(task);
+            } catch (saveErr: unknown) {
+              const msg = saveErr instanceof Error ? saveErr.message : String(saveErr);
+              if (msg.includes('Atomicity Violation')) {
+                logger.warn(
+                  `[Tick Loop] Atomicity Violation detected during task creation for position ${position.id}: ${msg}. Bypassing duplicate execution.`
+                );
+                continue;
+              }
+              throw saveErr;
+            }
 
             logger.info(
               `[Tick Loop] Stateful RebalanceTask ${task.id} created successfully on disk. Triggering Execution Monitor...`
