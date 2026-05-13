@@ -1,130 +1,57 @@
 ---
-name: issue-to-pr
-description: Professional GitHub issue analysis and fix workflow. When user asks to review an issue, first reproduce the bug, analyze critically, confirm or reject, write response. After confirmation, create branch, fix with tests, and create PR.
+name: issue-review-pipeline
+description: >
+  Multi-phase GitHub issue review and fix pipeline. Use this skill whenever someone asks to
+  review a GitHub issue, analyze a bug report, reproduce an issue, fix a bug and open a PR,
+  or verify a pull request fixes the original issue. Also triggers for phrases like "look at
+  this issue", "check if this suggestion introduces bugs", "review this critically with the
+  codebase", "write tests for this issue", or "confirm the fix works". Each phase is handled
+  by a focused sub-skill — read this file first to know which one to invoke.
 ---
 
-# Issue-to-PR Workflow Skill
+# Issue Review Pipeline — Coordinator
 
-This skill provides a professional software engineering workflow for handling GitHub issues. It follows a two-phase approach:
+This pipeline separates issue handling into **4 focused phases**, each with a dedicated skill.
+No single agent does everything. Each phase produces a JSON handoff artifact that gates the next.
 
-## Phase 1: Analysis & Confirmation (Reproduce First)
+## When to use which skill
 
-When triggered, the agent should:
+| User says                                                      | Start at                                             |
+| -------------------------------------------------------------- | ---------------------------------------------------- |
+| "review this issue", "analyze issue #N", "is this a real bug?" | **Skill 1 — issue-triage**                           |
+| "reproduce this bug", "write failing tests for #N"             | **Skill 2 — issue-reproduce** (requires triage.json) |
+| "fix this and open a PR", "implement the fix"                  | **Skill 3 — issue-fix-pr** (requires repro.json)     |
+| "verify the PR", "check if fix works", "no regressions?"       | **Skill 4 — issue-verify** (requires pr.json)        |
+| "review issue #N end to end"                                   | Start at Skill 1, proceed through all phases         |
 
-1. **Reproduce the Issue**
-   - Clone the repository if needed
-   - Set up the environment
-   - Follow the steps described in the issue
-   - Document the exact conditions under which the bug occurs
-   - Take screenshots or videos if applicable
+## Sub-skill locations
 
-2. **Analyze Critically**
-   - Examine the codebase to understand the root cause
-   - Check if the issue description is accurate and complete
-   - Identify any missing information or edge cases
-   - Determine if the issue is actually a bug or a feature request
+- `skills/issue-triage/SKILL.md` — Phase 1: read, analyze, confirm or reject
+- `skills/issue-reproduce/SKILL.md` — Phase 2: reproduce, write failing tests, enumerate edge cases
+- `skills/issue-fix-pr/SKILL.md` — Phase 3: implement fix, verify tests pass, open PR
+- `skills/issue-verify/SKILL.md` — Phase 4: re-run tests, review diff, sign off or send back
 
-3. **Confirm or Reject**
-   - Based on the reproduction, confirm whether the bug exists
-   - If confirmed, provide a detailed analysis of the root cause
-   - If rejected, explain why the issue is not valid (e.g., user error, missing steps, intended behavior)
-   - For each claim in the issue, provide a clear confirmation or rejection
+## Handoff format
 
-4. **Write Response**
-   - Post a comprehensive comment on the GitHub issue
-   - Include:
-     - Reproduction steps and results
-     - Root cause analysis
-     - Confirmation/rejection of each point
-     - Next steps (e.g., "I'll create a branch to fix this")
-     - Request for additional information if needed
+Each phase writes a JSON file that the next phase reads as its input context.
+This prevents agents from re-doing prior work and keeps each agent's scope narrow.
 
-## Phase 2: Fix & PR (After Confirmation)
+```
+triage.json  →  repro.json  →  pr.json  →  verify.json
+```
 
-Once the issue is confirmed and the user gives approval:
+See `references/handoff-schema.md` for the full JSON schema for each file.
 
-1. **Announce Work Started**
-   - Immediately post a comment on the issue: "I'm starting work on this issue."
-   - This keeps stakeholders informed and prevents duplicate efforts
+## Gating rules
 
-2. **Write Implementation Plan**
-   - Based on the root cause analysis, write a detailed plan as a comment on the issue
-   - Include:
-     - Step-by-step approach to fix the issue
-     - Files that need to be modified
-     - Tests that need to be added or updated
-     - Any edge cases to consider
-     - Estimated complexity/time estimate
-   - Ask for feedback on the plan before proceeding
+- **Skill 2 must not start** if `triage.json.verdict == "rejected"` — stop and report to user
+- **Skill 3 must not start** if `repro.json.repro_confirmed == false`
+- **Skill 4 must not start** until a real PR URL exists in `pr.json`
+- **If verify returns `needs_rework`**: restart from Skill 2 with the verify.json as additional context
 
-3. **Get Approval on Plan**
-   - Wait for user confirmation on the plan
-   - If user suggests changes, update the plan accordingly
-   - Once approved, proceed with implementation
+## CRITICAL: What each agent must NOT do
 
-4. **Create Local Branch**
-   - Create a new branch from the appropriate base
-   - Branch name format: `issue/<issue-number>-short-description`
-   - Push to remote if needed
-
-5. **Implement the Fix**
-   - Follow the approved plan step by step
-   - Write clean, production-ready code
-   - Follow the project's coding standards
-   - Add necessary comments and documentation
-   - Update the issue comment with progress if implementation takes multiple steps
-
-6. **Write Tests**
-   - Create tests that reproduce the bug
-   - Ensure tests fail without the fix and pass with it
-   - Cover edge cases and related scenarios
-   - Run existing tests to ensure no regression
-
-7. **Create Pull Request**
-   - Commit changes with proper messages
-   - Push the branch
-   - Create a PR with:
-     - Description linking to the issue
-     - Explanation of the fix
-     - Test results
-     - Reference to the implementation plan
-   - Request review from the user
-
-## Input Format
-
-The skill expects the user to provide:
-
-- GitHub issue URL or number
-- Repository URL or local path
-- Any additional context needed for reproduction
-
-## Output Format
-
-The skill produces:
-
-- Issue comments with analysis
-- Branch with fix
-- Pull request
-- Test results
-
-## Success Criteria
-
-- Issue is either confirmed with reproducible steps or rejected with clear explanation
-- Fix is implemented with comprehensive tests
-- PR is created and ready for review
-- All changes are reproducible by other developers
-
-## Dependencies
-
-- Git
-- Node.js / Python / appropriate runtime
-- Testing framework (Jest, pytest, etc.)
-- GitHub CLI (gh) recommended
-
-## Best Practices
-
-- Always reproduce first before making any changes
-- Write clear, detailed comments in both the issue and PR
-- Follow the project's existing patterns and conventions
-- Ensure all tests pass before creating the PR
-- Keep commits small and focused
+- **Triage agent**: must not write any code or tests. Read only.
+- **Reproduce agent**: must not attempt any fix. Write tests that FAIL — do not make them pass.
+- **Fix agent**: must not re-analyze or re-scope. Trust repro.json. Fix exactly what's there.
+- **Verify agent**: must not modify code. Observe and report only.
