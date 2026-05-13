@@ -55,7 +55,6 @@ export interface Position {
   state?: PositionState; // <-- New explicit state tracking
   closedAt?: number; // <-- Timestamp when transition to CLOSED/FAILED occurred
 
-  // Price and range metadata for UI/Analysis
   lowerBoundPrice?: number;
   upperBoundPrice?: number;
   activeBin?: number;
