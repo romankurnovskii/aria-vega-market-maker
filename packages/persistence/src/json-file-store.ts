@@ -242,6 +242,17 @@ export class JsonFileStore implements IStore {
         }
       }
 
+      const existingLock = tasks.find(
+        (t) => t.assignmentId === task.assignmentId || t.originalPositionId === task.originalPositionId
+      );
+      if (existingLock && existingLock.id !== task.id) {
+        throw new Error(
+          `Atomicity Violation: Active task ${existingLock.id} already exists for position ${task.originalPositionId}`
+        );
+      }
+
+      task.lockedAt = task.lockedAt ?? Date.now();
+
       const index = tasks.findIndex((t) => t.id === task.id);
       if (index >= 0) {
         tasks[index] = task;

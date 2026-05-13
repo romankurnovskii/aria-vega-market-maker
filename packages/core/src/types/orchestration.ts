@@ -85,4 +85,5 @@ export interface RebalanceTask {
   intent: Decision;
   evaluatedAt: number;
   events: TaskEvent[];
+  lockedAt?: number;
 }

@@ -84,3 +84,46 @@ test('JsonFileStore - concurrent saveTask updates are atomic and no updates are 
     assert.ok(found, `Task task_${i} was lost!`);
   }
 });
+
+test('JsonFileStore - concurrent saveTask for same position rejects with Atomicity Violation', async () => {
+  const store = new JsonFileStore(TEST_DATA_DIR);
+
+  const task1: RebalanceTask = {
+    id: 'task_1',
+    assignmentId: 'assign_A',
+    status: 'pending_close',
+    originalPositionId: 'pos_A',
+    intent: {
+      positionId: 'pos_A',
+      action: 'close',
+      sourceAssignmentId: 'assign_A',
+      evaluatedAt: Date.now(),
+    },
+    evaluatedAt: Date.now(),
+    events: [],
+  };
+
+  const task2: RebalanceTask = {
+    id: 'task_2',
+    assignmentId: 'assign_A',
+    status: 'pending_close',
+    originalPositionId: 'pos_A',
+    intent: {
+      positionId: 'pos_A',
+      action: 'close',
+      sourceAssignmentId: 'assign_A',
+      evaluatedAt: Date.now(),
+    },
+    evaluatedAt: Date.now(),
+    events: [],
+  };
+
+  await store.saveTask(task1);
+
+  await assert.rejects(
+    async () => {
+      await store.saveTask(task2);
+    },
+    (err: Error) => err.message.includes('Atomicity Violation')
+  );
+});

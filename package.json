@@ -11,7 +11,7 @@
     "test:coverage": "pnpm --recursive run test:coverage",
     "test:watch": "pnpm --recursive run test:watch",
     "format": "prettier --write .",
-    "prepare": "husky",
+    "prepare": "husky || true",
     "repomix": "npm run repomix:md",
     "repomix:md": "repomix --include \"**/*.md\""
   },
