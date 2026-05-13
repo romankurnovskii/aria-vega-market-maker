@@ -3412,3 +3412,563 @@ market-maker-1  | 06:07:51.667 [experimental-restake-step] INFO: '[ExperimentalR
 market-maker-1  | 06:07:51.668 [lifecycle] INFO: "[Execution Monitor] Strategy re-evaluation recommended 'skip', indicating target range is valid for position 62vV3DqPMiydsnAbHUxadmibQExgGTGGEwSH2j2wVhV1. Proceeding with open leg."
 market-maker-1  | 06:07:52.369 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position 62vV3DqPMiydsnAbHUxadmibQExgGTGGEwSH2j2wVhV1"
 ```
+
+### Lineage updated: Added FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh
+
+### Update: Wed May 13 09:08:54 IDT 2026
+
+```text
+market-maker-1  | 06:08:20.759 [lifecycle] INFO: '[Tick Loop] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh on chain [solana]'
+market-maker-1  | 06:08:20.759 [meteora-api-provider] INFO: '[MeteoraApiProvider] Fetching position details for FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:08:21.222 [lifecycle] INFO: '[Tick Loop] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh details: Pool Price: 95.37583396846156 | Bounds: [-5881, -5877] | In-Range: false'
+market-maker-1  | 06:08:21.222 [strategy-orchestrator] INFO: '[StrategyOrchestrator] Ticking orchestrator orch_asg_exp_test for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh [strategyId=experimental-restake]. Mode: active'
+market-maker-1  | 06:08:21.222 [experimental-restake-strategy] INFO: '[ExperimentalRestakeStrategy] Initiating strategy evaluation for position: FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:08:21.223 [workflow] INFO: '[Workflow] Running step: InitializationCheckStep [positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh]'
+market-maker-1  | 06:08:21.223 [initialization-check-step] INFO: '[InitializationCheckStep] Checking initialization status for position: FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:08:21.223 [initialization-check-step] INFO: '[InitializationCheckStep] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh is initialized and active.'
+market-maker-1  | 06:08:21.224 [workflow] INFO: '[Workflow] Running step: ClmmPricingStep [positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh]'
+market-maker-1  | 06:08:21.224 [clmm-pricing-step] INFO: '[ClmmPricingStep] positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh lowerBound=-5881 upperBound=-5877 midPrice=95.2615 geometricAverage=95.2615 effectiveBreakEven=N/A'
+market-maker-1  | 06:08:21.224 [clmm-pricing-step] INFO: '\n┌────────────────────────────────────────────────────────┐\n│ 🚀 CLMM POSITION PRICING METRICS                       │\n├────────────────────────────────────────────────────────┤\n│ Position ID:      FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh │\n│ Range Bounds:     Bin -5881  to Bin -5877            │\n│ Lower Price:      95.1853    USDC/SOL                 │\n│ Upper Price:      95.3377    USDC/SOL                 │\n│ Mid Price:        95.2615    USDC/SOL                 │\n├────────────────────────────────────────────────────────┤\n│ 📊 AVERAGE ENTRY PRICE CALCULATIONS                    │\n├────────────────────────────────────────────────────────┤\n│ 1. Geometric Average: 95.2615    USDC/SOL        │\n│    (Mathematical space center for Uniswap v3/Meteora) │\n│ 2. Spot Accounting:   95.2615    USDC/SOL        │\n│    (Total cost basis divided by total base assets)    │\n│ 3. Bid-Ask perspective:                                │\n│    Convexity Benefit: 0.0000     USDC             │\n│    (Benefit of range vs single limit order at mid)     │\n│ 4. Effective Break-even:                               │\n│    With Accrued Fees: N/A        USDC/SOL        │\n└────────────────────────────────────────────────────────┘'
+market-maker-1  | 06:08:21.224 [workflow] INFO: '[Workflow] Running step: ExperimentalRestakeStep [positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh]'
+market-maker-1  | 06:08:21.225 [experimental-restake-step] INFO: '[ExperimentalRestakeStep] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh. Active bound: -5876'
+market-maker-1  | 06:08:21.229 [execution-gate] INFO: '[ExecutionGate] Evaluating 1 recommendations for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:08:21.235 [lifecycle] INFO: '[Execution Monitor] Processing task task_1778652501230_601 (pending_close) for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:08:22.376 [lifecycle] INFO: '[Execution Monitor] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh state updated to REBALANCING'
+market-maker-1  | 06:08:22.378 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'close' on position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh"
+market-maker-1  | 06:08:22.378 [solana-executor] INFO: '[SolanaExecutor] Creating CLOSE transaction for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:08:22.915 [solana-executor] INFO: '[SolanaExecutor] Found position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh on-chain in bin range [-5881, -5877]. Building removal transactions...'
+market-maker-1  | 06:08:22.915 [meteora-onchain-provider] INFO: '[MeteoraOnChain] Building RemoveLiquidity Txs for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh (Bins: -5881 to -5877)'
+market-maker-1  | 06:08:23.437 [solana-executor] INFO: '[SolanaExecutor] executeTx attempt #1/15 for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh (Action: close). Elapsed: 0ms.'
+market-maker-1  | 06:08:25.813 [solana-executor] INFO: '[SolanaExecutor] executeTx attempt #2/15 for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh (Action: close). Elapsed: 2376ms.'
+market-maker-1  | 06:08:25.978 [solana-executor] INFO: '[SolanaExecutor] Building reclaim/close transaction for empty position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh...'
+market-maker-1  | 06:08:25.979 [meteora-onchain-provider] INFO: '[MeteoraOnChain] Building ClosePosition Tx for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh in pool 5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6'
+market-maker-1  | 06:08:26.585 [solana-executor] INFO: '[SolanaExecutor] executeTx attempt #1/15 for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh (Action: close). Elapsed: 0ms.'
+market-maker-1  | 06:08:28.822 [solana-executor] INFO: '[SolanaExecutor] executeTx attempt #2/15 for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh (Action: close). Elapsed: 2236ms.'
+```
+
+### Update: Wed May 13 09:12:35 IDT 2026
+
+```text
+market-maker-1  | 06:08:22.915 [solana-executor] INFO: '[SolanaExecutor] Found position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh on-chain in bin range [-5881, -5877]. Building removal transactions...'
+market-maker-1  | 06:08:22.915 [meteora-onchain-provider] INFO: '[MeteoraOnChain] Building RemoveLiquidity Txs for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh (Bins: -5881 to -5877)'
+market-maker-1  | 06:08:23.437 [solana-executor] INFO: '[SolanaExecutor] executeTx attempt #1/15 for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh (Action: close). Elapsed: 0ms.'
+market-maker-1  | 06:08:25.813 [solana-executor] INFO: '[SolanaExecutor] executeTx attempt #2/15 for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh (Action: close). Elapsed: 2376ms.'
+market-maker-1  | 06:08:25.978 [solana-executor] INFO: '[SolanaExecutor] Building reclaim/close transaction for empty position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh...'
+market-maker-1  | 06:08:25.979 [meteora-onchain-provider] INFO: '[MeteoraOnChain] Building ClosePosition Tx for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh in pool 5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6'
+market-maker-1  | 06:08:26.585 [solana-executor] INFO: '[SolanaExecutor] executeTx attempt #1/15 for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh (Action: close). Elapsed: 0ms.'
+market-maker-1  | 06:08:28.822 [solana-executor] INFO: '[SolanaExecutor] executeTx attempt #2/15 for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh (Action: close). Elapsed: 2236ms.'
+market-maker-1  | 06:09:22.873 [lifecycle] INFO: '[Execution Monitor] Processing task task_1778652501230_601 (awaiting_settlement) for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:09:31.190 [lifecycle] INFO: '[Tick Loop] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh on chain [solana]'
+market-maker-1  | 06:11:16.796 [lifecycle] INFO: '[Tick Loop] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh is currently locked (active rebalance task in-flight). Skipping evaluation.'
+market-maker-1  | 06:12:27.000 [lifecycle] INFO: '[Execution Monitor] Processing task task_1778652501230_601 (awaiting_settlement) for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:12:35.783 [lifecycle] INFO: '[Tick Loop] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh on chain [solana]'
+market-maker-1  | 06:12:35.790 [lifecycle] INFO: '[Tick Loop] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh is currently locked (active rebalance task in-flight). Skipping evaluation.'
+```
+
+### Update: Wed May 13 09:46:27 IDT 2026
+
+```text
+market-maker-1  | 06:09:22.873 [lifecycle] INFO: '[Execution Monitor] Processing task task_1778652501230_601 (awaiting_settlement) for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:09:31.190 [lifecycle] INFO: '[Tick Loop] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh on chain [solana]'
+market-maker-1  | 06:11:16.796 [lifecycle] INFO: '[Tick Loop] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh is currently locked (active rebalance task in-flight). Skipping evaluation.'
+market-maker-1  | 06:12:27.000 [lifecycle] INFO: '[Execution Monitor] Processing task task_1778652501230_601 (awaiting_settlement) for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:12:35.783 [lifecycle] INFO: '[Tick Loop] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh on chain [solana]'
+market-maker-1  | 06:12:35.790 [lifecycle] INFO: '[Tick Loop] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh is currently locked (active rebalance task in-flight). Skipping evaluation.'
+market-maker-1  | 06:13:24.218 [lifecycle] INFO: '[Execution Monitor] Processing task task_1778652501230_601 (awaiting_settlement) for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:14:11.075 [orchestrator-factory] INFO: '[OrchestratorFactory] Creating StrategyOrchestrator for assignment asg_exp_test targeting position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:14:11.075 [strategy-orchestrator] INFO: '[StrategyOrchestrator] Ticking orchestrator orch_asg_exp_test for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh [strategyId=experimental-restake]. Mode: active'
+market-maker-1  | 06:14:11.075 [experimental-restake-strategy] INFO: '[ExperimentalRestakeStrategy] Initiating strategy evaluation for position: FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:14:11.076 [workflow] INFO: '[Workflow] Running step: InitializationCheckStep [positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh]'
+market-maker-1  | 06:14:11.076 [initialization-check-step] INFO: '[InitializationCheckStep] Checking initialization status for position: FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:14:11.076 [initialization-check-step] INFO: '[InitializationCheckStep] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh is initialized and active.'
+market-maker-1  | 06:14:11.076 [workflow] INFO: '[Workflow] Running step: ClmmPricingStep [positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh]'
+market-maker-1  | 06:14:11.076 [clmm-pricing-step] INFO: '[ClmmPricingStep] positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh lowerBound=-5880 upperBound=-5876 midPrice=95.2996 geometricAverage=95.2996 effectiveBreakEven=95.2996'
+market-maker-1  | 06:14:11.076 [clmm-pricing-step] INFO: '\n┌────────────────────────────────────────────────────────┐\n│ 🚀 CLMM POSITION PRICING METRICS                       │\n├────────────────────────────────────────────────────────┤\n│ Position ID:      FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh │\n│ Range Bounds:     Bin -5880  to Bin -5876            │\n│ Lower Price:      95.2234    USDC/SOL                 │\n│ Upper Price:      95.3758    USDC/SOL                 │\n│ Mid Price:        95.2996    USDC/SOL                 │\n├────────────────────────────────────────────────────────┤\n│ 📊 AVERAGE ENTRY PRICE CALCULATIONS                    │\n├────────────────────────────────────────────────────────┤\n│ 1. Geometric Average: 95.2996    USDC/SOL        │\n│    (Mathematical space center for Uniswap v3/Meteora) │\n│ 2. Spot Accounting:   95.2996    USDC/SOL        │\n│    (Total cost basis divided by total base assets)    │\n│ 3. Bid-Ask perspective:                                │\n│    Convexity Benefit: 0.0000     USDC             │\n│    (Benefit of range vs single limit order at mid)     │\n│ 4. Effective Break-even:                               │\n│    With Accrued Fees: 95.2996    USDC/SOL        │\n└────────────────────────────────────────────────────────┘'
+market-maker-1  | 06:14:11.076 [workflow] INFO: '[Workflow] Running step: ExperimentalRestakeStep [positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh]'
+market-maker-1  | 06:14:11.076 [experimental-restake-step] INFO: '[ExperimentalRestakeStep] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh. Active bound: -5872'
+market-maker-1  | 06:14:11.077 [lifecycle] INFO: '[Execution Monitor] Strategy re-evaluation successfully recalculated new range bounds for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh.'
+market-maker-1  | 06:14:12.194 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh"
+```
+
+### Update: Wed May 13 10:28:25 IDT 2026
+
+```text
+market-maker-1  | 06:09:22.873 [lifecycle] INFO: '[Execution Monitor] Processing task task_1778652501230_601 (awaiting_settlement) for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:09:31.190 [lifecycle] INFO: '[Tick Loop] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh on chain [solana]'
+market-maker-1  | 06:11:16.796 [lifecycle] INFO: '[Tick Loop] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh is currently locked (active rebalance task in-flight). Skipping evaluation.'
+market-maker-1  | 06:12:27.000 [lifecycle] INFO: '[Execution Monitor] Processing task task_1778652501230_601 (awaiting_settlement) for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:12:35.783 [lifecycle] INFO: '[Tick Loop] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh on chain [solana]'
+market-maker-1  | 06:12:35.790 [lifecycle] INFO: '[Tick Loop] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh is currently locked (active rebalance task in-flight). Skipping evaluation.'
+market-maker-1  | 06:13:24.218 [lifecycle] INFO: '[Execution Monitor] Processing task task_1778652501230_601 (awaiting_settlement) for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:14:11.075 [orchestrator-factory] INFO: '[OrchestratorFactory] Creating StrategyOrchestrator for assignment asg_exp_test targeting position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:14:11.075 [strategy-orchestrator] INFO: '[StrategyOrchestrator] Ticking orchestrator orch_asg_exp_test for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh [strategyId=experimental-restake]. Mode: active'
+market-maker-1  | 06:14:11.075 [experimental-restake-strategy] INFO: '[ExperimentalRestakeStrategy] Initiating strategy evaluation for position: FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:14:11.076 [workflow] INFO: '[Workflow] Running step: InitializationCheckStep [positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh]'
+market-maker-1  | 06:14:11.076 [initialization-check-step] INFO: '[InitializationCheckStep] Checking initialization status for position: FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:14:11.076 [initialization-check-step] INFO: '[InitializationCheckStep] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh is initialized and active.'
+market-maker-1  | 06:14:11.076 [workflow] INFO: '[Workflow] Running step: ClmmPricingStep [positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh]'
+market-maker-1  | 06:14:11.076 [clmm-pricing-step] INFO: '[ClmmPricingStep] positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh lowerBound=-5880 upperBound=-5876 midPrice=95.2996 geometricAverage=95.2996 effectiveBreakEven=95.2996'
+market-maker-1  | 06:14:11.076 [clmm-pricing-step] INFO: '\n┌────────────────────────────────────────────────────────┐\n│ 🚀 CLMM POSITION PRICING METRICS                       │\n├────────────────────────────────────────────────────────┤\n│ Position ID:      FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh │\n│ Range Bounds:     Bin -5880  to Bin -5876            │\n│ Lower Price:      95.2234    USDC/SOL                 │\n│ Upper Price:      95.3758    USDC/SOL                 │\n│ Mid Price:        95.2996    USDC/SOL                 │\n├────────────────────────────────────────────────────────┤\n│ 📊 AVERAGE ENTRY PRICE CALCULATIONS                    │\n├────────────────────────────────────────────────────────┤\n│ 1. Geometric Average: 95.2996    USDC/SOL        │\n│    (Mathematical space center for Uniswap v3/Meteora) │\n│ 2. Spot Accounting:   95.2996    USDC/SOL        │\n│    (Total cost basis divided by total base assets)    │\n│ 3. Bid-Ask perspective:                                │\n│    Convexity Benefit: 0.0000     USDC             │\n│    (Benefit of range vs single limit order at mid)     │\n│ 4. Effective Break-even:                               │\n│    With Accrued Fees: 95.2996    USDC/SOL        │\n└────────────────────────────────────────────────────────┘'
+market-maker-1  | 06:14:11.076 [workflow] INFO: '[Workflow] Running step: ExperimentalRestakeStep [positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh]'
+market-maker-1  | 06:14:11.076 [experimental-restake-step] INFO: '[ExperimentalRestakeStep] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh. Active bound: -5872'
+market-maker-1  | 06:14:11.077 [lifecycle] INFO: '[Execution Monitor] Strategy re-evaluation successfully recalculated new range bounds for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh.'
+market-maker-1  | 06:14:12.194 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh"
+market-maker-1  | 07:12:01.140 [lifecycle] INFO: '[Tick Loop] Previous execution cycle is still active. Skipping overlapping tick loop. (Active tasks in flight: task_1778652501230_601 [pending_open] for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh)'
+```
+
+### Update: Wed May 13 11:10:38 IDT 2026
+
+```text
+market-maker-1  | 06:09:22.873 [lifecycle] INFO: '[Execution Monitor] Processing task task_1778652501230_601 (awaiting_settlement) for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:09:31.190 [lifecycle] INFO: '[Tick Loop] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh on chain [solana]'
+market-maker-1  | 06:11:16.796 [lifecycle] INFO: '[Tick Loop] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh is currently locked (active rebalance task in-flight). Skipping evaluation.'
+market-maker-1  | 06:12:27.000 [lifecycle] INFO: '[Execution Monitor] Processing task task_1778652501230_601 (awaiting_settlement) for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:12:35.783 [lifecycle] INFO: '[Tick Loop] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh on chain [solana]'
+market-maker-1  | 06:12:35.790 [lifecycle] INFO: '[Tick Loop] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh is currently locked (active rebalance task in-flight). Skipping evaluation.'
+market-maker-1  | 06:13:24.218 [lifecycle] INFO: '[Execution Monitor] Processing task task_1778652501230_601 (awaiting_settlement) for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:14:11.075 [orchestrator-factory] INFO: '[OrchestratorFactory] Creating StrategyOrchestrator for assignment asg_exp_test targeting position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:14:11.075 [strategy-orchestrator] INFO: '[StrategyOrchestrator] Ticking orchestrator orch_asg_exp_test for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh [strategyId=experimental-restake]. Mode: active'
+market-maker-1  | 06:14:11.075 [experimental-restake-strategy] INFO: '[ExperimentalRestakeStrategy] Initiating strategy evaluation for position: FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:14:11.076 [workflow] INFO: '[Workflow] Running step: InitializationCheckStep [positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh]'
+market-maker-1  | 06:14:11.076 [initialization-check-step] INFO: '[InitializationCheckStep] Checking initialization status for position: FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:14:11.076 [initialization-check-step] INFO: '[InitializationCheckStep] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh is initialized and active.'
+market-maker-1  | 06:14:11.076 [workflow] INFO: '[Workflow] Running step: ClmmPricingStep [positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh]'
+market-maker-1  | 06:14:11.076 [clmm-pricing-step] INFO: '[ClmmPricingStep] positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh lowerBound=-5880 upperBound=-5876 midPrice=95.2996 geometricAverage=95.2996 effectiveBreakEven=95.2996'
+market-maker-1  | 06:14:11.076 [clmm-pricing-step] INFO: '\n┌────────────────────────────────────────────────────────┐\n│ 🚀 CLMM POSITION PRICING METRICS                       │\n├────────────────────────────────────────────────────────┤\n│ Position ID:      FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh │\n│ Range Bounds:     Bin -5880  to Bin -5876            │\n│ Lower Price:      95.2234    USDC/SOL                 │\n│ Upper Price:      95.3758    USDC/SOL                 │\n│ Mid Price:        95.2996    USDC/SOL                 │\n├────────────────────────────────────────────────────────┤\n│ 📊 AVERAGE ENTRY PRICE CALCULATIONS                    │\n├────────────────────────────────────────────────────────┤\n│ 1. Geometric Average: 95.2996    USDC/SOL        │\n│    (Mathematical space center for Uniswap v3/Meteora) │\n│ 2. Spot Accounting:   95.2996    USDC/SOL        │\n│    (Total cost basis divided by total base assets)    │\n│ 3. Bid-Ask perspective:                                │\n│    Convexity Benefit: 0.0000     USDC             │\n│    (Benefit of range vs single limit order at mid)     │\n│ 4. Effective Break-even:                               │\n│    With Accrued Fees: 95.2996    USDC/SOL        │\n└────────────────────────────────────────────────────────┘'
+market-maker-1  | 06:14:11.076 [workflow] INFO: '[Workflow] Running step: ExperimentalRestakeStep [positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh]'
+market-maker-1  | 06:14:11.076 [experimental-restake-step] INFO: '[ExperimentalRestakeStep] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh. Active bound: -5872'
+market-maker-1  | 06:14:11.077 [lifecycle] INFO: '[Execution Monitor] Strategy re-evaluation successfully recalculated new range bounds for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh.'
+market-maker-1  | 06:14:12.194 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh"
+market-maker-1  | 07:12:01.140 [lifecycle] INFO: '[Tick Loop] Previous execution cycle is still active. Skipping overlapping tick loop. (Active tasks in flight: task_1778652501230_601 [pending_open] for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh)'
+market-maker-1  | 08:10:20.074 [lifecycle] INFO: '[Tick Loop] Previous execution cycle is still active. Skipping overlapping tick loop. (Active tasks in flight: task_1778652501230_601 [pending_open] for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh)'
+```
+
+### Update: Wed May 13 12:11:40 IDT 2026
+
+```text
+market-maker-1  | 06:09:22.873 [lifecycle] INFO: '[Execution Monitor] Processing task task_1778652501230_601 (awaiting_settlement) for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:09:31.190 [lifecycle] INFO: '[Tick Loop] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh on chain [solana]'
+market-maker-1  | 06:11:16.796 [lifecycle] INFO: '[Tick Loop] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh is currently locked (active rebalance task in-flight). Skipping evaluation.'
+market-maker-1  | 06:12:27.000 [lifecycle] INFO: '[Execution Monitor] Processing task task_1778652501230_601 (awaiting_settlement) for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:12:35.783 [lifecycle] INFO: '[Tick Loop] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh on chain [solana]'
+market-maker-1  | 06:12:35.790 [lifecycle] INFO: '[Tick Loop] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh is currently locked (active rebalance task in-flight). Skipping evaluation.'
+market-maker-1  | 06:13:24.218 [lifecycle] INFO: '[Execution Monitor] Processing task task_1778652501230_601 (awaiting_settlement) for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:14:11.075 [orchestrator-factory] INFO: '[OrchestratorFactory] Creating StrategyOrchestrator for assignment asg_exp_test targeting position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:14:11.075 [strategy-orchestrator] INFO: '[StrategyOrchestrator] Ticking orchestrator orch_asg_exp_test for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh [strategyId=experimental-restake]. Mode: active'
+market-maker-1  | 06:14:11.075 [experimental-restake-strategy] INFO: '[ExperimentalRestakeStrategy] Initiating strategy evaluation for position: FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:14:11.076 [workflow] INFO: '[Workflow] Running step: InitializationCheckStep [positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh]'
+market-maker-1  | 06:14:11.076 [initialization-check-step] INFO: '[InitializationCheckStep] Checking initialization status for position: FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:14:11.076 [initialization-check-step] INFO: '[InitializationCheckStep] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh is initialized and active.'
+market-maker-1  | 06:14:11.076 [workflow] INFO: '[Workflow] Running step: ClmmPricingStep [positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh]'
+market-maker-1  | 06:14:11.076 [clmm-pricing-step] INFO: '[ClmmPricingStep] positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh lowerBound=-5880 upperBound=-5876 midPrice=95.2996 geometricAverage=95.2996 effectiveBreakEven=95.2996'
+market-maker-1  | 06:14:11.076 [clmm-pricing-step] INFO: '\n┌────────────────────────────────────────────────────────┐\n│ 🚀 CLMM POSITION PRICING METRICS                       │\n├────────────────────────────────────────────────────────┤\n│ Position ID:      FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh │\n│ Range Bounds:     Bin -5880  to Bin -5876            │\n│ Lower Price:      95.2234    USDC/SOL                 │\n│ Upper Price:      95.3758    USDC/SOL                 │\n│ Mid Price:        95.2996    USDC/SOL                 │\n├────────────────────────────────────────────────────────┤\n│ 📊 AVERAGE ENTRY PRICE CALCULATIONS                    │\n├────────────────────────────────────────────────────────┤\n│ 1. Geometric Average: 95.2996    USDC/SOL        │\n│    (Mathematical space center for Uniswap v3/Meteora) │\n│ 2. Spot Accounting:   95.2996    USDC/SOL        │\n│    (Total cost basis divided by total base assets)    │\n│ 3. Bid-Ask perspective:                                │\n│    Convexity Benefit: 0.0000     USDC             │\n│    (Benefit of range vs single limit order at mid)     │\n│ 4. Effective Break-even:                               │\n│    With Accrued Fees: 95.2996    USDC/SOL        │\n└────────────────────────────────────────────────────────┘'
+market-maker-1  | 06:14:11.076 [workflow] INFO: '[Workflow] Running step: ExperimentalRestakeStep [positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh]'
+market-maker-1  | 06:14:11.076 [experimental-restake-step] INFO: '[ExperimentalRestakeStep] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh. Active bound: -5872'
+market-maker-1  | 06:14:11.077 [lifecycle] INFO: '[Execution Monitor] Strategy re-evaluation successfully recalculated new range bounds for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh.'
+market-maker-1  | 06:14:12.194 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh"
+market-maker-1  | 07:12:01.140 [lifecycle] INFO: '[Tick Loop] Previous execution cycle is still active. Skipping overlapping tick loop. (Active tasks in flight: task_1778652501230_601 [pending_open] for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh)'
+market-maker-1  | 08:10:20.074 [lifecycle] INFO: '[Tick Loop] Previous execution cycle is still active. Skipping overlapping tick loop. (Active tasks in flight: task_1778652501230_601 [pending_open] for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh)'
+market-maker-1  | 09:11:38.475 [lifecycle] INFO: '[Tick Loop] Previous execution cycle is still active. Skipping overlapping tick loop. (Active tasks in flight: task_1778652501230_601 [pending_open] for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh)'
+```
+
+### Update: Wed May 13 13:11:55 IDT 2026
+
+```text
+market-maker-1  | 06:12:35.783 [lifecycle] INFO: '[Tick Loop] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh on chain [solana]'
+market-maker-1  | 06:12:35.790 [lifecycle] INFO: '[Tick Loop] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh is currently locked (active rebalance task in-flight). Skipping evaluation.'
+market-maker-1  | 06:13:24.218 [lifecycle] INFO: '[Execution Monitor] Processing task task_1778652501230_601 (awaiting_settlement) for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:14:11.075 [orchestrator-factory] INFO: '[OrchestratorFactory] Creating StrategyOrchestrator for assignment asg_exp_test targeting position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:14:11.075 [strategy-orchestrator] INFO: '[StrategyOrchestrator] Ticking orchestrator orch_asg_exp_test for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh [strategyId=experimental-restake]. Mode: active'
+market-maker-1  | 06:14:11.075 [experimental-restake-strategy] INFO: '[ExperimentalRestakeStrategy] Initiating strategy evaluation for position: FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:14:11.076 [workflow] INFO: '[Workflow] Running step: InitializationCheckStep [positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh]'
+market-maker-1  | 06:14:11.076 [initialization-check-step] INFO: '[InitializationCheckStep] Checking initialization status for position: FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 06:14:11.076 [initialization-check-step] INFO: '[InitializationCheckStep] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh is initialized and active.'
+market-maker-1  | 06:14:11.076 [workflow] INFO: '[Workflow] Running step: ClmmPricingStep [positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh]'
+market-maker-1  | 06:14:11.076 [clmm-pricing-step] INFO: '[ClmmPricingStep] positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh lowerBound=-5880 upperBound=-5876 midPrice=95.2996 geometricAverage=95.2996 effectiveBreakEven=95.2996'
+market-maker-1  | 06:14:11.076 [clmm-pricing-step] INFO: '\n┌────────────────────────────────────────────────────────┐\n│ 🚀 CLMM POSITION PRICING METRICS                       │\n├────────────────────────────────────────────────────────┤\n│ Position ID:      FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh │\n│ Range Bounds:     Bin -5880  to Bin -5876            │\n│ Lower Price:      95.2234    USDC/SOL                 │\n│ Upper Price:      95.3758    USDC/SOL                 │\n│ Mid Price:        95.2996    USDC/SOL                 │\n├────────────────────────────────────────────────────────┤\n│ 📊 AVERAGE ENTRY PRICE CALCULATIONS                    │\n├────────────────────────────────────────────────────────┤\n│ 1. Geometric Average: 95.2996    USDC/SOL        │\n│    (Mathematical space center for Uniswap v3/Meteora) │\n│ 2. Spot Accounting:   95.2996    USDC/SOL        │\n│    (Total cost basis divided by total base assets)    │\n│ 3. Bid-Ask perspective:                                │\n│    Convexity Benefit: 0.0000     USDC             │\n│    (Benefit of range vs single limit order at mid)     │\n│ 4. Effective Break-even:                               │\n│    With Accrued Fees: 95.2996    USDC/SOL        │\n└────────────────────────────────────────────────────────┘'
+market-maker-1  | 06:14:11.076 [workflow] INFO: '[Workflow] Running step: ExperimentalRestakeStep [positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh]'
+market-maker-1  | 06:14:11.076 [experimental-restake-step] INFO: '[ExperimentalRestakeStep] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh. Active bound: -5872'
+market-maker-1  | 06:14:11.077 [lifecycle] INFO: '[Execution Monitor] Strategy re-evaluation successfully recalculated new range bounds for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh.'
+market-maker-1  | 06:14:12.194 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh"
+market-maker-1  | 07:12:01.140 [lifecycle] INFO: '[Tick Loop] Previous execution cycle is still active. Skipping overlapping tick loop. (Active tasks in flight: task_1778652501230_601 [pending_open] for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh)'
+market-maker-1  | 08:10:20.074 [lifecycle] INFO: '[Tick Loop] Previous execution cycle is still active. Skipping overlapping tick loop. (Active tasks in flight: task_1778652501230_601 [pending_open] for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh)'
+market-maker-1  | 09:11:38.475 [lifecycle] INFO: '[Tick Loop] Previous execution cycle is still active. Skipping overlapping tick loop. (Active tasks in flight: task_1778652501230_601 [pending_open] for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh)'
+market-maker-1  | 09:11:38.941 [lifecycle] ERROR: '[Execution Monitor] Rebalance failed during open leg. Cached position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh state updated to FAILED and archived.'
+market-maker-1  | 09:11:38.944 [lifecycle] INFO: '[Tick Loop] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh on chain [solana]'
+market-maker-1  | 09:11:38.944 [lifecycle] INFO: '[Tick Loop] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh is currently locked (active rebalance task in-flight). Skipping evaluation.'
+market-maker-1  | 09:38:52.932 [lifecycle] INFO: '[Execution Monitor] Processing task task_1778652501230_601 (pending_open) for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 09:38:52.939 [lifecycle] WARN: '[Execution Monitor] Auto-Heal: Archived cached position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh as FAILED due to task timeout.'
+```
+
+### Update: Wed May 13 13:30:46 IDT 2026
+
+```text
+market-maker-1  | 06:14:11.076 [initialization-check-step] INFO: '[InitializationCheckStep] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh is initialized and active.'
+market-maker-1  | 06:14:11.076 [workflow] INFO: '[Workflow] Running step: ClmmPricingStep [positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh]'
+market-maker-1  | 06:14:11.076 [clmm-pricing-step] INFO: '[ClmmPricingStep] positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh lowerBound=-5880 upperBound=-5876 midPrice=95.2996 geometricAverage=95.2996 effectiveBreakEven=95.2996'
+market-maker-1  | 06:14:11.076 [clmm-pricing-step] INFO: '\n┌────────────────────────────────────────────────────────┐\n│ 🚀 CLMM POSITION PRICING METRICS                       │\n├────────────────────────────────────────────────────────┤\n│ Position ID:      FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh │\n│ Range Bounds:     Bin -5880  to Bin -5876            │\n│ Lower Price:      95.2234    USDC/SOL                 │\n│ Upper Price:      95.3758    USDC/SOL                 │\n│ Mid Price:        95.2996    USDC/SOL                 │\n├────────────────────────────────────────────────────────┤\n│ 📊 AVERAGE ENTRY PRICE CALCULATIONS                    │\n├────────────────────────────────────────────────────────┤\n│ 1. Geometric Average: 95.2996    USDC/SOL        │\n│    (Mathematical space center for Uniswap v3/Meteora) │\n│ 2. Spot Accounting:   95.2996    USDC/SOL        │\n│    (Total cost basis divided by total base assets)    │\n│ 3. Bid-Ask perspective:                                │\n│    Convexity Benefit: 0.0000     USDC             │\n│    (Benefit of range vs single limit order at mid)     │\n│ 4. Effective Break-even:                               │\n│    With Accrued Fees: 95.2996    USDC/SOL        │\n└────────────────────────────────────────────────────────┘'
+market-maker-1  | 06:14:11.076 [workflow] INFO: '[Workflow] Running step: ExperimentalRestakeStep [positionId=FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh]'
+market-maker-1  | 06:14:11.076 [experimental-restake-step] INFO: '[ExperimentalRestakeStep] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh. Active bound: -5872'
+market-maker-1  | 06:14:11.077 [lifecycle] INFO: '[Execution Monitor] Strategy re-evaluation successfully recalculated new range bounds for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh.'
+market-maker-1  | 06:14:12.194 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh"
+market-maker-1  | 07:12:01.140 [lifecycle] INFO: '[Tick Loop] Previous execution cycle is still active. Skipping overlapping tick loop. (Active tasks in flight: task_1778652501230_601 [pending_open] for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh)'
+market-maker-1  | 08:10:20.074 [lifecycle] INFO: '[Tick Loop] Previous execution cycle is still active. Skipping overlapping tick loop. (Active tasks in flight: task_1778652501230_601 [pending_open] for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh)'
+market-maker-1  | 09:11:38.475 [lifecycle] INFO: '[Tick Loop] Previous execution cycle is still active. Skipping overlapping tick loop. (Active tasks in flight: task_1778652501230_601 [pending_open] for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh)'
+market-maker-1  | 09:11:38.941 [lifecycle] ERROR: '[Execution Monitor] Rebalance failed during open leg. Cached position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh state updated to FAILED and archived.'
+market-maker-1  | 09:11:38.944 [lifecycle] INFO: '[Tick Loop] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh on chain [solana]'
+market-maker-1  | 09:11:38.944 [lifecycle] INFO: '[Tick Loop] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh is currently locked (active rebalance task in-flight). Skipping evaluation.'
+market-maker-1  | 09:38:52.932 [lifecycle] INFO: '[Execution Monitor] Processing task task_1778652501230_601 (pending_open) for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 09:38:52.939 [lifecycle] WARN: '[Execution Monitor] Auto-Heal: Archived cached position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh as FAILED due to task timeout.'
+```
+
+### Update: Wed May 13 14:12:56 IDT 2026
+
+```text
+market-maker-1  | 06:14:12.194 [solana-executor] INFO: "[SolanaExecutor] Applying decision 'open' on position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh"
+market-maker-1  | 07:12:01.140 [lifecycle] INFO: '[Tick Loop] Previous execution cycle is still active. Skipping overlapping tick loop. (Active tasks in flight: task_1778652501230_601 [pending_open] for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh)'
+market-maker-1  | 08:10:20.074 [lifecycle] INFO: '[Tick Loop] Previous execution cycle is still active. Skipping overlapping tick loop. (Active tasks in flight: task_1778652501230_601 [pending_open] for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh)'
+market-maker-1  | 09:11:38.475 [lifecycle] INFO: '[Tick Loop] Previous execution cycle is still active. Skipping overlapping tick loop. (Active tasks in flight: task_1778652501230_601 [pending_open] for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh)'
+market-maker-1  | 09:11:38.941 [lifecycle] ERROR: '[Execution Monitor] Rebalance failed during open leg. Cached position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh state updated to FAILED and archived.'
+market-maker-1  | 09:11:38.944 [lifecycle] INFO: '[Tick Loop] Evaluating position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh on chain [solana]'
+market-maker-1  | 09:11:38.944 [lifecycle] INFO: '[Tick Loop] Position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh is currently locked (active rebalance task in-flight). Skipping evaluation.'
+market-maker-1  | 09:38:52.932 [lifecycle] INFO: '[Execution Monitor] Processing task task_1778652501230_601 (pending_open) for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 09:38:52.939 [lifecycle] WARN: '[Execution Monitor] Auto-Heal: Archived cached position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh as FAILED due to task timeout.'
+```
+
+### Update: Wed May 13 15:02:44 IDT 2026
+
+```text
+market-maker-1  | 09:38:52.932 [lifecycle] INFO: '[Execution Monitor] Processing task task_1778652501230_601 (pending_open) for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 09:38:52.939 [lifecycle] WARN: '[Execution Monitor] Auto-Heal: Archived cached position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh as FAILED due to task timeout.'
+```
+
+### Update: Wed May 13 15:47:32 IDT 2026
+
+```text
+market-maker-1  | 09:38:52.932 [lifecycle] INFO: '[Execution Monitor] Processing task task_1778652501230_601 (pending_open) for position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh'
+market-maker-1  | 09:38:52.939 [lifecycle] WARN: '[Execution Monitor] Auto-Heal: Archived cached position FenYpwghFHta7Cc3bqtHq1RSWCgiaX7zUjgvDZqxu5yh as FAILED due to task timeout.'
+```
+
+### Update: Wed May 13 17:04:55 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 17:48:38 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 18:52:32 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 19:33:03 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 19:48:02 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 19:49:02 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 19:50:02 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 19:51:02 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 19:52:02 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 19:53:03 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 19:54:03 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 19:55:03 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 19:56:03 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 19:57:03 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 19:58:04 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 19:59:04 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:00:04 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:01:04 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:02:04 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:03:04 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:04:05 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:05:05 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:06:05 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:07:05 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:08:05 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:09:05 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:10:06 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:11:06 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:12:06 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:13:06 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:14:06 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:15:07 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:16:07 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:17:07 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:18:07 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:19:07 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:20:07 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:21:08 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:22:08 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:23:08 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:24:08 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:25:08 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:26:09 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:27:09 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:28:09 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:29:09 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:30:09 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:31:09 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:32:10 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:33:10 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:34:10 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:35:10 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:36:10 IDT 2026
+
+```text
+
+```
+
+### Update: Wed May 13 20:37:10 IDT 2026
+
+```text
+
+```
