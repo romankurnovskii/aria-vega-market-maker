@@ -127,3 +127,36 @@ test('JsonFileStore - concurrent saveTask for same position rejects with Atomici
     (err: Error) => err.message.includes('Atomicity Violation')
   );
 });
+
+test('JsonFileStore - RebalanceTask balance snapshot fields and timestamps serialize and deserialize correctly', async () => {
+  const store = new JsonFileStore(TEST_DATA_DIR);
+
+  const taskWithSnapshots: RebalanceTask = {
+    id: 'task_snapshots_1',
+    assignmentId: 'assign_snap_1',
+    status: 'pending_close',
+    originalPositionId: 'pos_snap_1',
+    intent: {
+      positionId: 'pos_snap_1',
+      action: 'close',
+      sourceAssignmentId: 'assign_snap_1',
+      evaluatedAt: 1234567890,
+    },
+    evaluatedAt: 1234567890,
+    events: [],
+    preCloseBalances: { tokenX: '1000', tokenY: '2000', timestamp: 1234567800 },
+    postCloseBalances: { tokenX: '1500', tokenY: '2500', timestamp: 1234567850 },
+    recoveredFunds: { tokenX: '500', tokenY: '500' },
+  };
+
+  await store.saveTask(taskWithSnapshots);
+
+  const saved = await store.getTasks();
+  assert.strictEqual(saved.length, 1);
+
+  const retrieved = saved[0];
+  assert.strictEqual(retrieved.id, 'task_snapshots_1');
+  assert.deepStrictEqual(retrieved.preCloseBalances, { tokenX: '1000', tokenY: '2000', timestamp: 1234567800 });
+  assert.deepStrictEqual(retrieved.postCloseBalances, { tokenX: '1500', tokenY: '2500', timestamp: 1234567850 });
+  assert.deepStrictEqual(retrieved.recoveredFunds, { tokenX: '500', tokenY: '500' });
+});
