@@ -653,37 +653,69 @@ export async function processTasks(
         });
         await tasksStore.saveTask(task);
 
+        let existingRecord: ExecutionRecord | undefined;
+        if (task.newPositionId) {
+          existingRecord = {
+            id: 'idemp_' + task.id,
+            decision: task.intent,
+            txSignatures: [],
+            status: 'success',
+            executedAt: Date.now(),
+            newPositionId: task.newPositionId,
+          };
+        } else {
+          const records = await store.getExecutionRecords();
+          existingRecord = records.find(
+            (r) =>
+              r.decision.sourceAssignmentId === task.assignmentId &&
+              r.decision.action === 'open' &&
+              r.status === 'success' &&
+              r.executedAt >= task.evaluatedAt
+          );
+          if (existingRecord && existingRecord.newPositionId) {
+            task.newPositionId = existingRecord.newPositionId;
+            await tasksStore.saveTask(task);
+          }
+        }
+
         let record: ExecutionRecord;
-        try {
-          record = await executor.apply(task.intent, market, async () => {
-            return { action: 'skip' };
-          });
-          if (record.status === 'failed') {
-            throw new Error(`Open transaction failed: ${record.error}`);
-          }
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          task.events.push({
-            stage: 'ERROR',
-            timestamp: Date.now(),
-            message: `Open transaction failed: ${msg}`,
-            error: msg,
-          });
-          await tasksStore.saveTask(task);
+        if (existingRecord && existingRecord.newPositionId) {
+          logger.info(
+            `[Execution Monitor] Idempotency check: Task ${task.id} already executed (newPositionId: ${existingRecord.newPositionId}). Skipping executor.apply.`
+          );
+          record = existingRecord;
+        } else {
+          try {
+            record = await executor.apply(task.intent, market, async () => {
+              return { action: 'skip' };
+            });
+            if (record.status === 'failed') {
+              throw new Error(`Open transaction failed: ${record.error}`);
+            }
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            task.events.push({
+              stage: 'ERROR',
+              timestamp: Date.now(),
+              message: `Open transaction failed: ${msg}`,
+              error: msg,
+            });
+            await tasksStore.saveTask(task);
 
-          const knownPositions = await positionStore.getKnown();
-          const cachedPos = knownPositions.find((p) => p.id === task.originalPositionId);
-          if (cachedPos) {
-            cachedPos.state = 'FAILED';
-            cachedPos.closedAt = Date.now();
-            await positionStore.archivePosition(cachedPos);
-            await positionStore.saveKnown(knownPositions);
-            logger.error(
-              `[Execution Monitor] Rebalance failed during open leg. Cached position ${cachedPos.id} state updated to FAILED and archived.`
-            );
-          }
+            const knownPositions = await positionStore.getKnown();
+            const cachedPos = knownPositions.find((p) => p.id === task.originalPositionId);
+            if (cachedPos) {
+              cachedPos.state = 'FAILED';
+              cachedPos.closedAt = Date.now();
+              await positionStore.archivePosition(cachedPos);
+              await positionStore.saveKnown(knownPositions);
+              logger.error(
+                `[Execution Monitor] Rebalance failed during open leg. Cached position ${cachedPos.id} state updated to FAILED and archived.`
+              );
+            }
 
-          throw err;
+            throw err;
+          }
         }
 
         await store.saveExecutionRecord(record);
