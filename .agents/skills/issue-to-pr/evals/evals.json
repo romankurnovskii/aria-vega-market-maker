@@ -1,0 +1,35 @@
+{
+  "skill_name": "issue-to-pr",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Review and reproduce the bug described in issue #42 in the api-gateway repository at https://github.com/example/api-gateway/issues/42. The issue claims that the rate limiter is not being applied to authenticated users. Confirm or reject this and post your findings on the issue.",
+      "expected_output": "A comment on the GitHub issue with: 1) reproduction steps and results, 2) root cause analysis, 3) confirmation/rejection of the bug claim, 4) next steps",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "There's an issue in my local project (~/projects/payment-service) about a memory leak in the webhook handler. It's issue #17 in the GitHub repo https://github.com/myorg/payment-service/issues/17. Can you analyze it, try to reproduce the problem, and post your analysis on the issue?",
+      "expected_output": "A detailed GitHub issue comment with reproduction steps showing whether the memory leak exists, root cause if confirmed, and clear confirmation/rejection of the issue claims",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Issue #88 in https://github.com/example/cli-tool/issues/88 reports that 'npm run build' fails on Windows but works on Linux. After confirming this bug exists, create a branch called issue/88-windows-build-fix with a fix and open a PR ready for my review.",
+      "expected_output": "A GitHub PR with: 1) link to issue #88, 2) branch named issue/88-windows-build-fix, 3) code changes with tests, 4) PR description with fix explanation",
+      "files": []
+    },
+    {
+      "id": 4,
+      "prompt": "The user is reporting that database connections are not being released properly in the worker service. I believe this is issue #156 in https://github.com/myorg/backend/issues/156. Please analyze the issue, try to reproduce it, confirm or reject it, and if confirmed fix it with tests and create a PR.",
+      "expected_output": "A GitHub issue comment confirming/rejecting the bug, and if confirmed: a branch with fix, tests that fail without the fix, and a PR",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Can you review issue #23 at https://github.com/example/webapp/issues/23? It's about incorrect timezone handling in the scheduler. Reproduce the bug first, analyze the root cause, and post your findings. If it's a real bug, fix it with proper tests and create a PR.",
+      "expected_output": "Issue comment with reproduction results and root cause analysis, followed by a PR with the fix and tests",
+      "files": []
+    }
+  ]
+}
