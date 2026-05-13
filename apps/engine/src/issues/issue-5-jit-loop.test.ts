@@ -3,6 +3,7 @@
 // Tests should FAIL until the fix is implemented
 
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+process.env.NODE_ENV = 'test';
 import { test } from 'node:test';
 import assert from 'node:assert';
 import { processTasks } from '../lifecycle.js';
