@@ -86,7 +86,7 @@ export interface RebalanceTask {
   evaluatedAt: number;
   events: TaskEvent[];
   lockedAt?: number;
-  preCloseBalances?: { tokenX: string; tokenY: string };
-  postCloseBalances?: { tokenX: string; tokenY: string };
+  preCloseBalances?: { tokenX: string; tokenY: string; timestamp: number };
+  postCloseBalances?: { tokenX: string; tokenY: string; timestamp: number };
   recoveredFunds?: { tokenX: string; tokenY: string };
 }
