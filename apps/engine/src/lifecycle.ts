@@ -28,6 +28,7 @@ import {
   ExecutionRecord,
   Assignment,
   IOrchestrator,
+  PoolInfo,
 } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
@@ -74,25 +75,34 @@ async function getWalletBalances(
   await fetchForProgram(tokenProgramId);
   await fetchForProgram(token2022ProgramId);
 
-  const WSOL_MINT = 'So11111111111111111111111111111111111111112';
-  if (mintX === WSOL_MINT) {
-    try {
-      const nativeBal = await connection.getBalance(new PublicKey(walletAddress));
-      amountX = nativeBal.toString();
-    } catch (e) {
-      logger.warn(`[getWalletBalances] Failed to fetch native balance for mintX: ${e}`);
-    }
-  }
-  if (mintY === WSOL_MINT) {
-    try {
-      const nativeBal = await connection.getBalance(new PublicKey(walletAddress));
-      amountY = nativeBal.toString();
-    } catch (e) {
-      logger.warn(`[getWalletBalances] Failed to fetch native balance for mintY: ${e}`);
-    }
-  }
+  // NOTE: WSOL (wrapped SOL) should use its ATA balance directly. Do NOT replace with native SOL balance.
+  // Previously the function overwrote WSOL amounts with native SOL balances, causing incorrect deposit amounts.
+  // This has been removed to correctly use the ATA balance fetched above via getParsedTokenAccountsByOwner.
 
   return { amountX, amountY };
+}
+
+async function calculateRecoveredFunds(
+  task: RebalanceTask,
+  rpcPool: IRpcProvider,
+  walletAddress: string,
+  poolInfo: PoolInfo,
+  tasksStore: { saveTask: (t: RebalanceTask) => Promise<void> }
+): Promise<void> {
+  if (!task.preCloseBalances) return;
+  const currentBalances = await rpcPool.execute(async (connection: Connection) => {
+    return await getWalletBalances(connection, walletAddress, poolInfo.tokenXAddress, poolInfo.tokenYAddress);
+  });
+  const deltaX = BigInt(currentBalances.amountX) - BigInt(task.preCloseBalances.tokenX);
+  const deltaY = BigInt(currentBalances.amountY) - BigInt(task.preCloseBalances.tokenY);
+  task.recoveredFunds = {
+    tokenX: deltaX > 0n ? deltaX.toString() : '0',
+    tokenY: deltaY > 0n ? deltaY.toString() : '0',
+  };
+  logger.info(
+    `[Execution Monitor] Crash recovery detected. Recovered funds: X=${task.recoveredFunds.tokenX}, Y=${task.recoveredFunds.tokenY}`
+  );
+  await tasksStore.saveTask(task);
 }
 /**
  * Starts the one-time position discovery cycle.
@@ -355,6 +365,11 @@ export async function processTasks(
         };
 
         // --- Log CLOSE_BROADCAST ---
+        task.preCloseBalances = {
+          tokenX: initialBalances.amountX,
+          tokenY: initialBalances.amountY,
+          timestamp: Date.now(),
+        };
         task.events.push({
           stage: 'CLOSE_BROADCAST',
           timestamp: Date.now(),
@@ -375,6 +390,7 @@ export async function processTasks(
               logger.warn(
                 `[Execution Monitor] Position ${task.originalPositionId} was not found on-chain (already closed). Proceeding with rebalance flow.`
               );
+              await calculateRecoveredFunds(task, rpcPool, walletAddress, poolInfo, tasksStore);
               record = { status: 'success' as const, txSignatures: [] };
             } else {
               throw new Error(`Close transaction failed: ${record.error}`);
@@ -386,6 +402,7 @@ export async function processTasks(
             logger.warn(
               `[Execution Monitor] Position ${task.originalPositionId} was not found on-chain (already closed). Proceeding with rebalance flow.`
             );
+            await calculateRecoveredFunds(task, rpcPool, walletAddress, poolInfo, tasksStore);
             record = { status: 'success' as const, txSignatures: [] };
           } else {
             task.events.push({
@@ -653,37 +670,70 @@ export async function processTasks(
         });
         await tasksStore.saveTask(task);
 
+        let existingRecord: ExecutionRecord | undefined;
+        if (task.newPositionId) {
+          existingRecord = {
+            id: 'idemp_' + task.id,
+            decision: task.intent,
+            txSignatures: [],
+            status: 'success',
+            executedAt: Date.now(),
+            newPositionId: task.newPositionId,
+            recordVersion: 1,
+          };
+        } else {
+          const records = await store.getExecutionRecords();
+          existingRecord = records.find(
+            (r) =>
+              r.decision.sourceAssignmentId === task.assignmentId &&
+              r.decision.action === 'open' &&
+              r.status === 'success' &&
+              r.executedAt >= task.evaluatedAt
+          );
+          if (existingRecord && existingRecord.newPositionId) {
+            task.newPositionId = existingRecord.newPositionId;
+            await tasksStore.saveTask(task);
+          }
+        }
+
         let record: ExecutionRecord;
-        try {
-          record = await executor.apply(task.intent, market, async () => {
-            return { action: 'skip' };
-          });
-          if (record.status === 'failed') {
-            throw new Error(`Open transaction failed: ${record.error}`);
-          }
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          task.events.push({
-            stage: 'ERROR',
-            timestamp: Date.now(),
-            message: `Open transaction failed: ${msg}`,
-            error: msg,
-          });
-          await tasksStore.saveTask(task);
+        if (existingRecord && existingRecord.newPositionId) {
+          logger.info(
+            `[Execution Monitor] Idempotency check: Task ${task.id} already executed (newPositionId: ${existingRecord.newPositionId}). Skipping executor.apply.`
+          );
+          record = existingRecord;
+        } else {
+          try {
+            record = await executor.apply(task.intent, market, async () => {
+              return { action: 'skip' };
+            });
+            if (record.status === 'failed') {
+              throw new Error(`Open transaction failed: ${record.error}`);
+            }
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            task.events.push({
+              stage: 'ERROR',
+              timestamp: Date.now(),
+              message: `Open transaction failed: ${msg}`,
+              error: msg,
+            });
+            await tasksStore.saveTask(task);
 
-          const knownPositions = await positionStore.getKnown();
-          const cachedPos = knownPositions.find((p) => p.id === task.originalPositionId);
-          if (cachedPos) {
-            cachedPos.state = 'FAILED';
-            cachedPos.closedAt = Date.now();
-            await positionStore.archivePosition(cachedPos);
-            await positionStore.saveKnown(knownPositions);
-            logger.error(
-              `[Execution Monitor] Rebalance failed during open leg. Cached position ${cachedPos.id} state updated to FAILED and archived.`
-            );
-          }
+            const knownPositions = await positionStore.getKnown();
+            const cachedPos = knownPositions.find((p) => p.id === task.originalPositionId);
+            if (cachedPos) {
+              cachedPos.state = 'FAILED';
+              cachedPos.closedAt = Date.now();
+              await positionStore.archivePosition(cachedPos);
+              await positionStore.saveKnown(knownPositions);
+              logger.error(
+                `[Execution Monitor] Rebalance failed during open leg. Cached position ${cachedPos.id} state updated to FAILED and archived.`
+              );
+            }
 
-          throw err;
+            throw err;
+          }
         }
 
         await store.saveExecutionRecord(record);
