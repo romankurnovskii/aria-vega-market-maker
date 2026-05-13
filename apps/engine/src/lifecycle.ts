@@ -78,7 +78,7 @@ async function getWalletBalances(
   if (mintX === WSOL_MINT) {
     try {
       const nativeBal = await connection.getBalance(new PublicKey(walletAddress));
-      amountX = nativeBal.toString();
+      amountX = (BigInt(amountX) + nativeBal).toString();
     } catch (e) {
       logger.warn(`[getWalletBalances] Failed to fetch native balance for mintX: ${e}`);
     }
@@ -86,7 +86,7 @@ async function getWalletBalances(
   if (mintY === WSOL_MINT) {
     try {
       const nativeBal = await connection.getBalance(new PublicKey(walletAddress));
-      amountY = nativeBal.toString();
+      amountY = (BigInt(amountY) + nativeBal).toString();
     } catch (e) {
       logger.warn(`[getWalletBalances] Failed to fetch native balance for mintY: ${e}`);
     }

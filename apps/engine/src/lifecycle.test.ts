@@ -1003,3 +1003,103 @@ test('processTasks - Issue 4: Duplicate Position After Rebalance (Failed cache u
   // Under correct error handling, the task MUST NOT be deleted if saveKnown fails
   assert.strictEqual(m.tasks.length, 1, 'Task should not be deleted if saving known positions fails');
 });
+
+test('processTasks - Issue 13: WSOL ATA balance combined with native SOL', async () => {
+  const m = createMocks();
+
+  const WSOL_MINT = 'So11111111111111111111111111111111111111112';
+
+  m.positionProvider.getPoolInfo = async (_poolAddress): Promise<PoolInfo> => {
+    return {
+      poolAddress: MOCK_PUBKEY_2,
+      chain: 'solana',
+      protocol: 'meteora_dlmm',
+      feeRate: 100,
+      activeBound: 1000,
+      tokenXAddress: WSOL_MINT,
+      tokenYAddress: MOCK_PUBKEY_3,
+    };
+  };
+
+  m.rpcPool.execute = async (fn) => {
+    const mockConnection = {
+      getParsedTokenAccountsByOwner: async () => {
+        return {
+          value: [
+            {
+              account: {
+                data: {
+                  parsed: {
+                    info: {
+                      mint: WSOL_MINT,
+                      tokenAmount: { amount: '5000000000' },
+                    },
+                  },
+                },
+              },
+            },
+            {
+              account: {
+                data: {
+                  parsed: {
+                    info: {
+                      mint: MOCK_PUBKEY_3,
+                      tokenAmount: { amount: '2000000000' },
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        };
+      },
+      getBalance: async () => BigInt('1000000000'),
+    };
+    return fn(mockConnection as any);
+  };
+
+  const decision: Decision = {
+    positionId: MOCK_PUBKEY_1,
+    action: 'close+open',
+    openParams: {
+      poolAddress: MOCK_PUBKEY_2,
+      lowerBound: 1.0,
+      upperBound: 2.0,
+      tokenXAmount: '500',
+      tokenYAmount: '500',
+    },
+    sourceAssignmentId: 'assign_123',
+    evaluatedAt: Date.now(),
+  };
+
+  const task: RebalanceTask = {
+    id: 'task_wsol',
+    assignmentId: 'assign_123',
+    status: 'pending_close',
+    originalPositionId: MOCK_PUBKEY_1,
+    intent: decision,
+    evaluatedAt: Date.now(),
+    events: [{ stage: 'INIT', timestamp: Date.now(), message: 'Init task' }],
+  };
+
+  m.tasks.push(task);
+
+  m.knownPositions.push({
+    id: MOCK_PUBKEY_1,
+    poolAddress: MOCK_PUBKEY_2,
+    chain: 'solana',
+    protocol: 'meteora_dlmm',
+    lowerBound: 1.0,
+    upperBound: 2.0,
+    tokenX: { tokenAddress: WSOL_MINT, mint: WSOL_MINT, decimals: 9, amount: '0' },
+    tokenY: { tokenAddress: MOCK_PUBKEY_3, mint: MOCK_PUBKEY_3, decimals: 6, amount: '0' },
+    isInRange: true,
+    openedAt: Date.now(),
+    metadata: {},
+  });
+
+  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
+
+  assert.strictEqual(task.status, 'awaiting_settlement');
+  assert.ok(task.events?.some((e) => e.stage === 'SETTLEMENT_POLLING'));
+});
