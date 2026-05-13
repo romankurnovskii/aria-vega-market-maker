@@ -28,6 +28,7 @@ import {
   ExecutionRecord,
   Assignment,
   IOrchestrator,
+  PoolInfo,
 } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
@@ -74,25 +75,34 @@ async function getWalletBalances(
   await fetchForProgram(tokenProgramId);
   await fetchForProgram(token2022ProgramId);
 
-  const WSOL_MINT = 'So11111111111111111111111111111111111111112';
-  if (mintX === WSOL_MINT) {
-    try {
-      const nativeBal = await connection.getBalance(new PublicKey(walletAddress));
-      amountX = nativeBal.toString();
-    } catch (e) {
-      logger.warn(`[getWalletBalances] Failed to fetch native balance for mintX: ${e}`);
-    }
-  }
-  if (mintY === WSOL_MINT) {
-    try {
-      const nativeBal = await connection.getBalance(new PublicKey(walletAddress));
-      amountY = nativeBal.toString();
-    } catch (e) {
-      logger.warn(`[getWalletBalances] Failed to fetch native balance for mintY: ${e}`);
-    }
-  }
+  // NOTE: WSOL (wrapped SOL) should use its ATA balance directly. Do NOT replace with native SOL balance.
+  // Previously the function overwrote WSOL amounts with native SOL balances, causing incorrect deposit amounts.
+  // This has been removed to correctly use the ATA balance fetched above via getParsedTokenAccountsByOwner.
 
   return { amountX, amountY };
+}
+
+async function calculateRecoveredFunds(
+  task: RebalanceTask,
+  rpcPool: IRpcProvider,
+  walletAddress: string,
+  poolInfo: PoolInfo,
+  tasksStore: { saveTask: (t: RebalanceTask) => Promise<void> }
+): Promise<void> {
+  if (!task.preCloseBalances) return;
+  const currentBalances = await rpcPool.execute(async (connection: Connection) => {
+    return await getWalletBalances(connection, walletAddress, poolInfo.tokenXAddress, poolInfo.tokenYAddress);
+  });
+  const deltaX = BigInt(currentBalances.amountX) - BigInt(task.preCloseBalances.tokenX);
+  const deltaY = BigInt(currentBalances.amountY) - BigInt(task.preCloseBalances.tokenY);
+  task.recoveredFunds = {
+    tokenX: deltaX > 0n ? deltaX.toString() : '0',
+    tokenY: deltaY > 0n ? deltaY.toString() : '0',
+  };
+  logger.info(
+    `[Execution Monitor] Crash recovery detected. Recovered funds: X=${task.recoveredFunds.tokenX}, Y=${task.recoveredFunds.tokenY}`
+  );
+  await tasksStore.saveTask(task);
 }
 /**
  * Starts the one-time position discovery cycle.
@@ -380,21 +390,7 @@ export async function processTasks(
               logger.warn(
                 `[Execution Monitor] Position ${task.originalPositionId} was not found on-chain (already closed). Proceeding with rebalance flow.`
               );
-              if (task.preCloseBalances) {
-                const currentBalances = await rpcPool.execute(async (connection: Connection) => {
-                  return await getWalletBalances(connection, walletAddress, poolInfo.tokenXAddress, poolInfo.tokenYAddress);
-                });
-                const deltaX = BigInt(currentBalances.amountX) - BigInt(task.preCloseBalances.tokenX);
-                const deltaY = BigInt(currentBalances.amountY) - BigInt(task.preCloseBalances.tokenY);
-                task.recoveredFunds = {
-                  tokenX: deltaX > 0n ? deltaX.toString() : '0',
-                  tokenY: deltaY > 0n ? deltaY.toString() : '0',
-                };
-                logger.info(
-                  `[Execution Monitor] Crash recovery detected. Recovered funds: X=${task.recoveredFunds.tokenX}, Y=${task.recoveredFunds.tokenY}`
-                );
-                await tasksStore.saveTask(task);
-              }
+              await calculateRecoveredFunds(task, rpcPool, walletAddress, poolInfo, tasksStore);
               record = { status: 'success' as const, txSignatures: [] };
             } else {
               throw new Error(`Close transaction failed: ${record.error}`);
@@ -406,21 +402,7 @@ export async function processTasks(
             logger.warn(
               `[Execution Monitor] Position ${task.originalPositionId} was not found on-chain (already closed). Proceeding with rebalance flow.`
             );
-            if (task.preCloseBalances) {
-              const currentBalances = await rpcPool.execute(async (connection: Connection) => {
-                return await getWalletBalances(connection, walletAddress, poolInfo.tokenXAddress, poolInfo.tokenYAddress);
-              });
-              const deltaX = BigInt(currentBalances.amountX) - BigInt(task.preCloseBalances.tokenX);
-              const deltaY = BigInt(currentBalances.amountY) - BigInt(task.preCloseBalances.tokenY);
-              task.recoveredFunds = {
-                tokenX: deltaX > 0n ? deltaX.toString() : '0',
-                tokenY: deltaY > 0n ? deltaY.toString() : '0',
-              };
-              logger.info(
-                `[Execution Monitor] Crash recovery detected. Recovered funds: X=${task.recoveredFunds.tokenX}, Y=${task.recoveredFunds.tokenY}`
-              );
-              await tasksStore.saveTask(task);
-            }
+            await calculateRecoveredFunds(task, rpcPool, walletAddress, poolInfo, tasksStore);
             record = { status: 'success' as const, txSignatures: [] };
           } else {
             task.events.push({

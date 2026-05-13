@@ -87,7 +87,10 @@ export interface RebalanceTask {
   evaluatedAt: number;
   events: TaskEvent[];
   lockedAt?: number;
+  /** Snapshot of token balances taken immediately prior to broadcasting close transaction */
   preCloseBalances?: { tokenX: string; tokenY: string; timestamp: number };
+  /** Snapshot of token balances taken immediately after close transaction confirmation */
   postCloseBalances?: { tokenX: string; tokenY: string; timestamp: number };
+  /** Capital delta successfully attributed during crash recovery when on-chain position is already closed */
   recoveredFunds?: { tokenX: string; tokenY: string };
 }
