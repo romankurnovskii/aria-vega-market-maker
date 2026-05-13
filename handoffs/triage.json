@@ -1,0 +1,24 @@
+{
+  "skill": "issue-triage",
+  "timestamp": "2026-05-13T23:55:30+03:00",
+  "issue_url": "https://github.com/romankurnovskii/aria-vega-market-maker/issues/12",
+  "verdict": "confirmed",
+  "confidence": "high",
+  "summary": "Bug confirmed: SolanaExecutor.close() skips fee claiming by setting shouldClaimAndClose: false in buildRemoveLiquidityTransactions (line 113). This causes accrued trading fees to become unrecoverable on every rebalance cycle.",
+  "root_cause_hypothesis": "The close action in solana-executor.ts (lines 107-114) calls buildRemoveLiquidityTransactions with shouldClaimAndClose: false, which skips both fee claiming and PDA closure. While a separate closePosition() call exists (lines 130-143), it only closes the empty position PDA - fees have already been forfeited at the removeLiquidity step.",
+  "relevant_files": [
+    "packages/executor/src/solana-executor.ts:107-150",
+    "packages/providers/src/meteora/meteora-onchain-provider.ts:96-127"
+  ],
+  "gaps_found": [
+    "No buildClaimFeesTransactions call before buildRemoveLiquidityTransactions",
+    "The 'close' action path does not claim accumulated swap fees before removing liquidity",
+    "Missing documentation explaining why shouldClaimAndClose: false was chosen"
+  ],
+  "new_bugs_risk": [
+    "Option A (shouldClaimAndClose: true): Risk of transaction failure due to rounding errors, potentially blocking the entire close operation",
+    "Option B (Explicit Sequence): Lower risk but requires 3 separate transactions; fees may not accumulate if position is new"
+  ],
+  "rejected_reason": null,
+  "recommended_approach": "Implement Option B (Explicit Sequence): 1) Add buildClaimFeesTransactions call before buildRemoveLiquidityTransactions, 2) Keep removeLiquidity with shouldClaimAndClose: false, 3) Keep closePosition call (already exists). This follows Meteora SDK best practices and provides better error isolation than Option A."
+}

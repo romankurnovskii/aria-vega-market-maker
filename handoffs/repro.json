@@ -1,0 +1,64 @@
+{
+  "skill": "issue-reproduce",
+  "timestamp": "2026-05-14T00:09:00+03:00",
+  "issue_url": "https://github.com/romankurnovskii/aria-vega-market-maker/issues/12",
+  "triage_used": true,
+  "repro_confirmed": true,
+  "repro_steps": [
+    "1. Call SolanaExecutor.apply() with decision.action = 'close'",
+    "2. Observe that provider.buildRemoveLiquidityTransactions is called with shouldClaimAndClose: false",
+    "3. Note that provider.buildClaimFeesTransactions is NEVER called",
+    "4. Fees accrued in the position are silently forfeited"
+  ],
+  "repro_environment": {
+    "os": "darwin",
+    "runtime": "Node.js with TypeScript",
+    "framework": "Node.js native test runner (node:test)"
+  },
+  "test_file_path": "apps/engine/src/solana-executor-issue-12.test.ts",
+  "failing_tests": [
+    {
+      "name": "ISSUE #12: SolanaExecutor.close should claim fees before removing liquidity",
+      "expected": "buildClaimFeesTransactions called before buildRemoveLiquidityTransactions",
+      "actual": "buildClaimFeesTransactions is NOT called - fees are skipped"
+    },
+    {
+      "name": "ISSUE #12: Edge case - no fees accumulated should not cause error",
+      "expected": "Claim fee operation succeeds even with zero fees",
+      "actual": "Cannot verify since claimFees is never called"
+    }
+  ],
+  "edge_cases": [
+    {
+      "description": "Position with zero accumulated fees",
+      "expected_behavior": "claimFees should succeed (no-op on Meteora if no fees)",
+      "covered": true
+    },
+    {
+      "description": "Position with significant accumulated fees",
+      "expected_behavior": "All accrued fees should be claimed before liquidity removal",
+      "covered": true
+    },
+    {
+      "description": "close+open action (rebalance)",
+      "expected_behavior": "Should throw error (must use task intent architecture)",
+      "covered": true
+    },
+    {
+      "description": "Non-existent position ID",
+      "expected_behavior": "Should throw clear error 'not found on-chain'",
+      "covered": false
+    }
+  ],
+  "caveats": [
+    "Tests mock the provider methods to track call order rather than testing real Meteora SDK behavior",
+    "Actual execution will fail with mock RPC pool - this is expected, we only verify call order",
+    "Test must be compiled before running: npx tsc in apps/engine directory",
+    "Test runner command: node --test dist/src/solana-executor-issue-12.test.js"
+  ],
+  "out_of_scope": [
+    "Integration test with real Meteora SDK on devnet",
+    "Performance testing of sequential vs atomic transaction approaches",
+    "Adding retry logic for failed fee claims"
+  ]
+}
