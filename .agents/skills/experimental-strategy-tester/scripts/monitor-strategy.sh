@@ -9,6 +9,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="$SCRIPT_DIR/../logs"
 PID_DIR="$LOG_DIR/pids"
 
+# Derive project root (two levels up from script: .agents/skills/experimental-strategy-tester/scripts/)
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+DOCKER_COMPOSE="$PROJECT_ROOT/docker-compose.dev.yml"
+
 POSITION_ID="${1:?Usage: $0 <POSITION_ID> [ACTION] [REPORT_FILE]}"
 ACTION="${2:-start}"
 REPORT_FILE="${3:-}"
@@ -23,11 +27,18 @@ STDERR_LOG="$LOG_DIR/monitor-${POSITION_ID}.err"
 
 mkdir -p "$PID_DIR"
 
+running=1
+cleanup() {
+  echo "Received signal, shutting down gracefully..." >> "$REPORT_FILE"
+  running=0
+}
+trap cleanup SIGTERM SIGINT SIGHUP
+
 case "$ACTION" in
   start)
     # Detect any existing monitor process for this position (excluding self)
-    if pgrep -f "[m]onitor-strategy\.sh.*$POSITION_ID" >/dev/null 2>&1; then
-      for pid in $(pgrep -f "[m]onitor-strategy\.sh.*$POSITION_ID"); do
+    if pgrep -f "[m]onitor-strategy\.sh[[:space:]].* $POSITION_ID " >/dev/null 2>&1; then
+      for pid in $(pgrep -f "[m]onitor-strategy\.sh[[:space:]].* $POSITION_ID "); do
         if [ "$pid" -ne $$ ]; then
           echo "ERROR: A monitor for position $POSITION_ID is already running (PID $pid). Use '$0 $POSITION_ID status' to check or '$0 $POSITION_ID stop' to stop it."
           exit 1
@@ -40,6 +51,11 @@ case "$ACTION" in
       exit 1
     fi
 
+    if [ ! -f "$DOCKER_COMPOSE" ]; then
+      echo "ERROR: docker-compose file not found at $DOCKER_COMPOSE"
+      exit 1
+    fi
+
     echo "=== Starting monitor for position $POSITION_ID at $(date) ===" > "$REPORT_FILE"
     echo "Logs: $REPORT_FILE" | tee -a "$REPORT_FILE"
 
@@ -48,12 +64,13 @@ case "$ACTION" in
 
     # daemonize
     nohup bash -c "
-      echo \"Monitor started with PID \$\$ at \$(date)\" >> \"$STDOUT_LOG\"
-      while true; do
+      trap 'exit 0' SIGTERM SIGINT SIGHUP
+      echo \"Monitor started with PID \$ at \$(date)\" >> \"$STDOUT_LOG\"
+      while [ \$running -eq 1 ]; do
         echo '' >> \"$REPORT_FILE\"
         echo \"### Update: \$(date)\" >> \"$REPORT_FILE\"
         echo '\`\`\`text' >> \"$REPORT_FILE\"
-        docker compose -f /Users/r/dev/github/aria-vega-market-maker/docker-compose.dev.yml logs --tail 50 market-maker 2>/dev/null | grep \"$POSITION_ID\" >> \"$REPORT_FILE\" || true
+        docker compose -f \"$DOCKER_COMPOSE\" logs --tail 50 market-maker 2>/dev/null | grep -F \"$POSITION_ID\" >> \"$REPORT_FILE\" || true
         echo '\`\`\`' >> \"$REPORT_FILE\"
         sleep 60
       done

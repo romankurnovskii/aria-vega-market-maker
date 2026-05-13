@@ -46,12 +46,6 @@ docker compose -f docker-compose.dev.yml up --build -d
 - **Trace the Lineage**: When the framework closes the target position and spawns a new one (via `close+open`), update the monitoring database and logs to track the new child position ID as the direct successor.
 - **Do Not Auto-Associate**: Never bind the strategy to other unrelated active positions found in the wallet. If the target position is no longer active and has no pending child task, halt and ask for user confirmation.
 
-### 4. Position Lineage & Single-Target Enforcement (CRITICAL)
-
-- **Enforce Single Target**: Strictly monitor ONLY the specific target position ID requested by the user, and any child positions dynamically spawned from it.
-- **Trace the Lineage**: When the framework closes the target position and spawns a new one (via `close+open`), update the monitoring database and logs to track the new child position ID as the direct successor.
-- **Do Not Auto-Associate**: Never bind the strategy to other unrelated active positions found in the wallet. If the target position is no longer active and has no pending child task, halt and ask for user confirmation.
-
 ### 5. Continuous Log Monitoring (Managed Scripts)
 
 Use the managed monitoring scripts with proper process lifecycle control:

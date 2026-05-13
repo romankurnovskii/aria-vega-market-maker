@@ -9,11 +9,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="$SCRIPT_DIR/../logs"
 PID_DIR="$LOG_DIR/pids"
 
+# Derive project root (two levels up from script: .agents/skills/experimental-strategy-tester/scripts/)
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+DATA_DIR="$PROJECT_ROOT/data"
+DOCKER_COMPOSE="$PROJECT_ROOT/docker-compose.dev.yml"
+
 ASSIGNMENT_ID="${1:?Usage: $0 <ASSIGNMENT_ID> {start\|stop\|restart\|status\|logs\|clean\} [REPORT_FILE]}"
 ACTION="${2:-start}"
 REPORT_FILE="${3:-}"
-
-DATA_DIR="/Users/r/dev/github/aria-vega-market-maker/data"
 
 if [ -z "$REPORT_FILE" ]; then
   REPORT_FILE="$LOG_DIR/execution-report-dynamic-${ASSIGNMENT_ID}-$(date +%Y%m%d-%H%M%S).md"
@@ -25,20 +28,14 @@ STDERR_LOG="$LOG_DIR/monitor-dynamic-${ASSIGNMENT_ID}.err"
 
 mkdir -p "$PID_DIR"
 
-get_initial_position_id() {
-  node -e "
-    const fs = require('fs');
-    try {
-      const files = fs.readdirSync('$DATA_DIR').filter(f => f.endsWith('_assignments.json'));
-      if (files.length === 0) { process.exit(0); }
-      const data = JSON.parse(fs.readFileSync('$DATA_DIR/' + files[0], 'utf8'));
-      const asg = data.find(a => a.id === '$ASSIGNMENT_ID');
-      console.log(asg ? asg.positionId : '');
-    } catch (e) { console.log(''); }
-  "
+running=1
+cleanup() {
+  echo "Received signal, shutting down gracefully..." >> "$REPORT_FILE"
+  running=0
 }
+trap cleanup SIGTERM SIGINT SIGHUP
 
-get_current_position_id() {
+get_initial_position_id() {
   node -e "
     const fs = require('fs');
     try {
@@ -54,8 +51,8 @@ get_current_position_id() {
 case "$ACTION" in
   start)
     # Detect any existing dynamic monitor process for this assignment (excluding self)
-    if pgrep -f "[m]onitor-strategy-dynamic\.sh.*$ASSIGNMENT_ID" >/dev/null 2>&1; then
-      for pid in $(pgrep -f "[m]onitor-strategy-dynamic\.sh.*$ASSIGNMENT_ID"); do
+    if pgrep -f "[m]onitor-strategy-dynamic\.sh[[:space:]].* $ASSIGNMENT_ID " >/dev/null 2>&1; then
+      for pid in $(pgrep -f "[m]onitor-strategy-dynamic\.sh[[:space:]].* $ASSIGNMENT_ID "); do
         if [ "$pid" -ne $$ ]; then
           echo "ERROR: A dynamic monitor for assignment $ASSIGNMENT_ID is already running (PID $pid). Use '$0 $ASSIGNMENT_ID status' to check or '$0 $ASSIGNMENT_ID stop' to stop it."
           exit 1
@@ -74,6 +71,11 @@ case "$ACTION" in
       exit 1
     fi
 
+    if [ ! -f "$DOCKER_COMPOSE" ]; then
+      echo "ERROR: docker-compose file not found at $DOCKER_COMPOSE"
+      exit 1
+    fi
+
     echo "=== Starting dynamic monitor for assignment $ASSIGNMENT_ID at $(date) ===" > "$REPORT_FILE"
     echo "Initial Position: $INITIAL_POSITION_ID" | tee -a "$REPORT_FILE"
 
@@ -82,10 +84,11 @@ case "$ACTION" in
 
     # daemonize
     nohup bash -c "
-      DECLARED_LINEAGE=(\"${INITIAL_POSITION_ID}\")
-      echo \"Dynamic monitor started with PID \$\$ at \$(date)\" >> \"$STDOUT_LOG\"
+      trap 'exit 0' SIGTERM SIGINT SIGHUP
+      DECLARED_LINEAGE=(\"\${INITIAL_POSITION_ID}\")
+      echo \"Dynamic monitor started with PID \$ at \$(date)\" >> \"$STDOUT_LOG\"
 
-      while true; do
+      while [ \$running -eq 1 ]; do
         CURRENT_POSITION_ID=\$(get_initial_position_id 2>/dev/null || true)
 
         if [ -n \"\$CURRENT_POSITION_ID\" ]; then
@@ -97,6 +100,10 @@ case "$ACTION" in
             DECLARED_LINEAGE+=(\"\$CURRENT_POSITION_ID\")
             echo \"\n### Lineage updated: Added \$CURRENT_POSITION_ID at \$(date)\" >> \"$REPORT_FILE\"
           fi
+        else
+          # No assignment data found, exit gracefully
+          echo \"No assignment data found. Exiting.\" >> \"$REPORT_FILE\"
+          exit 0
         fi
 
         echo '' >> \"$REPORT_FILE\"
@@ -108,7 +115,7 @@ case "$ACTION" in
           if [ -z \"\$GREP_PATTERN\" ]; then GREP_PATTERN=\"\$pos\"; else GREP_PATTERN=\"\$GREP_PATTERN|\$pos\"; fi
         done
 
-        docker compose -f /Users/r/dev/github/aria-vega-market-maker/docker-compose.dev.yml logs --tail 100 market-maker 2>/dev/null | grep -E \"\$GREP_PATTERN\" >> \"$REPORT_FILE\" || true
+        docker compose -f \"$DOCKER_COMPOSE\" logs --tail 100 market-maker 2>/dev/null | grep -E \"\$GREP_PATTERN\" >> \"$REPORT_FILE\" || true
         echo '\`\`\`' >> \"$REPORT_FILE\"
         sleep 60
       done

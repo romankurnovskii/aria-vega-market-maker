@@ -679,11 +679,13 @@ export async function processTasks(
         }
 
         let record: ExecutionRecord;
+        let wasIdempotentSkip = false;
         if (existingRecord && existingRecord.newPositionId) {
           logger.info(
             `[Execution Monitor] Idempotency check: Task ${task.id} already executed (newPositionId: ${existingRecord.newPositionId}). Skipping executor.apply.`
           );
           record = existingRecord;
+          wasIdempotentSkip = true;
         } else {
           try {
             record = await executor.apply(task.intent, market, async () => {
@@ -718,7 +720,9 @@ export async function processTasks(
           }
         }
 
-        await store.saveExecutionRecord(record);
+        if (!wasIdempotentSkip) {
+          await store.saveExecutionRecord(record);
+        }
 
         logger.info(`[Execution Monitor] 🎉 SUCCESS: RebalanceTask ${task.id} has successfully completed!`);
         logger.info(
