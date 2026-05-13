@@ -251,7 +251,6 @@ export class JsonFileStore implements IStore {
         );
       }
 
-      task.locked = true;
       task.lockedAt = task.lockedAt ?? Date.now();
 
       const index = tasks.findIndex((t) => t.id === task.id);
