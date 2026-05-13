@@ -1004,7 +1004,7 @@ test('processTasks - Issue 4: Duplicate Position After Rebalance (Failed cache u
   assert.strictEqual(m.tasks.length, 1, 'Task should not be deleted if saving known positions fails');
 });
 
-test('processTasks - Issue 13: WSOL ATA balance combined with native SOL', async () => {
+test('processTasks - Issue 13: WSOL uses ATA balance exclusively (not native SOL)', async () => {
   const m = createMocks();
 
   const WSOL_MINT = 'So11111111111111111111111111111111111111112';
