@@ -348,7 +348,13 @@ export async function processTasks(
           logger.info(`[Execution Monitor] Position ${task.originalPositionId} state updated to ${cachedPos.state}`);
         }
 
-        logger.info(`[Execution Monitor] Executing CLOSE transaction for task ${task.id}...`);
+        task.expectedDeltaX = cachedPos.tokenX.amount;
+        task.expectedDeltaY = cachedPos.tokenY.amount;
+
+        logger.info(
+          `[Execution Monitor] Executing CLOSE transaction for task ${task.id}... ` +
+            `(expectedDeltaX=${task.expectedDeltaX}, expectedDeltaY=${task.expectedDeltaY})`
+        );
         const closeDecision: Decision = {
           ...task.intent,
           action: 'close' as const,
@@ -452,7 +458,15 @@ export async function processTasks(
         await tasksStore.saveTask(task);
 
         const solanaExecutor = executor as unknown as {
-          pollBalances?: (tx: string, ty: string, w: string, ix: bigint, iy: bigint) => Promise<void>;
+          pollBalances?: (
+            tx: string,
+            ty: string,
+            w: string,
+            ix: bigint,
+            iy: bigint,
+            timeoutMs?: number,
+            options?: { expectedDeltaX?: bigint; expectedDeltaY?: bigint }
+          ) => Promise<void>;
         };
         if (solanaExecutor.pollBalances && record && record.txSignatures && record.txSignatures.length > 0) {
           await solanaExecutor.pollBalances(
@@ -460,7 +474,12 @@ export async function processTasks(
             poolInfo.tokenYAddress,
             walletAddress,
             BigInt(initialBalances.amountX),
-            BigInt(initialBalances.amountY)
+            BigInt(initialBalances.amountY),
+            undefined, // default timeout
+            {
+              expectedDeltaX: task.expectedDeltaX ? BigInt(task.expectedDeltaX) : undefined,
+              expectedDeltaY: task.expectedDeltaY ? BigInt(task.expectedDeltaY) : undefined,
+            }
           );
         } else {
           logger.info(

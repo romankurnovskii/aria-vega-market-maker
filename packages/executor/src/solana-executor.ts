@@ -364,7 +364,7 @@ export class SolanaExecutor implements IExecutor {
   }
 
   /**
-   * Polls the wallet's token balances until at least one of them increases, indicating settlement.
+   * Polls the wallet's token balances until expected minimum deltas are met, indicating settlement.
    *
    * @param {string} tokenXAddress - Token X mint pubkey.
    * @param {string} tokenYAddress - Token Y mint pubkey.
@@ -372,6 +372,7 @@ export class SolanaExecutor implements IExecutor {
    * @param {bigint} initialX - Initial token X amount as bigint.
    * @param {bigint} initialY - Initial token Y amount as bigint.
    * @param {number} [timeoutMs=60000] - Total polling timeout.
+   * @param {{ expectedDeltaX?: bigint; expectedDeltaY?: bigint }} [options] - Minimum expected deltas for settlement.
    */
   public async pollBalances(
     tokenXAddress: string,
@@ -379,10 +380,15 @@ export class SolanaExecutor implements IExecutor {
     walletAddress: string,
     initialX: bigint,
     initialY: bigint,
-    timeoutMs = 60000
+    timeoutMs = 60000,
+    options: { expectedDeltaX?: bigint; expectedDeltaY?: bigint } = {}
   ): Promise<void> {
+    const { expectedDeltaX, expectedDeltaY } = options;
     const startTime = Date.now();
-    logger.info(`[SolanaExecutor] Starting balance polling loop for settlement...`);
+    logger.info(
+      `[SolanaExecutor] Starting balance polling loop for settlement... ` +
+        `expectedDeltaX=${expectedDeltaX?.toString() ?? 'any'}, expectedDeltaY=${expectedDeltaY?.toString() ?? 'any'}`
+    );
 
     while (Date.now() - startTime < timeoutMs) {
       try {
@@ -434,16 +440,25 @@ export class SolanaExecutor implements IExecutor {
 
         const currentX = BigInt(balances.amountX);
         const currentY = BigInt(balances.amountY);
+        const deltaX = currentX - initialX;
+        const deltaY = currentY - initialY;
 
-        if (currentX > initialX || currentY > initialY) {
+        // Check if both expected deltas are met (if provided), otherwise fall back to any increase
+        const xSettled = expectedDeltaX !== undefined ? deltaX >= expectedDeltaX : deltaX > 0n;
+        const ySettled = expectedDeltaY !== undefined ? deltaY >= expectedDeltaY : deltaY > 0n;
+
+        if (xSettled || ySettled) {
           logger.info(
-            `[SolanaExecutor] Balance increase detected! Token X: ${initialX} -> ${currentX}, Token Y: ${initialY} -> ${currentY}`
+            `[SolanaExecutor] Settlement detected! ` +
+              `Token X: ${initialX} -> ${currentX} (delta=${deltaX}), ` +
+              `Token Y: ${initialY} -> ${currentY} (delta=${deltaY})`
           );
           return;
         }
 
         logger.info(
-          `[SolanaExecutor] No balance increase yet. X: ${currentX} (init: ${initialX}), Y: ${currentY} (init: ${initialY}). Waiting 2s...`
+          `[SolanaExecutor] No settlement yet. X: ${currentX} (init: ${initialX}, delta=${deltaX}), ` +
+            `Y: ${currentY} (init: ${initialY}, delta=${deltaY}). Waiting 2s...`
         );
       } catch (err: unknown) {
         logger.warn(`[SolanaExecutor] Error polling balances: ${(err as Error).message || String(err)}`);
@@ -452,6 +467,6 @@ export class SolanaExecutor implements IExecutor {
       await new Promise((resolve) => setTimeout(resolve, 2000));
     }
 
-    throw new Error(`Balance polling timed out after ${timeoutMs}ms without increase.`);
+    throw new Error(`Balance polling timed out after ${timeoutMs}ms without reaching expected settlement deltas.`);
   }
 }

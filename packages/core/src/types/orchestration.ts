@@ -84,5 +84,7 @@ export interface RebalanceTask {
   newPositionId?: string;
   intent: Decision;
   evaluatedAt: number;
+  expectedDeltaX?: string;
+  expectedDeltaY?: string;
   events: TaskEvent[];
 }
