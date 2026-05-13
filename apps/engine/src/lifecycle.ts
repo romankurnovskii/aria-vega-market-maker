@@ -75,11 +75,7 @@ async function getWalletBalances(
   await fetchForProgram(tokenProgramId);
   await fetchForProgram(token2022ProgramId);
 
-  // NOTE: WSOL (wrapped SOL) should use its ATA balance directly. Do NOT replace with native SOL balance.
-  // Previously the function overwrote WSOL amounts with native SOL balances, causing incorrect deposit amounts.
-  // This has been removed to correctly use the ATA balance fetched above via getParsedTokenAccountsByOwner.
-
-  return { amountX, amountY };
+return { amountX, amountY };
 }
 
 async function calculateRecoveredFunds(
