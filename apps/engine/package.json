@@ -24,8 +24,10 @@
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/supertest": "^6.0.2",
     "@types/swagger-ui-express": "^4.1.8",
-    "@types/yamljs": "^0.2.34"
+    "@types/yamljs": "^0.2.34",
+    "supertest": "^7.0.0"
   },
   "scripts": {
     "build": "tsc",

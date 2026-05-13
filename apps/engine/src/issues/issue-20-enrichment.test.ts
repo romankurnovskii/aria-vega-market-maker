@@ -3,19 +3,12 @@ import { test } from 'node:test';
 import assert from 'node:assert';
 import request from 'supertest';
 
-import {
-  Position,
-  IStore,
-  IOrchestratorRegistry,
-  IExecutor,
-  IPositionProvider,
-  IPositionStore,
-} from '@lp-system/core';
+import { Position, IStore, IOrchestratorRegistry, IExecutor, IPositionProvider, IPositionStore } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 
 const MOCK_WALLET = 'HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTYUQh';
 
-test('Issue #20: GET /positions returns enriched position data with price info', async (t) => {
+test('Issue #20: GET /positions returns enriched position data with price info', async () => {
   const positions: Position[] = [
     {
       id: 'pos_test_1',
@@ -97,7 +90,7 @@ test('Issue #20: GET /positions returns enriched position data with price info',
   };
 
   const mockFactory: Partial<OrchestratorFactory> = {
-    create: () => ({ id: 'orch_1' } as any),
+    create: () => ({ id: 'orch_1' }) as any,
     getAvailableStrategies: () => [],
   };
 
