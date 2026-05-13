@@ -39,6 +39,7 @@ export interface ExecutionRecord {
   error?: string;
   executedAt: number;
   newPositionId?: string;
+  recordVersion?: number;
 }
 
 export type RebalanceTaskStatus = 'pending_close' | 'awaiting_settlement' | 'pending_open';
