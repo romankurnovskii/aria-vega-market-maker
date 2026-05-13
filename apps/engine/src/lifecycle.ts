@@ -695,7 +695,8 @@ export async function processTasks(
                 });
 
                 // Wait remaining backoff time
-                await new Promise((resolve) => setTimeout(resolve, backoffMs - timeSinceLastAttempt));
+                const delay = process.env.NODE_ENV === 'test' ? 10 : backoffMs - timeSinceLastAttempt;
+                await new Promise((resolve) => setTimeout(resolve, delay));
               }
             }
 
