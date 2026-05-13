@@ -15,6 +15,11 @@ node_modules/
 data/
 *.json.bak
 
+# Runtime process state & logs
+.agents/skills/*/logs/pids/
+.agents/skills/*/logs/*.out
+.agents/skills/*/logs/*.err
+
 # IDE & system files
 .DS_Store
 .idea/
