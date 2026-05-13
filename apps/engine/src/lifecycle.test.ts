@@ -1003,3 +1003,82 @@ test('processTasks - Issue 4: Duplicate Position After Rebalance (Failed cache u
   // Under correct error handling, the task MUST NOT be deleted if saveKnown fails
   assert.strictEqual(m.tasks.length, 1, 'Task should not be deleted if saving known positions fails');
 });
+
+test('processTasks - Scenario H: Crash Simulation (SIGKILL) mid-execution', async () => {
+  const m = createMocks();
+  let applyCalls = 0;
+
+  m.executor.apply = async (_decision) => {
+    applyCalls++;
+    // Simulate SIGKILL by throwing an error that mimics process exit
+    // In a real scenario, the process would just stop.
+    // Here we simulate the restart by running the loop again after this failure.
+    throw new Error('SIGKILL');
+  };
+
+  const task: RebalanceTask = {
+    id: 'task_crash',
+    assignmentId: 'assign_crash',
+    status: 'pending_open',
+    originalPositionId: MOCK_PUBKEY_1,
+    intent: {
+      positionId: MOCK_PUBKEY_1,
+      action: 'open',
+      sourceAssignmentId: 'assign_crash',
+      openParams: {
+        poolAddress: MOCK_PUBKEY_2,
+        lowerBound: 1.1,
+        upperBound: 2.1,
+        tokenXAmount: '500',
+        tokenYAmount: '500',
+      },
+      evaluatedAt: Date.now(),
+    },
+    evaluatedAt: Date.now(),
+    events: [],
+  };
+  m.tasks.push(task);
+
+  // Run 1: Crash during executor.apply
+  try {
+    await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
+  } catch (err: any) {
+    assert.strictEqual(err.message, 'SIGKILL');
+  }
+
+  assert.strictEqual(applyCalls, 1, 'Executor should have been called once before crash');
+  assert.strictEqual(m.tasks.length, 1, 'Task should still be in store after crash');
+
+  // Simulate restart: executor.apply now succeeds if called again (but it shouldn't be called!)
+  // We need to simulate that the transaction actually went through on-chain even though we crashed.
+  // In a real scenario, we would check for existing records.
+  m.executor.apply = async (decision) => {
+    applyCalls++;
+    return {
+      id: 'exec_recovered',
+      decision,
+      txSignatures: ['tx_sig_recovered'],
+      status: 'success',
+      executedAt: Date.now(),
+      newPositionId: MOCK_PUBKEY_3,
+    };
+  };
+
+  // We simulate that an execution record was actually saved by the executor before the crash
+  // or that we can find it in the store.
+  m.store.saveExecutionRecord({
+    id: 'exec_pre_crash',
+    decision: task.intent,
+    txSignatures: ['tx_sig_pre_crash'],
+    status: 'success',
+    executedAt: Date.now(),
+    newPositionId: MOCK_PUBKEY_3,
+    recordVersion: 1,
+  });
+
+  // Run 2: Recovery after restart
+  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
+
+  assert.strictEqual(applyCalls, 1, 'Executor should NOT be called again after recovery (idempotency)');
+  assert.strictEqual(m.tasks.length, 0, 'Task should be completed and removed after recovery');
+});
