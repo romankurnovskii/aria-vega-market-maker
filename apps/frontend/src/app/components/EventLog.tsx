@@ -10,11 +10,13 @@
  * @sideEffects None
  */
 
+import { TerminalSquare } from 'lucide-react';
+
 interface EventLogProps {
   events: string[];
 }
 
-export const EventLog = ({ events }: EventLogProps): JSX.Element => {
+export const EventLog = ({ events }: EventLogProps) => {
   return (
     <div className="flex-1 bg-[#0D0D0D] p-4 text-[#F4F4F0] font-mono-jb text-[10px] leading-relaxed border border-[#0D0D0D] overflow-y-auto flex flex-col min-h-[150px]">
       <div className="flex items-center gap-2 text-[#FF4500] mb-3 border-b border-gray-800 pb-2 shrink-0">

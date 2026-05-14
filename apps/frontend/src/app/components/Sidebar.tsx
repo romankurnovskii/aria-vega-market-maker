@@ -8,6 +8,9 @@
  * - Uses named icons from lucide-react
  */
 
+import React from 'react';
+import { Database, Layers, Zap, Box } from 'lucide-react';
+
 interface SidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
@@ -20,13 +23,13 @@ interface TabItem {
 }
 
 const tabs: TabItem[] = [
-  { id: 'positions', icon: (props: any) => <Database {...props} />, label: 'Positions' },
-  { id: 'assignments', icon: (props: any) => <Layers {...props} />, label: 'Assignments' },
-  { id: 'strategies', icon: (props: any) => <Zap {...props} />, label: 'Strategies' },
-  { id: 'steps', icon: (props: any) => <Box {...props} />, label: 'Pipeline' },
+  { id: 'positions', icon: Database, label: 'Positions' },
+  { id: 'assignments', icon: Layers, label: 'Assignments' },
+  { id: 'strategies', icon: Zap, label: 'Strategies' },
+  { id: 'steps', icon: Box, label: 'Pipeline' },
 ];
 
-export const Sidebar = ({ activeTab, onTabChange }: SidebarProps): JSX.Element => {
+export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   return (
     <aside className="w-full lg:w-48 flex flex-col gap-1 shrink-0">
       {tabs.map((tab) => (

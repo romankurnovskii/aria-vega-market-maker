@@ -13,7 +13,7 @@ interface FooterProps {
   apiUrl: string;
 }
 
-export const Footer = ({ apiUrl }: FooterProps): JSX.Element => {
+export const Footer = ({ apiUrl }: FooterProps) => {
   return (
     <footer className="mt-4 border-y border-[#0D0D0D] bg-[#0D0D0D] text-[#FF4500] py-1 overflow-hidden relative z-10 font-bold text-[10px] tracking-widest uppercase shrink-0">
       <div className="marquee-content whitespace-nowrap">
