@@ -27,6 +27,8 @@ export class MeteoraApiProvider implements IPositionProvider {
     Promise<{ decimalsX: number; decimalsY: number; tokenXMint: string; tokenYMint: string }>
   >();
 
+  private getPositionsCache = new Map<string, { data: Position[]; timestamp: number }>();
+
   /**
    * Constructs the provider with the Meteora API base URL.
    *
@@ -83,11 +85,21 @@ export class MeteoraApiProvider implements IPositionProvider {
    * Can accept an optional poolAddress parameter. If not provided, it attempts
    * to fetch open portfolio information to discover the pools.
    *
+   * Implements a 3-second LRU cache to prevent redundant requests during batch calls.
+   *
    * @param {string} walletAddress - Solana wallet public key.
    * @param {string} [poolAddress] - Optional specific pool address to query.
    * @returns {Promise<Position[]>} Array of position objects.
    */
   public async getPositions(walletAddress: string, poolAddress?: string): Promise<Position[]> {
+    const cacheKey = `${walletAddress}:${poolAddress || 'all'}`;
+    const cached = this.getPositionsCache.get(cacheKey);
+    const now = Date.now();
+
+    if (cached && now - cached.timestamp < 3000) {
+      return cached.data;
+    }
+
     logger.info(`[MeteoraApiProvider] Querying positions for wallet ${walletAddress} from API: ${this.apiUrl}`);
 
     const poolsToQuery: string[] = [];
@@ -211,6 +223,14 @@ export class MeteoraApiProvider implements IPositionProvider {
           });
         }
       }
+    }
+
+    this.getPositionsCache.set(cacheKey, { data: allPositions, timestamp: Date.now() });
+
+    // LRU: Cleanup old cache entries if it grows too large
+    if (this.getPositionsCache.size > 50) {
+      const oldestKey = this.getPositionsCache.keys().next().value;
+      if (oldestKey) this.getPositionsCache.delete(oldestKey);
     }
 
     return allPositions;
