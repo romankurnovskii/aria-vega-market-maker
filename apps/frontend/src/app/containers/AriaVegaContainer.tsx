@@ -23,6 +23,7 @@ import { PositionsView } from '../components/PositionsView';
 import { AssignmentsView } from '../components/AssignmentsView';
 import { StrategiesView } from '../components/StrategiesView';
 import { StepsView } from '../components/StepsView';
+import { EventLog } from '../components/EventLog';
 
 import { Footer } from '../components/Footer';
 
@@ -54,6 +55,14 @@ export const getTokenSymbol = (tokenObj?: { mint?: string; tokenAddress?: string
 export interface HealthData {
   epoch: number;
   status: string;
+}
+
+interface AriaVegaData {
+  health: HealthData;
+  positions: Position[];
+  assignments: Assignment[];
+  strategies: Strategy[];
+  steps: Step[];
 }
 
 interface Position {
@@ -110,6 +119,11 @@ export const AriaVegaContainer = () => {
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [events, setEvents] = useState<string[]>(['[SYSTEM] Aria Vega Terminal Initializing...']);
+
+  const logEvent = (msg: string): void => {
+    setEvents((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev].slice(0, 50));
+  };
 
   // Fetch all state from API
   const syncState = async (): Promise<void> => {
@@ -210,6 +224,7 @@ export const AriaVegaContainer = () => {
   };
 
   useEffect(() => {
+    logEvent('[SYS] Connecting to Aria Vega Control Server...');
     syncState();
 
     // Auto refresh every 5 seconds
@@ -266,32 +281,73 @@ export const AriaVegaContainer = () => {
   };
 
   /**
-   * Triggers a manual evaluation tick for a strategy on a given position.
+   * Handles position action evaluation (strategy evaluation).
    *
    * @param positionId - The target position ID
    * @param strategyId - The strategy to evaluate
    */
   const handleEvaluateStrategy = async (positionId: string, strategyId: string): Promise<void> => {
     try {
-      const selectedPos = data.positions.find((p: any) => p.id === positionId);
-      if (!selectedPos) return;
+      logEvent(`[EVALUATE] Triggering strategy evaluation for ${strategyId} on position ${positionId}...`);
 
-      const res = await fetch(`${API_URL}/strategies/${strategyId}/evaluate`, {
+      const res = await fetch(`${API_URL}/positions/${positionId}/actions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          positionId,
-          poolAddress: selectedPos.pool,
+          action: 'evaluate',
+          strategyId,
         }),
       });
 
       const result = await res.json();
       if (res.ok) {
-        if (result.result) {
+        const { result: strategyResult } = result;
+        if (strategyResult) {
+          logEvent(`[EVALUATE] Result: ${strategyResult.action} — ${strategyResult.reason || 'No reason provided'}`);
+        } else {
+          logEvent(`[EVALUATE] Completed. No action recommended.`);
         }
       } else {
+        logEvent(`[EVALUATE] Error: ${result.error || 'Evaluation failed'}`);
       }
-    } catch (err: any) {}
+    } catch (err: any) {
+      logEvent(`[EVALUATE] Failed: ${err.message || String(err)}`);
+    }
+  };
+
+  /**
+   * Handles removing all liquidity from a position.
+   *
+   * @param positionId - The target position ID
+   */
+  const handleRemoveLiquidity = async (positionId: string): Promise<void> => {
+    try {
+      logEvent(`[REMOVE] Initiating liquidity removal for position ${positionId}...`);
+
+      const res = await fetch(`${API_URL}/positions/${positionId}/actions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'removeLiquidity',
+        }),
+      });
+
+      const result = await res.json();
+      if (res.ok) {
+        logEvent(`[REMOVE] Success! Tx signatures: ${result.transactionSignatures?.join(', ') || 'N/A'}`);
+        if (result.claimedFees) {
+          logEvent(`[REMOVE] Claimed fees — TokenX: ${result.claimedFees.tokenX}, TokenY: ${result.claimedFees.tokenY}`);
+        }
+        if (result.positionClosed) {
+          logEvent(`[REMOVE] Position has been closed.`);
+        }
+        syncState();
+      } else {
+        logEvent(`[REMOVE] Error: ${result.error || 'Removal failed'}`);
+      }
+    } catch (err: any) {
+      logEvent(`[REMOVE] Failed: ${err.message || String(err)}`);
+    }
   };
 
   /**
@@ -342,7 +398,15 @@ export const AriaVegaContainer = () => {
 
           <div className="flex-1 min-h-0 flex flex-col">
             {activeTab === 'positions' && (
-              <PositionsView positions={data.positions} assignments={data.assignments} strategies={data.strategies} />
+              <PositionsView
+                positions={data.positions}
+                assignments={data.assignments}
+                strategies={data.strategies}
+                events={events}
+                onAssign={handleAssignStrategy}
+                onEvaluate={handleEvaluateStrategy}
+                onRemoveLiquidity={handleRemoveLiquidity}
+              />
             )}
             {activeTab === 'assignments' && (
               <AssignmentsView assignments={data.assignments} onDelete={handleDeleteAssignment} />
@@ -350,6 +414,8 @@ export const AriaVegaContainer = () => {
             {activeTab === 'strategies' && <StrategiesView strategies={data.strategies} />}
             {activeTab === 'steps' && <StepsView steps={data.steps} />}
           </div>
+
+          <EventLog events={events} />
         </main>
       </div>
 

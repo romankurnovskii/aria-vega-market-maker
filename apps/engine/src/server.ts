@@ -22,7 +22,7 @@ import path, { dirname } from 'path';
 import { IStore, IOrchestratorRegistry, IExecutor, IPositionProvider, IPositionStore, Position } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
-import { createAssignmentsRouter, createStrategiesRouter, createIntrospectionRouter } from './routes/index.js';
+import { createAssignmentsRouter, createStrategiesRouter, createIntrospectionRouter, createPositionsRouter } from './routes/index.js';
 import { getPriceFromBinId } from '@lp-system/providers';
 
 const logger = getLogger('server');
@@ -59,6 +59,7 @@ export function startHttpServer(
 
   app.use('/assignments', createAssignmentsRouter(store, registry, factory));
   app.use('/strategies', createStrategiesRouter(registry, positionProvider));
+  app.use('/positions', createPositionsRouter(registry, positionProvider, executor));
   app.use('/', createIntrospectionRouter(factory));
 
   app.get('/positions', async (_req, res) => {

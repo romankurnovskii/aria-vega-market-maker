@@ -25,6 +25,7 @@ interface PositionDetailProps {
   strategies: any[];
   onAssign: (positionId: string, strategyId: string, mode: string) => Promise<void>;
   onEvaluate: (positionId: string, strategyId: string) => Promise<void>;
+  onRemoveLiquidity: (positionId: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -34,6 +35,7 @@ export const PositionDetail = ({
   strategies,
   onAssign,
   onEvaluate,
+  onRemoveLiquidity,
   onClose,
 }: PositionDetailProps) => {
   const [selectedStrategyId, setSelectedStrategyId] = useState<string>('');
@@ -238,13 +240,19 @@ export const PositionDetail = ({
             </div>
           </div>
 
-          <div className="pt-1">
+          <div className="pt-1 flex flex-col gap-2">
             <button
               onClick={() => onEvaluate(position.id, selectedStrategyId)}
               disabled={selectedStrategyId === 'NONE' || !orchestration}
               className="w-full flex items-center justify-center gap-2 border border-[#0D0D0D] p-2 text-xs font-bold uppercase hover:bg-[#F4F4F0] hover:text-[#FF4500] hover:border-[#FF4500] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Zap size={14} /> Evaluate Ad-Hoc
+            </button>
+            <button
+              onClick={() => onRemoveLiquidity(position.id)}
+              className="w-full flex items-center justify-center gap-2 bg-[#FF4500] text-white border border-[#0D0D0D] p-2 text-xs font-bold uppercase hover:bg-[#D03800] transition-colors"
+            >
+              Remove Liquidity
             </button>
           </div>
         </div>
