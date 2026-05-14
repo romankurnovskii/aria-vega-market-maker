@@ -242,7 +242,10 @@ export const PositionDetail = ({
 
           <div className="pt-1">
             <button
-              onClick={() => onEvaluate(position.id, selectedStrategyId)}
+              onClick={() => {
+                console.log(`[PositionDetail] Evaluate button clicked for position: ${position.id}, strategy: ${selectedStrategyId}`);
+                onEvaluate(position.id, selectedStrategyId);
+              }}
               disabled={selectedStrategyId === 'NONE' || !orchestration}
               className="w-full flex items-center justify-center gap-2 border border-[#0D0D0D] p-2 text-xs font-bold uppercase hover:bg-[#F4F4F0] hover:text-[#FF4500] hover:border-[#FF4500] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >

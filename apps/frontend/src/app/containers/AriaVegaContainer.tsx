@@ -273,11 +273,18 @@ export const AriaVegaContainer = () => {
    * @param strategyId - The strategy to evaluate
    */
   const handleEvaluateStrategy = async (positionId: string, strategyId: string): Promise<void> => {
+    console.log(`[AriaVega] Triggering ad-hoc evaluation for strategy: ${strategyId}, position: ${positionId}`);
     try {
       const selectedPos = data.positions.find((p: any) => p.id === positionId);
-      if (!selectedPos) return;
+      if (!selectedPos) {
+        console.warn(`[AriaVega] Evaluation failed: Position ${positionId} not found in state.`);
+        return;
+      }
 
-      const res = await fetch(`${API_URL}/strategies/${strategyId}/evaluate`, {
+      const requestUrl = `${API_URL}/strategies/${strategyId}/evaluate`;
+      console.log(`[AriaVega] POST ${requestUrl}`);
+
+      const res = await fetch(requestUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -287,6 +294,8 @@ export const AriaVegaContainer = () => {
       });
 
       const result = await res.json();
+      console.log(`[AriaVega] Evaluation result status: ${res.status}`, result);
+
       if (res.ok) {
         setEvalLogs((prev) => [
           {
