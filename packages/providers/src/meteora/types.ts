@@ -143,19 +143,41 @@ export interface DatapiPosition {
   isOutOfRange?: boolean;
   createdAt?: number;
   pool_data?: PoolResponse;
+  minPrice?: string;
+  maxPrice?: string;
+  poolActiveBinId?: number;
+  poolActivePrice?: string;
+  feePerTvl24h?: string;
+  isClosed?: boolean;
+  closedAt?: number | null;
+  pnlUsd?: string;
+  pnlSol?: string;
+  pnlPctChange?: string;
+  pnlSolPctChange?: string;
+  allTimeDeposits?: {
+    tokenX?: { amount?: string; usd?: string; amountSol?: string };
+    tokenY?: { amount?: string; usd?: string; amountSol?: string };
+    total?: { usd?: string; sol?: string };
+  };
+  allTimeWithdrawals?: {
+    tokenX?: { amount?: string; usd?: string; amountSol?: string };
+    tokenY?: { amount?: string; usd?: string; amountSol?: string };
+    total?: { usd?: string; sol?: string };
+  };
+  allTimeFees?: {
+    tokenX?: { amount?: string; usd?: string; amountSol?: string };
+    tokenY?: { amount?: string; usd?: string; amountSol?: string };
+    total?: { usd?: string; sol?: string };
+  };
   unrealizedPnl?: {
     balances?: number;
     balancesSol?: string;
-    balanceTokenX?: {
-      amount: string;
-      usd: string;
-      amountSol: string;
-    };
-    balanceTokenY?: {
-      amount: string;
-      usd: string;
-      amountSol: string;
-    };
+    balanceTokenX?: { amount?: string; usd?: string; amountSol?: string };
+    balanceTokenY?: { amount?: string; usd?: string; amountSol?: string };
+    unclaimedFeeTokenX?: { amount?: string; usd?: string; amountSol?: string };
+    unclaimedFeeTokenY?: { amount?: string; usd?: string; amountSol?: string };
+    unclaimedRewardTokenX?: { amount?: string; usd?: string; amountSol?: string };
+    unclaimedRewardTokenY?: { amount?: string; usd?: string; amountSol?: string };
   };
 }
 

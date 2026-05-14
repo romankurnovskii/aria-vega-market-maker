@@ -68,6 +68,7 @@ interface Position {
   tokenX: { amount: string; decimals: number } | null | undefined;
   tokenY: { amount: string; decimals: string } | null | undefined;
   raw: any;
+  pnlData?: any;
 }
 
 export interface Assignment {
@@ -188,6 +189,7 @@ export const AriaVegaContainer = () => {
           tokenX: pos.tokenX,
           tokenY: pos.tokenY,
           raw: pos,
+          pnlData: pos.pnlData || pos.metadata?.pnl || pos.metadata || pos,
         };
       });
 
