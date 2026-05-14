@@ -39,24 +39,11 @@ export interface PoolInfo {
   chain: ChainId;
   protocol: ProtocolType;
   feeRate: number;
-  activeBound: number; // Agnostic boundary
-  tokenXAddress: string; // Agnostic
-  tokenYAddress: string; // Agnostic
-
-  /**
-   * @deprecated Kept for legacy Solana/Meteora support.
-   */
-  binStep?: number;
-  /**
-   * @deprecated Use `activeBound` instead. Kept for legacy Solana/Meteora support.
-   */
+  activeBound: number;
+  tokenXAddress: string;
+  tokenYAddress: string;
+  binStep: number;
   activeBinId?: number;
-  /**
-   * @deprecated Use `tokenXAddress` instead. Kept for legacy Solana/Meteora support.
-   */
   tokenXMint?: string;
-  /**
-   * @deprecated Use `tokenYAddress` instead. Kept for legacy Solana/Meteora support.
-   */
   tokenYMint?: string;
 }

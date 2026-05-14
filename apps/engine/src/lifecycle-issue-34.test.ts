@@ -90,6 +90,7 @@ function createMocks() {
         activeBound: 1000,
         tokenXAddress: MOCK_PUBKEY_2,
         tokenYAddress: MOCK_PUBKEY_3,
+        binStep: 1,
       };
     },
     getMarketSnapshot: async (poolAddress): Promise<MarketSnapshot> => {
