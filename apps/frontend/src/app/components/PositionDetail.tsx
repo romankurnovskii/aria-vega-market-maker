@@ -15,9 +15,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Zap, X, ChevronRight } from 'lucide-react';
 
 import { formatAmount, getTokenSymbol } from '../containers/AriaVegaContainer';
+import { PositionHeader } from './PositionHeader';
+import { PositionBalances } from './PositionBalances';
+import { PriceAnalytics } from './PriceAnalytics';
+import { PnLAndFees } from './PnLAndFees';
+import { OrchestrationControls } from './OrchestrationControls';
+import { EventLog } from './EventLog';
 
 interface PositionDetailProps {
   position: any;
@@ -70,225 +75,62 @@ export const PositionDetail = ({
   const tokenXSym = getTokenSymbol(position.tokenX);
   const tokenYSym = getTokenSymbol(position.tokenY);
 
+  const handleAssign = () => {
+    onAssign(position.id, selectedStrategyId, selectedMode);
+  };
+
+  const handleEvaluate = () => {
+    console.log(`[PositionDetail] Evaluate button clicked for position: ${position.id}, strategy: ${selectedStrategyId}`);
+    onEvaluate(position.id, selectedStrategyId);
+  };
+
   return (
     <div className="flex flex-col gap-4 w-full lg:w-5/12 h-full min-h-0 animate-in slide-in-from-right-4 duration-300">
       {/* Actions Pane */}
       <div className="border border-[#0D0D0D] bg-white p-4 shrink-0 flex flex-col gap-4 overflow-y-auto">
-        <div className="flex justify-between items-start border-b border-[#0D0D0D] pb-3">
-          <div className="min-w-0">
-            <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">Target Position</div>
-            <div className="font-syne font-bold text-lg truncate" title={position.id}>
-              {position.id}
-            </div>
-            <div className="text-xs text-gray-600 truncate mt-1">
-              Pool:{' '}
-              <span className="font-mono text-[10px]" title={position.pool}>
-                {position.pool}
-              </span>
-            </div>
-            {/* State machine premium badge */}
-            <div className="mt-2 flex items-center">
-              <span
-                className={`px-2 py-0.5 text-[9px] font-bold border uppercase tracking-widest font-mono-jb ${
-                  position.state === 'OPEN'
-                    ? 'border-green-500 text-green-600 bg-green-50'
-                    : position.state === 'CREATING'
-                      ? 'border-blue-500 text-blue-600 bg-blue-50 animate-pulse'
-                      : position.state === 'REBALANCING'
-                        ? 'border-yellow-500 text-yellow-600 bg-yellow-50 animate-pulse'
-                        : position.state === 'CLOSING'
-                          ? 'border-orange-500 text-orange-600 bg-orange-50 animate-pulse'
-                          : position.state === 'CLOSED'
-                            ? 'border-gray-500 text-gray-600 bg-gray-50'
-                            : 'border-[#FF4500] text-[#FF4500] bg-red-50'
-                }`}
-              >
-                {position.state}
-              </span>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1 border border-transparent hover:border-[#FF4500] hover:text-[#FF4500] transition-colors bg-[#F4F4F0]"
-            title="Close"
-          >
-            <X size={16} />
-          </button>
-        </div>
+        <PositionHeader positionId={position.id} pool={position.pool} state={position.state} onClose={onClose} />
 
-        {/* Balances Display */}
-        <div className="bg-[#F4F4F0] p-2.5 border border-[#0D0D0D] text-xs">
-          <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-1.5 font-bold">Position Balances</div>
-          <div className="flex flex-col gap-1 font-mono-jb">
-            <div className="flex justify-between">
-              <span className="text-gray-500">{tokenXSym}:</span>
-              <span className="font-bold text-[#0D0D0D]">
-                {pnl.unrealizedPnl?.balanceTokenX?.usd !== undefined && Number(pnl.unrealizedPnl.balanceTokenX.usd) > 0
-                  ? `$${Number(pnl.unrealizedPnl.balanceTokenX.usd).toFixed(4)}`
-                  : position.tokenX
-                  ? `${formatAmount(position.tokenX.amount, position.tokenX.decimals)}`
-                  : '0.00'}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">{tokenYSym}:</span>
-              <span className="font-bold text-[#0D0D0D]">
-                {pnl.unrealizedPnl?.balanceTokenY?.usd !== undefined && Number(pnl.unrealizedPnl.balanceTokenY.usd) > 0
-                  ? `$${Number(pnl.unrealizedPnl.balanceTokenY.usd).toFixed(4)}`
-                  : position.tokenY
-                  ? `${formatAmount(position.tokenY.amount, position.tokenY.decimals)}`
-                  : '0.00'}
-              </span>
-            </div>
-          </div>
-        </div>
+        <PositionBalances
+          tokenXSym={tokenXSym}
+          tokenYSym={tokenYSym}
+          tokenX={position.tokenX}
+          tokenY={position.tokenY}
+          unrealizedPnlTokenXUsd={pnl.unrealizedPnl?.balanceTokenX?.usd ? Number(pnl.unrealizedPnl.balanceTokenX.usd) : undefined}
+          unrealizedPnlTokenYUsd={pnl.unrealizedPnl?.balanceTokenY?.usd ? Number(pnl.unrealizedPnl.balanceTokenY.usd) : undefined}
+          formatAmount={formatAmount}
+        />
 
-        {/* Market & Price Analytics */}
-        <div className="bg-[#F4F4F0] p-2.5 border border-[#0D0D0D] text-xs flex flex-col gap-1.5">
-          <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Price Analytics</div>
-          <div className="flex justify-between font-mono-jb">
-            <span className="text-gray-500">Min / Max Price:</span>
-            <span className="font-bold text-[#0D0D0D]">
-              {minPrice !== undefined ? minPrice.toFixed(4) : '0.0000'} / {maxPrice !== undefined ? maxPrice.toFixed(4) : '0.0000'}
-            </span>
-          </div>
-          <div className="flex justify-between font-mono-jb">
-            <span className="text-gray-500">Pool Active Price:</span>
-            <span className="font-bold text-[#0D0D0D]">
-              {poolActivePrice !== undefined ? poolActivePrice.toFixed(4) : '0.0000'}
-            </span>
-          </div>
-          <div className="flex justify-between font-mono-jb">
-            <span className="text-gray-500">24h Fee / TVL:</span>
-            <span className="font-bold text-[#0D0D0D]">
-              {feePerTvl24h !== undefined ? `${feePerTvl24h.toFixed(2)}%` : '0.00%'}
-            </span>
-          </div>
-        </div>
+        <PriceAnalytics
+          minPrice={minPrice}
+          maxPrice={maxPrice}
+          poolActivePrice={poolActivePrice}
+          feePerTvl24h={feePerTvl24h}
+        />
 
-        {/* Realized PnL & All-Time Fees */}
-        <div className="bg-[#F4F4F0] p-2.5 border border-[#0D0D0D] text-xs flex flex-col gap-1.5">
-          <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">PnL & All-Time Fees</div>
-          <div className="flex justify-between font-mono-jb items-center">
-            <span className="text-gray-500">Realized PnL:</span>
-            <span className={`font-bold ${pnlUsd && pnlUsd >= 0 ? 'text-green-600' : pnlUsd && pnlUsd < 0 ? 'text-[#FF4500]' : 'text-[#0D0D0D]'}`}>
-              {pnlUsd !== undefined ? `$${pnlUsd.toFixed(4)}` : '$0.0000'}
-              {pnlPctChange !== undefined && ` (${pnlPctChange >= 0 ? '+' : ''}${(pnlPctChange * 100).toFixed(2)}%)`}
-            </span>
-          </div>
-          <div className="flex justify-between font-mono-jb">
-            <span className="text-gray-500">All-Time Fees (USD):</span>
-            <span className="font-bold text-[#0D0D0D]">
-              {allTimeFeesTotalUsd !== undefined ? `$${allTimeFeesTotalUsd.toFixed(4)}` : '$0.0000'}
-            </span>
-          </div>
-          <div className="flex justify-between font-mono-jb text-[11px] pl-2 border-l border-gray-300">
-            <span className="text-gray-500">{tokenXSym} Fees:</span>
-            <span className="font-bold text-[#0D0D0D]">
-              {allTimeFeesXUsd !== undefined && allTimeFeesXUsd > 0
-                ? `$${allTimeFeesXUsd.toFixed(4)}`
-                : allTimeFeesXAmt !== undefined
-                ? `${allTimeFeesXAmt} ${tokenXSym}`
-                : `$0.0000`}
-            </span>
-          </div>
-          <div className="flex justify-between font-mono-jb text-[11px] pl-2 border-l border-gray-300">
-            <span className="text-gray-500">{tokenYSym} Fees:</span>
-            <span className="font-bold text-[#0D0D0D]">
-              {allTimeFeesYUsd !== undefined && allTimeFeesYUsd > 0
-                ? `$${allTimeFeesYUsd.toFixed(4)}`
-                : allTimeFeesYAmt !== undefined
-                ? `${allTimeFeesYAmt} ${tokenYSym}`
-                : `$0.0000`}
-            </span>
-          </div>
-        </div>
+        <PnLAndFees
+          pnlUsd={pnlUsd}
+          pnlPctChange={pnlPctChange}
+          allTimeFeesTotalUsd={allTimeFeesTotalUsd}
+          allTimeFeesXUsd={allTimeFeesXUsd}
+          allTimeFeesXAmt={allTimeFeesXAmt}
+          allTimeFeesYUsd={allTimeFeesYUsd}
+          allTimeFeesYAmt={allTimeFeesYAmt}
+          tokenXSym={tokenXSym}
+          tokenYSym={tokenYSym}
+        />
 
-        <div className="flex flex-col gap-3">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-[#FF4500]">Orchestration & Strategy</div>
-          <div className="flex flex-col gap-2">
-            <select
-              value={selectedStrategyId}
-              onChange={(e) => setSelectedStrategyId(e.target.value)}
-              className="w-full bg-[#F4F4F0] border border-[#0D0D0D] p-2 text-xs uppercase outline-none focus:border-[#FF4500]"
-            >
-              <option value="NONE">-- No Strategy (Unassign) --</option>
-              {strategies.map((s: any) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.id})
-                </option>
-              ))}
-            </select>
-
-            <div className="flex gap-2">
-              <select
-                value={selectedMode}
-                onChange={(e) => setSelectedMode(e.target.value)}
-                className="flex-1 bg-[#F4F4F0] border border-[#0D0D0D] p-2 text-xs uppercase outline-none focus:border-[#FF4500]"
-                disabled={selectedStrategyId === 'NONE'}
-              >
-                <option value="active">Active</option>
-                <option value="monitor">Monitor</option>
-              </select>
-
-              <button
-                onClick={() => onAssign(position.id, selectedStrategyId, selectedMode)}
-                className="flex-1 bg-[#0D0D0D] text-[#F4F4F0] p-2 text-xs font-bold uppercase hover:bg-[#FF4500] transition-colors border border-[#0D0D0D]"
-              >
-                Set Assignment
-              </button>
-            </div>
-          </div>
-
-          <div className="pt-1">
-            <button
-              onClick={() => {
-                console.log(`[PositionDetail] Evaluate button clicked for position: ${position.id}, strategy: ${selectedStrategyId}`);
-                onEvaluate(position.id, selectedStrategyId);
-              }}
-              disabled={selectedStrategyId === 'NONE'}
-              className="w-full flex items-center justify-center gap-2 border border-[#0D0D0D] p-2 text-xs font-bold uppercase hover:bg-[#F4F4F0] hover:text-[#FF4500] hover:border-[#FF4500] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Zap size={14} /> Evaluate Ad-Hoc
-            </button>
-          </div>
-        </div>
+        <OrchestrationControls
+          strategies={strategies}
+          selectedStrategyId={selectedStrategyId}
+          selectedMode={selectedMode}
+          onStrategyChange={setSelectedStrategyId}
+          onModeChange={setSelectedMode}
+          onAssign={handleAssign}
+          onEvaluate={handleEvaluate}
+        />
       </div>
 
-      {/* Events Log Console */}
-      <div className="flex-1 border border-[#0D0D0D] bg-[#0D0D0D] text-[#F4F4F0] p-4 font-mono text-[10px] overflow-hidden flex flex-col min-h-0 relative">
-        <div className="absolute top-0 right-0 p-2 opacity-20 pointer-events-none uppercase tracking-tighter text-xs">
-          Live CRT Terminal
-        </div>
-        <div className="flex items-center gap-2 border-b border-[#F4F4F0]/20 pb-2 mb-2 shrink-0">
-          <div className="w-2 h-2 bg-[#FF4500] animate-pulse"></div>
-          <span className="uppercase font-bold tracking-widest text-[#FF4500]">Strategy Event Log</span>
-        </div>
-
-        <div className="flex-1 overflow-y-auto flex flex-col gap-1 custom-scrollbar">
-          {evalLogs.length === 0 ? (
-            <div className="text-gray-500 italic opacity-50">No events recorded. Click "Evaluate Ad-Hoc" to trigger.</div>
-          ) : (
-            evalLogs.map((log) => (
-              <div key={log.id} className="border-b border-white/5 pb-1 mb-1 animate-in fade-in slide-in-from-left-2 duration-200">
-                <div className="flex justify-between opacity-60 text-[9px]">
-                  <span>[{log.timestamp}]</span>
-                  <span>{log.strategyId}</span>
-                </div>
-                {log.error ? (
-                  <div className="text-[#FF4500] break-words uppercase font-bold mt-0.5">
-                    !! ERROR: {log.error}
-                  </div>
-                ) : (
-                  <div className="text-green-400 break-words mt-0.5">
-                    >> {typeof log.result === 'object' ? JSON.stringify(log.result) : String(log.result)}
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+      <EventLog logs={evalLogs} />
     </div>
   );
 };
