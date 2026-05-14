@@ -10,7 +10,7 @@ import { stringify } from './helpers.js';
 try {
   fs.mkdirSync(LOCAL_DB_LOGS_PATH, { recursive: true });
 } catch (error) {
-  console.error(`[logger-init] Failed to create logs directory at ${LOCAL_DB_LOGS_PATH}:`, error);
+  process.stderr.write(`[logger-init] Failed to create logs directory at ${LOCAL_DB_LOGS_PATH}: ${error}\n`);
 }
 
 const isDocker = (process.env.DOCKER_ENV || 'false').toLowerCase() === 'true';
