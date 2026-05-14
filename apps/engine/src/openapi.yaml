@@ -417,27 +417,27 @@ components:
               enum: [skip, close]
               example: 'skip'
         - type: object
-          required:
-            - action
-            - params
-          properties:
-            action:
-              type: string
-              enum: [open]
-              example: 'open'
-            params:
-              $ref: '#/components/schemas/OpenParams'
-        - type: object
-          required:
-            - action
-            - openParams
-          properties:
-            action:
-              type: string
-              enum: [close+open]
-              example: 'close+open'
-            openParams:
-              $ref: '#/components/schemas/OpenParams'
+required:
+             - action
+             - openParams
+           properties:
+             action:
+               type: string
+               enum: [open]
+               example: 'open'
+             openParams:
+               $ref: '#/components/schemas/OpenParams'
+         - type: object
+           required:
+             - action
+             - openParams
+           properties:
+             action:
+               type: string
+               enum: [close+open]
+               example: 'close+open'
+             openParams:
+               $ref: '#/components/schemas/OpenParams'
 
     OpenParams:
       type: object
