@@ -110,6 +110,7 @@ export const AriaVegaContainer = () => {
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [evalLogs, setEvalLogs] = useState<any[]>([]);
 
   // Fetch all state from API
   const syncState = async (): Promise<void> => {
@@ -287,11 +288,40 @@ export const AriaVegaContainer = () => {
 
       const result = await res.json();
       if (res.ok) {
-        if (result.result) {
-        }
+        setEvalLogs((prev) => [
+          {
+            id: Date.now(),
+            timestamp: new Date().toLocaleTimeString(),
+            strategyId,
+            positionId,
+            result: result.result,
+          },
+          ...prev.slice(0, 49),
+        ]);
       } else {
+        setEvalLogs((prev) => [
+          {
+            id: Date.now(),
+            timestamp: new Date().toLocaleTimeString(),
+            error: result.message || 'Evaluation failed',
+            strategyId,
+            positionId,
+          },
+          ...prev.slice(0, 49),
+        ]);
       }
-    } catch (err: any) {}
+    } catch (err: any) {
+      setEvalLogs((prev) => [
+        {
+          id: Date.now(),
+          timestamp: new Date().toLocaleTimeString(),
+          error: err.message || 'Network error',
+          strategyId,
+          positionId,
+        },
+        ...prev.slice(0, 49),
+      ]);
+    }
   };
 
   /**
@@ -342,7 +372,14 @@ export const AriaVegaContainer = () => {
 
           <div className="flex-1 min-h-0 flex flex-col">
             {activeTab === 'positions' && (
-              <PositionsView positions={data.positions} assignments={data.assignments} strategies={data.strategies} />
+              <PositionsView
+                positions={data.positions}
+                assignments={data.assignments}
+                strategies={data.strategies}
+                onAssign={handleAssignStrategy}
+                onEvaluate={handleEvaluateStrategy}
+                evalLogs={evalLogs}
+              />
             )}
             {activeTab === 'assignments' && (
               <AssignmentsView assignments={data.assignments} onDelete={handleDeleteAssignment} />
