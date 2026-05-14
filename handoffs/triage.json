@@ -1,24 +1,26 @@
 {
   "skill": "issue-triage",
-  "timestamp": "2026-05-14T15:56:10Z",
-  "issue_url": "https://github.com/romankurnovskii/aria-vega-market-maker/issues/31",
-  "issue_number": 31,
+  "timestamp": "2026-05-14T16:05:00Z",
+  "issue_url": "https://github.com/romankurnovskii/aria-vega-market-maker/issues/34",
+  "issue_number": 34,
   "verdict": "confirmed",
   "confidence": "high",
-  "summary": "Solana executor overwrites WSOL ATA balances with native SOL balances or caps WSOL deposits based on native SOL, causing balance inconsistency.",
-  "root_cause_hypothesis": "In solana-executor.ts, pollBalances overwrites amountX/amountY with native SOL balance if mint is WSOL_MINT, and open decision caps WSOL deposit amounts based on native SOL balance.",
+  "summary": "Monolithic RebalanceTask retains close+open tasks in awaiting_settlement status rather than splitting them into independent stateless close and open operations.",
+  "root_cause_hypothesis": "In lifecycle.ts, processTasks transitions a close+open task to awaiting_settlement and polls for balance settlement, creating tight coupling and stalling restart recovery.",
   "relevant_files": [
     {
-      "path": "packages/executor/src/solana-executor.ts",
-      "reason": "Contains explicit WSOL_MINT checks that query native SOL balance and overwrite ATA balance or cap deposit amounts."
+      "path": "apps/engine/src/lifecycle.ts",
+      "reason": "Contains monolithic RebalanceTask state machine handling and awaiting_settlement polling logic."
+    },
+    {
+      "path": "packages/core/src/types/orchestration.ts",
+      "reason": "Defines RebalanceTaskStatus including awaiting_settlement."
     }
   ],
-  "gaps_found": [
-    "meteora-onchain-provider.ts does not actually contain any WSOL balance overwrites; the issue description mentions it but the bug resides in solana-executor.ts."
-  ],
+  "gaps_found": [],
   "new_bugs_risk": [
-    "Removing native SOL checks when opening a position might remove rent/gas capping for native SOL deposits if native SOL wrapping is ever done dynamically, but the framework design mandates using ATA balances directly."
+    "Decoupling open leg requires startTickLoop to synthesize position state from wallet balances when evaluating a position in REBALANCING state."
   ],
   "rejected_reason": null,
-  "recommended_approach": "Remove native SOL balance overwriting and capping from solana-executor.ts when handling WSOL_MINT, ensuring WSOL ATA balance is used exclusively, matching the unified pattern in lifecycle.ts."
+  "recommended_approach": "Remove awaiting_settlement from RebalanceTaskStatus, delete close task immediately upon success, and let startTickLoop evaluate REBALANCING positions statelessly to spawn independent pending_open tasks."
 }

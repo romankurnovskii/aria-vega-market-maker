@@ -1,13 +1,13 @@
 {
   "skill": "issue-reproduce",
-  "timestamp": "2026-05-14T16:00:30Z",
-  "issue_url": "https://github.com/romankurnovskii/aria-vega-market-maker/issues/31",
+  "timestamp": "2026-05-14T16:10:00Z",
+  "issue_url": "https://github.com/romankurnovskii/aria-vega-market-maker/issues/34",
   "triage_used": true,
   "repro_confirmed": true,
   "repro_steps": [
-    "Step 1: Instantiate SolanaExecutor with a mock RPC pool returning 5 SOL WSOL ATA balance but 0 native SOL balance.",
-    "Step 2: Call pollBalances for WSOL_MINT with expectedDeltaX. Observe timeout because it overwrites amountX with 0 native SOL balance.",
-    "Step 3: Call apply with an open decision for 1 WSOL deposit while wallet has 0.05 native SOL. Observe capping of tokenXAmount to 0."
+    "Step 1: Execute processTasks with a RebalanceTask in pending_close status for a close+open intent.",
+    "Step 2: Verify that under monolithic execution, task transitions to awaiting_settlement instead of deleting the task immediately.",
+    "Step 3: Assert failure when checking that task should be deleted upon close completion."
   ],
   "repro_environment": {
     "os": "macOS",
@@ -16,26 +16,21 @@
       "pnpm": "10.x"
     }
   },
-  "test_file_path": "apps/engine/src/solana-executor-issue-31.test.ts",
+  "test_file_path": "apps/engine/src/lifecycle-issue-34.test.ts",
   "failing_tests": [
     {
-      "name": "ISSUE #31: pollBalances should not overwrite WSOL ATA balance with native SOL balance",
-      "expected": "false (does not throw timeout)",
-      "actual": "true (throws timeout error)"
-    },
-    {
-      "name": "ISSUE #31: apply (open) should not cap WSOL deposit amounts based on native SOL balance",
-      "expected": "1000000000",
-      "actual": "0"
+      "name": "ISSUE #34: RebalanceTask should split close and open into independent operations",
+      "expected": "0 active tasks (deleted upon close)",
+      "actual": "1 active task (retained in awaiting_settlement)"
     }
   ],
   "edge_cases": [
     {
-      "description": "Zero native SOL balance when depositing WSOL from ATA",
-      "expected_behavior": "Should use WSOL ATA balance directly and succeed without capping",
+      "description": "Evaluating position in REBALANCING state during next tick loop",
+      "expected_behavior": "Should synthesize position from wallet balances and create independent pending_open task",
       "covered": true
     }
   ],
-  "caveats": ["Tested via mock RPC provider to simulate divergence between WSOL ATA balance and native SOL balance."],
+  "caveats": ["Requires updating existing lifecycle scenario tests to match decoupled stateless design."],
   "out_of_scope": []
 }

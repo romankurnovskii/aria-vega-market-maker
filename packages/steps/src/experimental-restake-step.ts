@@ -63,7 +63,7 @@ export class ExperimentalRestakeStep implements IStep {
       let usdcAmount: string;
       if (context.params.restakeAmount !== undefined) {
         const amountNum = Number(context.params.restakeAmount);
-        usdcAmount = (amountNum * Math.pow(10, decimalsY)).toFixed(0);
+        usdcAmount = BigInt(Math.round(amountNum * Math.pow(10, decimalsY))).toString();
         logger.info(
           `[${this.name}] Using configured restakeAmount from parameters: ${amountNum} USDC (${usdcAmount} micro-units)`
         );
@@ -133,7 +133,7 @@ export class ExperimentalRestakeStep implements IStep {
       let solAmount: string;
       if (context.params.restakeAmountSol !== undefined) {
         const amountNum = Number(context.params.restakeAmountSol);
-        solAmount = (amountNum * Math.pow(10, decimalsX)).toFixed(0);
+        solAmount = BigInt(Math.round(amountNum * Math.pow(10, decimalsX))).toString();
         logger.info(`[${this.name}] Using configured restakeAmountSol from parameters: ${amountNum} SOL`);
       } else {
         const rawAmount = BigInt(context.position.tokenX.amount);

@@ -32,7 +32,7 @@ export class SolanaRpcProvider implements IRpcProvider {
 
   /**
    * Executes a function against the RPC connection with retry logic.
-   * Retries up to 3 times with 200ms delays on failure.
+   * Retries up to 3 times with exponential backoff (200ms, 400ms, 800ms) on failure.
    *
    * @param {<T>(conn: Connection) => Promise<T>} fn - Async function to execute with the connection.
    * @returns {Promise<T>} The resolved result from the provided function.
@@ -41,7 +41,7 @@ export class SolanaRpcProvider implements IRpcProvider {
   public async execute<T>(fn: (conn: Connection) => Promise<T>): Promise<T> {
     let attempts = 0;
     const maxAttempts = 3;
-    const delayMs = 200;
+    const baseDelayMs = 200;
 
     while (attempts < maxAttempts) {
       try {
@@ -51,6 +51,7 @@ export class SolanaRpcProvider implements IRpcProvider {
         if (attempts >= maxAttempts) {
           throw error;
         }
+        const delayMs = baseDelayMs * Math.pow(2, attempts - 1);
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }

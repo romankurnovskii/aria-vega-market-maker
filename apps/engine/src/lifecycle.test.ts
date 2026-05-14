@@ -264,25 +264,42 @@ test('processTasks - Scenario A: Standard rebalance (close+open)', async () => {
   // 1. Process 'pending_close'
   await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
 
-  assert.strictEqual(task.status, 'awaiting_settlement');
+  assert.strictEqual(m.tasks.length, 0);
   assert.ok(task.events?.some((e) => e.stage === 'CLOSE_BROADCAST'));
   assert.ok(task.events?.some((e) => e.stage === 'CLOSE_CONFIRMED'));
-  assert.ok(task.events?.some((e) => e.stage === 'SETTLEMENT_POLLING'));
-  assert.ok(task.events?.some((e) => e.stage === 'SETTLEMENT_DETECTED'));
+  assert.ok(task.events?.some((e) => e.stage === 'POSITION_CLOSED'));
 
-  // 2. Process 'awaiting_settlement' -> transition to 'pending_open'
-  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
-
-  assert.strictEqual(task.status, 'pending_open');
-  assert.ok(task.events?.some((e) => e.stage === 'JIT_REEVALUATION'));
+  // 2. Simulate next tick in startTickLoop creating pending_open task
+  const openTask: RebalanceTask = {
+    id: 'task_open_abc',
+    assignmentId: 'assign_123',
+    status: 'pending_open',
+    originalPositionId: MOCK_PUBKEY_1,
+    intent: {
+      positionId: MOCK_PUBKEY_1,
+      action: 'open',
+      openParams: {
+        poolAddress: MOCK_PUBKEY_2,
+        lowerBound: 1.1,
+        upperBound: 2.1,
+        tokenXAmount: '500',
+        tokenYAmount: '500',
+      },
+      sourceAssignmentId: 'assign_123',
+      evaluatedAt: Date.now(),
+    },
+    evaluatedAt: Date.now(),
+    events: [{ stage: 'INIT', timestamp: Date.now(), message: 'Init open task' }],
+  };
+  m.tasks.push(openTask);
 
   // 3. Process 'pending_open' -> completes and deletes
   await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
 
   assert.strictEqual(m.tasks.length, 0); // Task should be deleted
-  assert.ok(task.events?.some((e) => e.stage === 'OPEN_BROADCAST'));
-  assert.ok(task.events?.some((e) => e.stage === 'OPEN_CONFIRMED'));
-  assert.ok(task.events?.some((e) => e.stage === 'COMPLETED'));
+  assert.ok(openTask.events?.some((e) => e.stage === 'OPEN_BROADCAST'));
+  assert.ok(openTask.events?.some((e) => e.stage === 'OPEN_CONFIRMED'));
+  assert.ok(openTask.events?.some((e) => e.stage === 'COMPLETED'));
 });
 
 test('processTasks - Scenario B: Rebalance with JIT Abort', async () => {
@@ -290,7 +307,7 @@ test('processTasks - Scenario B: Rebalance with JIT Abort', async () => {
 
   const decision: Decision = {
     positionId: MOCK_PUBKEY_1,
-    action: 'close+open',
+    action: 'open',
     openParams: {
       poolAddress: MOCK_PUBKEY_2,
       lowerBound: 1.0,
@@ -305,32 +322,14 @@ test('processTasks - Scenario B: Rebalance with JIT Abort', async () => {
   const task: RebalanceTask = {
     id: 'task_abc',
     assignmentId: 'assign_123',
-    status: 'awaiting_settlement', // start at settlement to test skip leg
+    status: 'pending_open',
     originalPositionId: MOCK_PUBKEY_1,
     intent: decision,
     evaluatedAt: Date.now(),
-    events: [
-      { stage: 'INIT', timestamp: Date.now() },
-      { stage: 'CLOSE_BROADCAST', timestamp: Date.now() },
-      { stage: 'CLOSE_CONFIRMED', timestamp: Date.now() },
-      { stage: 'SETTLEMENT_POLLING', timestamp: Date.now() },
-      { stage: 'SETTLEMENT_DETECTED', timestamp: Date.now() },
-    ],
+    events: [{ stage: 'INIT', timestamp: Date.now() }],
   };
 
   m.tasks.push(task);
-
-  const mockOrchestrator: IOrchestrator = {
-    id: 'assign_123',
-    assignmentId: 'assign_123',
-    positionId: MOCK_PUBKEY_1,
-    strategyId: 'active-restake',
-    mode: 'active',
-    tick: async (): Promise<StrategyResult> => {
-      return { action: 'close' }; // close signal to abort open leg under new semantics!
-    },
-  };
-  m.orchestrators.push(mockOrchestrator);
 
   m.knownPositions.push({
     id: MOCK_PUBKEY_1,
@@ -348,9 +347,7 @@ test('processTasks - Scenario B: Rebalance with JIT Abort', async () => {
 
   await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
 
-  assert.strictEqual(m.tasks.length, 0); // Task should be deleted on JIT abort
-  assert.ok(task.events?.some((e) => e.stage === 'JIT_REEVALUATION'));
-  assert.ok(task.events?.some((e) => e.stage === 'JIT_SKIPPED'));
+  assert.strictEqual(m.tasks.length, 0);
   assert.ok(task.events?.some((e) => e.stage === 'COMPLETED'));
 });
 
@@ -1100,6 +1097,6 @@ test('processTasks - Issue 13: WSOL uses ATA balance exclusively (not native SOL
 
   await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
 
-  assert.strictEqual(task.status, 'awaiting_settlement');
-  assert.ok(task.events?.some((e) => e.stage === 'SETTLEMENT_POLLING'));
+  assert.strictEqual(m.tasks.length, 0);
+  assert.ok(task.events?.some((e) => e.stage === 'POSITION_CLOSED'));
 });

@@ -24,10 +24,8 @@ import {
   Decision,
   Position,
   RebalanceTask,
-  StrategyResult,
   ExecutionRecord,
   Assignment,
-  IOrchestrator,
   PoolInfo,
 } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
@@ -286,8 +284,6 @@ export async function processTasks(
         task.events = [];
       }
 
-      const orchestrators = registry.getForPosition(task.originalPositionId);
-
       // 1. Timeout check (fail-safe) with Auto-Heal Timeout Pruning
       const MAX_TASK_AGE_MS = 5 * 60 * 1000; // 5 minutes
       if (Date.now() - task.evaluatedAt > MAX_TASK_AGE_MS) {
@@ -440,243 +436,43 @@ export async function processTasks(
           txSignature: record.txSignatures?.[0],
         });
         await tasksStore.saveTask(task);
+        task.events.push({
+          stage: 'POSITION_CLOSED',
+          timestamp: Date.now(),
+          message: 'Position closed successfully. Decoupling open leg for stateless rebalancing.',
+        });
+        task.events.push({
+          stage: 'COMPLETED',
+          timestamp: Date.now(),
+          message: 'Close leg completed successfully.',
+        });
+        await tasksStore.saveTask(task);
 
-        // Scenario C: Pure Close completes immediately
-        if (task.intent.action === 'close') {
-          task.events.push({
-            stage: 'COMPLETED',
-            timestamp: Date.now(),
-            message: 'Pure close task completed successfully.',
-          });
-          await tasksStore.saveTask(task);
-
-          if (cachedPos) {
-            const posId = cachedPos.id;
+        if (cachedPos) {
+          const posId = cachedPos.id;
+          if (task.intent.action === 'close') {
             cachedPos.state = 'CLOSED';
             cachedPos.closedAt = Date.now();
             await positionStore.archivePosition(cachedPos);
             const remaining = knownPositions.filter((p) => p.id !== posId);
             await positionStore.saveKnown(remaining);
             logger.info(`[Execution Monitor] Pure closed position ${posId} archived and pruned from known positions cache.`);
-          }
-          await tasksStore.deleteTask(task.id);
-          continue; // Move to next task
-        }
-
-        logger.info(`[Execution Monitor] Close transaction completed. Polling balances for settlement...`);
-        // --- Log SETTLEMENT_POLLING ---
-        task.events.push({
-          stage: 'SETTLEMENT_POLLING',
-          timestamp: Date.now(),
-          message: 'Starting polling for balance settlement...',
-        });
-        await tasksStore.saveTask(task);
-
-        const solanaExecutor = executor as unknown as {
-          pollBalances?: (
-            tx: string,
-            ty: string,
-            w: string,
-            ix: bigint,
-            iy: bigint,
-            timeoutMs?: number,
-            options?: { expectedDeltaX?: bigint; expectedDeltaY?: bigint }
-          ) => Promise<void>;
-        };
-        if (solanaExecutor.pollBalances && record && record.txSignatures && record.txSignatures.length > 0) {
-          await solanaExecutor.pollBalances(
-            poolInfo.tokenXAddress,
-            poolInfo.tokenYAddress,
-            walletAddress,
-            BigInt(initialBalances.amountX),
-            BigInt(initialBalances.amountY),
-            undefined, // default timeout
-            {
-              expectedDeltaX: task.expectedDeltaX ? BigInt(task.expectedDeltaX) : undefined,
-              expectedDeltaY: task.expectedDeltaY ? BigInt(task.expectedDeltaY) : undefined,
-            }
-          );
-        } else {
-          logger.info(
-            `[Execution Monitor] Skipping balance polling because position was already closed or no transaction signatures were generated.`
-          );
-        }
-
-        // --- Log SETTLEMENT_DETECTED ---
-        task.events.push({
-          stage: 'SETTLEMENT_DETECTED',
-          timestamp: Date.now(),
-          message: 'Settlement detected and balances verified.',
-        });
-
-        task.status = 'awaiting_settlement';
-        task.evaluatedAt = Date.now();
-        await tasksStore.saveTask(task);
-        logger.info(`[Execution Monitor] Task ${task.id} transitioned to 'awaiting_settlement'`);
-        continue;
-      }
-
-      if (task.status === 'awaiting_settlement') {
-        const poolAddress = task.intent.openParams?.poolAddress || task.intent.positionId;
-        const poolInfo = await positionProvider.getPoolInfo(poolAddress);
-        const market = await positionProvider.getMarketSnapshot(poolInfo.poolAddress);
-
-        // Fetch decimals from cached known positions
-        const knownPositions = await positionStore.getKnown();
-        const cachedPos = knownPositions.find((p) => p.id === task.originalPositionId);
-        const decimalsX = cachedPos?.tokenX.decimals ?? 9;
-        const decimalsY = cachedPos?.tokenY.decimals ?? 6;
-
-        // Fetch fresh settled wallet balances
-        const walletBalances = await rpcPool.execute(async (connection: Connection) => {
-          return await getWalletBalances(connection, walletAddress, poolInfo.tokenXAddress, poolInfo.tokenYAddress);
-        });
-
-        logger.info(
-          `[Execution Monitor] Synthesizing Position with wallet balances: X=${walletBalances.amountX}, Y=${walletBalances.amountY}`
-        );
-
-        // Build synthetic position using pre-closure metadata and live balances
-        const syntheticPos: Position = {
-          id: task.originalPositionId,
-          poolAddress: poolInfo.poolAddress,
-          chain: 'solana' as const,
-          protocol: 'meteora_dlmm' as const,
-          lowerBound: task.intent.openParams?.lowerBound || 0,
-          upperBound: task.intent.openParams?.upperBound || 0,
-          tokenX: {
-            tokenAddress: poolInfo.tokenXAddress,
-            mint: poolInfo.tokenXAddress,
-            decimals: decimalsX,
-            amount: walletBalances.amountX,
-          },
-          tokenY: {
-            tokenAddress: poolInfo.tokenYAddress,
-            mint: poolInfo.tokenYAddress,
-            decimals: decimalsY,
-            amount: walletBalances.amountY,
-          },
-          isInRange: true,
-          openedAt: Date.now(),
-          metadata: {},
-        };
-
-        let openParamsToUse = task.intent.openParams;
-
-        // --- Log JIT_REEVALUATION ---
-        task.events.push({
-          stage: 'JIT_REEVALUATION',
-          timestamp: Date.now(),
-          message: 'Performing Just-In-Time evaluation on synthetic position...',
-        });
-        await tasksStore.saveTask(task);
-
-        logger.info(`[Execution Monitor] Re-evaluating strategy using synthetic position...`);
-        let reEvalResult: StrategyResult = { action: 'skip' };
-        let hasActiveOrchestrator = false;
-
-        try {
-          let strategyOrchestrator: IOrchestrator | undefined;
-
-          // 1. Decoupled JIT: Attempt to instantiate strategy from the task assignment directly
-          if (factory && task.assignmentId) {
-            if (typeof tasksStore.getAssignments === 'function') {
-              const assignments = await tasksStore.getAssignments();
-              const assignment = assignments.find((a) => a.id === task.assignmentId);
-              if (assignment) {
-                strategyOrchestrator = factory.create(assignment);
-                hasActiveOrchestrator = true;
-              } else {
-                logger.warn(`[Execution Monitor] Assignment ${task.assignmentId} not found in store for JIT evaluation.`);
-              }
-            }
-          }
-
-          if (strategyOrchestrator) {
-            reEvalResult = await strategyOrchestrator.tick(syntheticPos, market);
           } else {
-            // 2. Fallback to registry if factory isn't available
-            for (const orch of orchestrators) {
-              hasActiveOrchestrator = true;
-              const res = await orch.tick(syntheticPos, market);
-              if (res.action !== 'skip') {
-                reEvalResult = res;
-                break;
-              }
-            }
-          }
-        } catch (err) {
-          logger.error(
-            `[Execution Monitor] Strategy re-evaluation failed: ${
-              err instanceof Error ? err.message : String(err)
-            }. Falling back to predefined open parameters.`
-          );
-        }
-
-        if (reEvalResult.action === 'open' || reEvalResult.action === 'close+open') {
-          const openParams = reEvalResult.action === 'close+open' ? reEvalResult.openParams : reEvalResult.params;
-          if (openParams) {
-            openParamsToUse = openParams;
+            cachedPos.state = 'REBALANCING';
+            await positionStore.saveKnown(knownPositions);
             logger.info(
-              `[Execution Monitor] Strategy re-evaluation successfully recalculated new range bounds for position ${task.originalPositionId}.`
+              `[Execution Monitor] Position ${posId} closed. Marked as REBALANCING for stateless open on next tick.`
             );
           }
-        } else if (hasActiveOrchestrator && reEvalResult.action === 'close') {
-          openParamsToUse = undefined;
-          logger.info(
-            `[Execution Monitor] Strategy re-evaluation recommended 'close'. Aborting open leg for position ${task.originalPositionId}.`
-          );
-        } else if (hasActiveOrchestrator && reEvalResult.action === 'skip') {
-          // A 'skip' signal on the synthetic position means the target range is currently in-range
-          // and does not need further rebalancing. We should proceed with opening it.
-          logger.info(
-            `[Execution Monitor] Strategy re-evaluation recommended 'skip', indicating target range is valid for position ${task.originalPositionId}. Proceeding with open leg.`
-          );
         }
-
-        if (openParamsToUse) {
-          task.intent.openParams = openParamsToUse;
-          task.intent.action = 'open';
-          task.status = 'pending_open';
-          task.evaluatedAt = Date.now();
-          await tasksStore.saveTask(task);
-          logger.info(`[Execution Monitor] Task ${task.id} updated with open params (status: pending_open)`);
-          // Fall through to execute the open transaction immediately in the same tick cycle
-        } else {
-          logger.info(
-            `[Execution Monitor] No predefined open parameters and strategy re-evaluation recommended 'skip'. Deleting task and unlocking orchestrator.`
-          );
-          // --- Log JIT_SKIPPED ---
-          task.events.push({
-            stage: 'JIT_SKIPPED',
-            timestamp: Date.now(),
-            message: 'Strategy re-evaluation recommended skip. Skipping open leg.',
-          });
-          task.events.push({
-            stage: 'COMPLETED',
-            timestamp: Date.now(),
-            message: 'Rebalance task aborted due to JIT skip.',
-          });
-          await tasksStore.saveTask(task);
-          await tasksStore.deleteTask(task.id);
-        }
+        await tasksStore.deleteTask(task.id);
+        continue;
       }
 
       if (task.status === 'pending_open') {
         const poolAddress = task.intent.openParams?.poolAddress || task.intent.positionId;
         const poolInfo = await positionProvider.getPoolInfo(poolAddress);
         const market = await positionProvider.getMarketSnapshot(poolInfo.poolAddress);
-
-        // JIT Signal Validation: check if signal is stale (e.g., > 180,000ms)
-        const MAX_SIGNAL_AGE_MS = 180000;
-        if (Date.now() - task.evaluatedAt > MAX_SIGNAL_AGE_MS) {
-          logger.warn(
-            `[Execution Monitor] Signal for task ${task.id} is stale (${Date.now() - task.evaluatedAt}ms). Re-triggering re-evaluation...`
-          );
-          task.status = 'awaiting_settlement';
-          await tasksStore.saveTask(task);
-          continue;
-        }
 
         logger.info(`[Execution Monitor] Executing OPEN transaction for task ${task.id}...`);
         // --- Log OPEN_BROADCAST ---
@@ -977,42 +773,76 @@ export function startTickLoop(
 
           // Fetch fresh status and snapshot
           let freshPosition: Position;
-          try {
-            freshPosition = await positionProvider.getPosition(position.id, position.poolAddress);
-            if (!freshPosition.state) {
-              freshPosition.state = 'OPEN';
-            }
-          } catch (getPosError: unknown) {
-            if (getPosError instanceof Error && getPosError.message.includes('not found')) {
-              const ageMs = Date.now() - (position.openedAt || 0);
-              const INDEXING_GRACE_PERIOD_MS = 15 * 60 * 1000; // 15-minute grace period
-              if (ageMs < INDEXING_GRACE_PERIOD_MS) {
-                logger.warn(
-                  `[Tick Loop] Position ${position.id} not found by API, but was opened recently (${Math.floor(ageMs / 1000)}s ago). Skipping evaluation during indexing grace period.`
-                );
+          if (position.state === 'REBALANCING') {
+            logger.info(
+              `[Tick Loop] Position ${position.id} is in REBALANCING state. Synthesizing position from wallet balances...`
+            );
+            const poolInfo = await positionProvider.getPoolInfo(position.poolAddress);
+            const walletBalances = await rpcPool.execute(async (connection: Connection) => {
+              return await getWalletBalances(connection, walletAddress, poolInfo.tokenXAddress, poolInfo.tokenYAddress);
+            });
+            freshPosition = {
+              id: position.id,
+              poolAddress: poolInfo.poolAddress,
+              chain: 'solana',
+              protocol: 'meteora_dlmm',
+              lowerBound: position.lowerBound || 0,
+              upperBound: position.upperBound || 0,
+              tokenX: {
+                tokenAddress: poolInfo.tokenXAddress,
+                mint: poolInfo.tokenXAddress,
+                decimals: position.tokenX.decimals,
+                amount: walletBalances.amountX,
+              },
+              tokenY: {
+                tokenAddress: poolInfo.tokenYAddress,
+                mint: poolInfo.tokenYAddress,
+                decimals: position.tokenY.decimals,
+                amount: walletBalances.amountY,
+              },
+              isInRange: true,
+              openedAt: position.openedAt || Date.now(),
+              metadata: position.metadata || {},
+              state: 'REBALANCING',
+            };
+          } else {
+            try {
+              freshPosition = await positionProvider.getPosition(position.id, position.poolAddress);
+              if (!freshPosition.state) {
+                freshPosition.state = 'OPEN';
+              }
+            } catch (getPosError: unknown) {
+              if (getPosError instanceof Error && getPosError.message.includes('not found')) {
+                const ageMs = Date.now() - (position.openedAt || 0);
+                const INDEXING_GRACE_PERIOD_MS = 15 * 60 * 1000; // 15-minute grace period
+                if (ageMs < INDEXING_GRACE_PERIOD_MS) {
+                  logger.warn(
+                    `[Tick Loop] Position ${position.id} not found by API, but was opened recently (${Math.floor(ageMs / 1000)}s ago). Skipping evaluation during indexing grace period.`
+                  );
+                  continue;
+                }
+
+                logger.warn(`[Tick Loop] Position ${position.id} was not found on-chain. Marking as CLOSED and archiving.`);
+
+                position.state = 'CLOSED';
+                position.closedAt = Date.now();
+                await positionStore.archivePosition(position);
+
+                // Deregister from registry
+                const activeOrchs = registry.getForPosition(position.id);
+                for (const orch of activeOrchs) {
+                  registry.deregister(orch.id);
+                }
+                // Remove from updated known list
+                const index = updatedKnownPositions.findIndex((p) => p.id === position.id);
+                if (index >= 0) {
+                  updatedKnownPositions.splice(index, 1);
+                  storeNeedsUpdate = true;
+                }
                 continue;
               }
-
-              logger.warn(`[Tick Loop] Position ${position.id} was not found on-chain. Marking as CLOSED and archiving.`);
-
-              position.state = 'CLOSED';
-              position.closedAt = Date.now();
-              await positionStore.archivePosition(position);
-
-              // Deregister from registry
-              const activeOrchs = registry.getForPosition(position.id);
-              for (const orch of activeOrchs) {
-                registry.deregister(orch.id);
-              }
-              // Remove from updated known list
-              const index = updatedKnownPositions.findIndex((p) => p.id === position.id);
-              if (index >= 0) {
-                updatedKnownPositions.splice(index, 1);
-                storeNeedsUpdate = true;
-              }
-              continue;
+              throw getPosError;
             }
-            throw getPosError;
           }
 
           // Deep compare old state vs fresh state
@@ -1058,18 +888,19 @@ export function startTickLoop(
             const tasksStore = store as unknown as {
               saveTask: (t: RebalanceTask) => Promise<void>;
             };
+            const taskAction = position.state === 'REBALANCING' ? 'open' : decision.action;
             const task: RebalanceTask = {
               id: `task_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
               assignmentId: decision.sourceAssignmentId,
-              status: decision.action === 'open' ? 'pending_open' : 'pending_close',
+              status: taskAction === 'open' ? 'pending_open' : 'pending_close',
               originalPositionId: decision.positionId,
-              intent: decision,
+              intent: { ...decision, action: taskAction },
               evaluatedAt: decision.evaluatedAt || Date.now(),
               events: [
                 {
                   stage: 'INIT',
                   timestamp: Date.now(),
-                  message: `Task initialized for action: ${decision.action}`,
+                  message: `Task initialized for action: ${taskAction}`,
                 },
               ],
             };
