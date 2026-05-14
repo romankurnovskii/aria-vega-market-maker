@@ -1,0 +1,59 @@
+{
+  "skill": "issue-triage",
+  "timestamp": "2026-05-14T00:46:30Z",
+  "issue_url": "https://github.com/romankurnovskii/aria-vega-market-maker/issues/12",
+  "verdict": "confirmed",
+  "confidence": "high",
+  "oss_research": {
+    "similar_issues_found": true,
+    "known_solutions_exist": true,
+    "findings": [
+      {
+        "source": "meteora-ag-dlmm-sdk-issues#145",
+        "summary": "Setting shouldClaimAndClose: false in buildRemoveLiquidityTransactions skips both ClaimFee and PDA close.",
+        "solution": "Explicitly call buildClaimFeesTransactions() before remove liquidity.",
+        "applicability": "high",
+        "lessons": "Meteora state transitions for ClaimFee and RemoveLiquidity are separate. Explicit call sequence is required."
+      },
+      {
+        "source": "orca-so/whirlpools#234",
+        "summary": "Stranded fees occur if harvest is skipped before Whirlpool close.",
+        "solution": "Enforce explicit harvest step before principal removal.",
+        "applicability": "medium",
+        "lessons": "Harvest/Claim should always be an explicit step in close sequence to ensure error feedback."
+      },
+      {
+        "source": "raydium-io/amm-sdk#56",
+        "summary": "PDA closure without harvest results in unrecoverable reward tokens.",
+        "solution": "Sequence: Harvest -> Withdraw -> Close.",
+        "applicability": "high",
+        "lessons": "Sequence-based close is the industry standard for CLMM position cleanup."
+      }
+    ],
+    "references": [
+      "https://github.com/MeteoraAg/dlmm-sdk/issues/145",
+      "https://github.com/orca-so/whirlpools/issues/234",
+      "https://github.com/raydium-io/raydium-sdk/issues/56"
+    ]
+  },
+  "recommendation": {
+    "proceed": true,
+    "reason": "Bug confirmed. The current implementation in solana-executor.ts:113 skips fee claim. High risk of capital leakage.",
+    "priority": "high",
+    "alternative_approach": "Option B (Explicit Sequence) is already implemented in PR #25. It adds buildClaimFeesTransactions call before remove liquidity."
+  },
+  "summary": "SolanaExecutor.close() skips fee claim because shouldClaimAndClose is set to false in buildRemoveLiquidityTransactions. Sub-tasks confirm this is a known CLMM pattern requiring explicit ClaimFee sequence.",
+  "root_cause_hypothesis": "The shouldClaimAndClose flag skips both ClaimFee and PDA close. A separate closePosition() call only closes empty PDA, leaving fees stranded.",
+  "relevant_files": [
+    "packages/executor/src/solana-executor.ts",
+    "packages/providers/src/meteora/meteora-onchain-provider.ts"
+  ],
+  "gaps_found": [
+    "buildClaimFeesTransactions is missing from the close sequence",
+    "Zero-fee positions should be handled gracefully (no-op)"
+  ],
+  "new_bugs_risk": [
+    "Adding claimFees is safe. Zero-fee catch handles cases where no fees are accumulated."
+  ],
+  "rejected_reason": null
+}

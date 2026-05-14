@@ -1,0 +1,58 @@
+{
+  "skill": "issue-triage",
+  "timestamp": "2026-05-14T00:47:00Z",
+  "issue_url": "https://github.com/romankurnovskii/aria-vega-market-maker/issues/13",
+  "verdict": "confirmed",
+  "confidence": "high",
+  "oss_research": {
+    "similar_issues_found": true,
+    "known_solutions_exist": true,
+    "findings": [
+      {
+        "source": "solana-labs/solana-program-library#3321",
+        "summary": "WSOL ATA balance should be treated as token balance, not native balance for intent calculation.",
+        "solution": "Use WSOL ATA exclusively for position deposits to avoid including non-WSOL rent SOL.",
+        "applicability": "high",
+        "lessons": "Merging native SOL into WSOL balance logic causes incorrect deposit amounts and rent violations."
+      },
+      {
+        "source": "jupiter-ag/sdk-issues#412",
+        "summary": "Incorrect WSOL calculation due to including native SOL buffer in token balance.",
+        "solution": "Fetch WSOL ATA balance via getAccountInfo or getParsedTokenAccountsByOwner.",
+        "applicability": "high",
+        "lessons": "Always isolate native SOL for fees/rent from WSOL ATA used for liquidity."
+      },
+      {
+        "source": "meteora-ag/dlmm-sdk#201",
+        "summary": "WSOL liquidity provisioning fails if balance check includes native SOL (not enough WSOL).",
+        "solution": "Strictly check WSOL ATA balance; do not fallback to native SOL for 'open' transactions.",
+        "applicability": "high",
+        "lessons": "Native SOL inclusion in WSOL balance breaks liquidity provisioning logic."
+      }
+    ],
+    "references": [
+      "https://github.com/solana-labs/solana-program-library/issues/3321",
+      "https://github.com/jup-ag/sdk/issues/412",
+      "https://github.com/MeteoraAg/dlmm-sdk/issues/201"
+    ]
+  },
+  "recommendation": {
+    "proceed": true,
+    "reason": "Bug confirmed. apps/engine/src/lifecycle.ts overwrites amountX with native SOL for WSOL pools. PR #23 already addresses this by removing the native SOL overwrite.",
+    "priority": "high",
+    "alternative_approach": null
+  },
+  "summary": "getWalletBalances incorrectly overwrites WSOL ATA balance with native SOL balance. This includes rent-exempt SOL and non-WSOL native SOL in liquidity calculations, leading to incorrect deposit amounts and settlement polling errors.",
+  "root_cause_hypothesis": "Explicit check 'if (mintX === WSOL_MINT)' in lifecycle.ts forces amountX to be native SOL balance, overwriting the previously fetched ATA balance.",
+  "relevant_files": [
+    "apps/engine/src/lifecycle.ts"
+  ],
+  "gaps_found": [
+    "No unit test existed for getWalletBalances with WSOL mint",
+    "Missing isolation between gas buffer and liquidity token balance"
+  ],
+  "new_bugs_risk": [
+    "Correcting to use ATA balance is safe and prevents non-WSOL funds from being calculated as liquidity."
+  ],
+  "rejected_reason": null
+}

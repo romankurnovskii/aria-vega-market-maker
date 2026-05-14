@@ -1,0 +1,65 @@
+{
+  "skill": "issue-triage",
+  "timestamp": "2026-05-14T00:46:00Z",
+  "issue_url": "https://github.com/romankurnovskii/aria-vega-market-maker/issues/4",
+  "verdict": "architectural",
+  "confidence": "high",
+  "oss_research": {
+    "similar_issues_found": true,
+    "known_solutions_exist": true,
+    "findings": [
+      {
+        "source": "solana-labs/solana-web3.js/issues/2456",
+        "summary": "Transaction rebroadcast without idempotency can cause duplicate submissions when blockhash expires.",
+        "solution": "Application-level idempotency with task execution tracking.",
+        "applicability": "high",
+        "lessons": "Use task ID as idempotency key and track execution state before broadcasting."
+      },
+      {
+        "source": "meteoro-dlmm/sdk#89",
+        "summary": "Rebroadcast loop without deduplication leads to duplicate position creation on timeout.",
+        "solution": "Track last known signature in task state; verify on-chain before retry.",
+        "applicability": "high",
+        "lessons": "Check task execution metadata before broadcasting to prevent duplicate ops."
+      },
+      {
+        "source": "solana-labs/solana-web3.js/issues/1802",
+        "summary": "Solana blockhash deduplication expires after ~2 minutes. App-level tracking required for longer tasks.",
+        "solution": "Store execution metadata in task persistence layer; implement pre-flight checks.",
+        "applicability": "high",
+        "lessons": "Blockhash deduplication is insufficient for long-running rebalance tasks."
+      }
+    ],
+    "references": [
+      "https://github.com/solana-labs/solana-web3.js/issues/2456",
+      "https://github.com/meteoro-dlmm/sdk/issues/89",
+      "https://github.com/solana-labs/solana-web3.js/issues/1802"
+    ]
+  },
+  "recommendation": {
+    "proceed": true,
+    "reason": "Bug confirmed. Root cause is architectural - requires schema extension + executor modification + lifecycle changes.",
+    "priority": "high",
+    "alternative_approach": "Split into 5 phases as requested by owner. Phase 1: Schema (closeExecution/openExecution), Phase 2: Executor idempotency checks, Phase 3: Lifecycle pre-flight guards, Phase 4: Testing, Phase 5: Migration."
+  },
+  "summary": "BUG-003 confirmed. SolanaExecutor lacks application-level idempotency. Blockhash deduplication expires after ~2 min. Without task execution tracking, duplicate transactions can occur on retry.",
+  "root_cause_hypothesis": "executeTx() rebuilds transactions with fresh blockhash on retry. Lifecycle calls executor.apply() without checking prior execution state. RebalanceTask schema lacks execution tracking fields.",
+  "relevant_files": [
+    "packages/executor/src/solana-executor.ts",
+    "apps/engine/src/lifecycle.ts",
+    "packages/core/src/types/orchestration.ts",
+    "packages/persistence/src/json-file-store.ts"
+  ],
+  "gaps_found": [
+    "RebalanceTask schema lacks closeExecution/openExecution fields",
+    "SolanaExecutor.apply() returns ExecutionRecord but doesn't persist to task store",
+    "Lifecycle processTasks() has no pre-flight check for existing execution",
+    "Default maxAttempts=15 is excessive; recommended ≤3"
+  ],
+  "new_bugs_risk": [
+    "Adding closeExecution/openExecution to schema is safe",
+    "Pre-flight checks in executor are low risk",
+    "Reducing maxAttempts to 3 may impact delivery under severe congestion"
+  ],
+  "rejected_reason": null
+}
