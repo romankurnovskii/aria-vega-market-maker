@@ -12,8 +12,8 @@
     "test:watch": "pnpm --recursive run test:watch",
     "format": "prettier --write .",
     "prepare": "husky || true",
-    "repomix": "npm run repomix:md",
-    "repomix:md": "repomix --include \"**/*.md\""
+    "repomix": "repomix --ignore \".agents,.git\"",
+    "repomix:md": "repomix --include \"apps/**/*.md,packages/**/*.md,docs/**/*.md\" --ignore \".agents,.git\""
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
