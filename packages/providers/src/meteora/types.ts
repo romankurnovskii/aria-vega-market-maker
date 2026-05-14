@@ -5,7 +5,7 @@
  * @features
  * - PoolResponse: Full pool metadata and current state (GET /pools/{address})
  * - ErrorResponse: API error response (400)
- * - CumulativeMetrics: Aggregate volume, trade fee, and protocol fee
+ * - CumulativeMetrics: Aggregate volume and total fees
  * - TimeWindowData: Time-windowed metrics (30m / 1h / 2h / 4h / 12h / 24h)
  * - PoolConfig: Pool configuration (bin step, fee rates)
  * - TokenMetrics: Token metadata (price, supply, holders, etc.)
