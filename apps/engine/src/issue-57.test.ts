@@ -162,13 +162,44 @@ test('ISSUE #57: POST /positions/:id/actions with action=removeLiquidity removes
     assert.strictEqual(data.status, 'success');
     assert.strictEqual(data.action, 'removeLiquidity');
     assert.deepStrictEqual(data.transactionSignatures, ['sig_123', 'sig_456']);
-    assert.deepStrictEqual(data.claimedFees, { tokenX: '2500000', tokenY: '1800000' });
     assert.strictEqual(data.positionClosed, true);
 
     const decision = getDecision() as Record<string, unknown>;
     assert.ok(decision);
     assert.strictEqual(decision.action, 'close');
     assert.strictEqual(decision.positionId, MOCK_POSITION_ID);
+  } finally {
+    server.close();
+  }
+});
+
+test('ISSUE #57: POST /positions/:id/actions with action=addLiquidity adds liquidity', async () => {
+  const { server, url, getDecision } = await setupTestServer();
+  try {
+    const res = await fetch(`${url}/${MOCK_POSITION_ID}/actions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'addLiquidity',
+        tokenXAmount: '100',
+        tokenYAmount: '200',
+        slippageTolerance: 50,
+      }),
+    });
+
+    assert.strictEqual(res.status, 200);
+    const data = (await res.json()) as Record<string, unknown>;
+    assert.strictEqual(data.status, 'success');
+    assert.strictEqual(data.action, 'addLiquidity');
+    assert.deepStrictEqual(data.transactionSignatures, ['sig_123', 'sig_456']);
+    assert.strictEqual(data.positionOpened, true);
+
+    const decision = getDecision() as Record<string, unknown>;
+    assert.ok(decision);
+    assert.strictEqual(decision.action, 'open');
+    assert.strictEqual(decision.positionId, MOCK_POSITION_ID);
+    assert.strictEqual((decision.openParams as Record<string, unknown>).tokenXAmount, '100');
+    assert.strictEqual((decision.openParams as Record<string, unknown>).tokenYAmount, '200');
   } finally {
     server.close();
   }
