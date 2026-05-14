@@ -65,7 +65,7 @@ export const PositionTable = ({ positions, positionOrchestration, selectedPosId,
                   >
                     <td className="py-2 px-3 border-r border-gray-200 font-bold flex items-center gap-2">
                       {isSelected && <ChevronRight size={12} className="text-[#FF4500]" />}
-                      <span className="truncate max-w-[120px]" title={pos.id}>
+                      <span className="font-mono" title={pos.id}>
                         {pos.id}
                       </span>
                       {pos.state && pos.state !== 'OPEN' && (
@@ -95,7 +95,7 @@ export const PositionTable = ({ positions, positionOrchestration, selectedPosId,
                         className={pos.status === 'In Range' ? 'text-green-600 cursor-help' : 'text-[#FF4500] cursor-help'}
                         title={`Bins: ${pos.minBin} to ${pos.maxBin}`}
                       >
-                        {pos.binCount} bins (+{Number(pos.rangePercent).toFixed(1)}%)
+                        {pos.binCount} bins ({Number(pos.rangePercent).toFixed(1)}%)
                       </span>
                     </td>
                     <td className={`py-2 px-3 text-right ${orchClass}`}>{orchLabel}</td>
