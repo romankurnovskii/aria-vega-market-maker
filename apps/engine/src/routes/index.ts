@@ -1,4 +1,4 @@
 export { createAssignmentsRouter } from './assignments.js';
 export { createStrategiesRouter } from './strategies.js';
 export { createIntrospectionRouter } from './introspection.js';
-export { createPositionsRouter } from './positions.js';
+export { handlePositionsRouter } from './positions.js';

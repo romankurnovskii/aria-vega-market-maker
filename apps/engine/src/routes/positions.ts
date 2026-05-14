@@ -7,7 +7,7 @@ const logger = getLogger('router-positions');
 /**
  * Creates the positions router handling unified position actions.
  */
-export function createPositionsRouter(
+export function handlePositionsRouter(
   positionProvider: IPositionProvider,
   executor: IExecutor,
   registry: IOrchestratorRegistry,
@@ -113,7 +113,7 @@ export function createPositionsRouter(
               lowerBinId: position.lowerBound,
               upperBinId: position.upperBound,
               metadata: {
-                slippageTolerance: slippageTolerance ?? 100, // Default 1% (100 bps)
+                slippageTolerance: slippageTolerance ?? 50, // Default 0.5% (50 bps)
               },
             },
           },

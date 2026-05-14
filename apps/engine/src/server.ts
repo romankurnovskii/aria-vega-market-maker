@@ -27,7 +27,7 @@ import {
   createAssignmentsRouter,
   createStrategiesRouter,
   createIntrospectionRouter,
-  createPositionsRouter,
+  handlePositionsRouter,
 } from './routes/index.js';
 
 const logger = getLogger('server');
@@ -146,7 +146,7 @@ export function startHttpServer(
     }
   });
 
-  app.use('/positions', createPositionsRouter(positionProvider, executor, registry, walletAddress, positionStore));
+  app.use('/positions', handlePositionsRouter(positionProvider, executor, registry, walletAddress, positionStore));
 
   const swaggerDocument = YAML.load(path.join(__dirname, '../src/openapi.yaml'));
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
