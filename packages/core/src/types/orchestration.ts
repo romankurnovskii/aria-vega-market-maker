@@ -42,7 +42,7 @@ export interface ExecutionRecord {
   recordVersion?: number;
 }
 
-export type RebalanceTaskStatus = 'pending_close' | 'awaiting_settlement' | 'pending_open';
+export type RebalanceTaskStatus = 'pending_close' | 'pending_open';
 
 export type TaskEventStage =
   // 1. Universal Start
@@ -51,6 +51,7 @@ export type TaskEventStage =
   // 2. The Close Leg (Used by 'close' and 'close+open')
   | 'CLOSE_BROADCAST'
   | 'CLOSE_CONFIRMED'
+  | 'POSITION_CLOSED' // NEW: Event marker for stateless rebalancing
 
   // 3. The Settlement Buffer (Used by 'close+open')
   | 'SETTLEMENT_POLLING'
