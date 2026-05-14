@@ -25,6 +25,7 @@ interface PositionDetailProps {
   strategies: any[];
   onAssign: (positionId: string, strategyId: string, mode: string) => Promise<void>;
   onEvaluate: (positionId: string, strategyId: string) => Promise<void>;
+  evalLogs: any[];
   onClose: () => void;
 }
 
@@ -34,6 +35,7 @@ export const PositionDetail = ({
   strategies,
   onAssign,
   onEvaluate,
+  evalLogs,
   onClose,
 }: PositionDetailProps) => {
   const [selectedStrategyId, setSelectedStrategyId] = useState<string>('');
@@ -240,13 +242,51 @@ export const PositionDetail = ({
 
           <div className="pt-1">
             <button
-              onClick={() => onEvaluate(position.id, selectedStrategyId)}
+              onClick={() => {
+                console.log(`[PositionDetail] Evaluate button clicked for position: ${position.id}, strategy: ${selectedStrategyId}`);
+                onEvaluate(position.id, selectedStrategyId);
+              }}
               disabled={selectedStrategyId === 'NONE' || !orchestration}
               className="w-full flex items-center justify-center gap-2 border border-[#0D0D0D] p-2 text-xs font-bold uppercase hover:bg-[#F4F4F0] hover:text-[#FF4500] hover:border-[#FF4500] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Zap size={14} /> Evaluate Ad-Hoc
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Events Log Console */}
+      <div className="flex-1 border border-[#0D0D0D] bg-[#0D0D0D] text-[#F4F4F0] p-4 font-mono text-[10px] overflow-hidden flex flex-col min-h-0 relative">
+        <div className="absolute top-0 right-0 p-2 opacity-20 pointer-events-none uppercase tracking-tighter text-xs">
+          Live CRT Terminal
+        </div>
+        <div className="flex items-center gap-2 border-b border-[#F4F4F0]/20 pb-2 mb-2 shrink-0">
+          <div className="w-2 h-2 bg-[#FF4500] animate-pulse"></div>
+          <span className="uppercase font-bold tracking-widest text-[#FF4500]">Strategy Event Log</span>
+        </div>
+
+        <div className="flex-1 overflow-y-auto flex flex-col gap-1 custom-scrollbar">
+          {evalLogs.length === 0 ? (
+            <div className="text-gray-500 italic opacity-50">No events recorded. Click "Evaluate Ad-Hoc" to trigger.</div>
+          ) : (
+            evalLogs.map((log) => (
+              <div key={log.id} className="border-b border-white/5 pb-1 mb-1 animate-in fade-in slide-in-from-left-2 duration-200">
+                <div className="flex justify-between opacity-60 text-[9px]">
+                  <span>[{log.timestamp}]</span>
+                  <span>{log.strategyId}</span>
+                </div>
+                {log.error ? (
+                  <div className="text-[#FF4500] break-words uppercase font-bold mt-0.5">
+                    !! ERROR: {log.error}
+                  </div>
+                ) : (
+                  <div className="text-green-400 break-words mt-0.5">
+                    >> {typeof log.result === 'object' ? JSON.stringify(log.result) : String(log.result)}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
         </div>
       </div>
     </div>
