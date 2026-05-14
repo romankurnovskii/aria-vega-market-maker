@@ -305,6 +305,16 @@ test('integration: getPositions with real API structure', async () => {
           leverage: 10,
         },
         openedAt: 1234567890,
+        pnlData: {
+          position_address: 'pos1',
+          pool_address: 'pool1',
+          lower_bin_id: 100,
+          upper_bin_id: 200,
+          amount_x: '1000',
+          amount_y: '2000',
+          is_in_range: true,
+          opened_at: 1234567890,
+        },
         poolAddress: 'pool1',
         protocol: 'meteora_dlmm',
         tokenX: {
