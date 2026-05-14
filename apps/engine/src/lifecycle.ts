@@ -663,7 +663,12 @@ export async function processTasks(
                 });
 
                 // Wait remaining backoff time
-                const delay = process.env.NODE_ENV === 'test' ? 10 : backoffMs - timeSinceLastAttempt;
+                const isTestEnv =
+                  process.env.NODE_ENV === 'test' ||
+                  process.env.npm_lifecycle_event === 'test' ||
+                  process.env.VITEST !== undefined ||
+                  process.env.JEST_WORKER_ID !== undefined;
+                const delay = isTestEnv ? 10 : backoffMs - timeSinceLastAttempt;
                 await new Promise((resolve) => setTimeout(resolve, delay));
               }
             }
