@@ -22,8 +22,13 @@ import path, { dirname } from 'path';
 import { IStore, IOrchestratorRegistry, IExecutor, IPositionProvider, IPositionStore, Position } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
-import { createAssignmentsRouter, createStrategiesRouter, createIntrospectionRouter } from './routes/index.js';
 import { getPriceFromBinId } from '@lp-system/providers';
+import {
+  createAssignmentsRouter,
+  createStrategiesRouter,
+  createIntrospectionRouter,
+  handlePositionsRouter,
+} from './routes/index.js';
 
 const logger = getLogger('server');
 
@@ -140,6 +145,8 @@ export function startHttpServer(
       res.status(500).json({ error: msg });
     }
   });
+
+  app.use('/positions', handlePositionsRouter(positionProvider, executor, registry, walletAddress, positionStore));
 
   const swaggerDocument = YAML.load(path.join(__dirname, '../src/openapi.yaml'));
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
