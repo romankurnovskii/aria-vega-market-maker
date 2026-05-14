@@ -49,7 +49,7 @@ export interface PoolResponse {
    */
   tvl: number;
   volume: TimeWindowData;
-  launchpad: string | null;
+  launchpad: string;
 }
 
 export interface ErrorResponse {
@@ -61,9 +61,8 @@ export interface ErrorResponse {
 // ---------------------------------------------------------------------------
 
 export interface CumulativeMetrics {
-  protocol_fee: number;
-  trade_fee: number;
   volume: number;
+  fees: number;
 }
 
 export interface TimeWindowData {
@@ -80,6 +79,7 @@ export interface PoolConfig {
   bin_step: number;
   max_fee_pct: number;
   protocol_fee_pct: number;
+  collect_fee_mode: number;
 }
 
 export interface TokenMetrics {
@@ -142,6 +142,7 @@ export interface DatapiPosition {
   position_address?: string;
   isOutOfRange?: boolean;
   createdAt?: number;
+  pool_data?: PoolResponse;
   unrealizedPnl?: {
     balances?: number;
     balancesSol?: string;
