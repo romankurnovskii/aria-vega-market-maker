@@ -75,7 +75,7 @@ async function getWalletBalances(
   await fetchForProgram(tokenProgramId);
   await fetchForProgram(token2022ProgramId);
 
-return { amountX, amountY };
+  return { amountX, amountY };
 }
 
 async function calculateRecoveredFunds(
@@ -354,8 +354,8 @@ export async function processTasks(
           logger.info(`[Execution Monitor] Position ${task.originalPositionId} state updated to ${cachedPos.state}`);
         }
 
-        task.expectedDeltaX = cachedPos.tokenX.amount;
-        task.expectedDeltaY = cachedPos.tokenY.amount;
+        task.expectedDeltaX = cachedPos?.tokenX?.amount;
+        task.expectedDeltaY = cachedPos?.tokenY?.amount;
 
         logger.info(
           `[Execution Monitor] Executing CLOSE transaction for task ${task.id}... ` +
@@ -719,7 +719,11 @@ export async function processTasks(
           record = existingRecord;
         } else {
           try {
-            record = await executor.apply(task.intent, market, async () => {
+            const openIntent: Decision = {
+              ...task.intent,
+              positionId: poolAddress,
+            };
+            record = await executor.apply(openIntent, market, async () => {
               return { action: 'skip' };
             });
             if (record.status === 'failed') {
