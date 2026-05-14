@@ -19,6 +19,11 @@ classDiagram
         +Id positionId
         +Range boundaries
         +TokenAmount liquidity
+        +Number lowerBoundPrice
+        +Number upperBoundPrice
+        +Number activeBin
+        +Number binCount
+        +Number rangePercent
     }
     class Decision {
         +Action type

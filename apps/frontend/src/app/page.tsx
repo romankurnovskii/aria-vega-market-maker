@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Activity, Box, Zap, Trash2, Layers, Database, ChevronRight, TerminalSquare, X } from 'lucide-react';
 
+import AddLiquidityForm from './components/AddLiquidityForm';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8441';
 
 // Helper to format token amounts with their decimals
@@ -305,6 +307,7 @@ export default function AriaVegaTerminal() {
                 events={events}
                 onAssign={handleAssignStrategy}
                 onEvaluate={handleEvaluateStrategy}
+                onSync={syncState}
               />
             )}
             {activeTab === 'assignments' && (
@@ -333,8 +336,9 @@ export default function AriaVegaTerminal() {
 
 // --- SUB-VIEWS ---
 
-function PositionsView({ positions, assignments, strategies, events, onAssign, onEvaluate }: any) {
+function PositionsView({ positions, assignments, strategies, events, onAssign, onEvaluate, onSync }: any) {
   const [selectedPosId, setSelectedPosId] = useState<string | null>(null);
+  const [showAddLiquidity, setShowAddLiquidity] = useState(false);
 
   const positionOrchestration = useMemo(() => {
     const map: Record<string, { strategyId: string; mode: string }> = {};
@@ -534,7 +538,7 @@ function PositionsView({ positions, assignments, strategies, events, onAssign, o
                 </div>
               </div>
 
-              <div className="pt-1">
+              <div className="pt-1 flex flex-col gap-2">
                 <button
                   onClick={() => onEvaluate(selectedPos.id, selectedStrategyId)}
                   disabled={selectedStrategyId === 'NONE' || !selectedOrch}
@@ -542,7 +546,28 @@ function PositionsView({ positions, assignments, strategies, events, onAssign, o
                 >
                   <Zap size={14} /> Evaluate Ad-Hoc
                 </button>
+                <button
+                  onClick={() => setShowAddLiquidity(true)}
+                  className="w-full flex items-center justify-center gap-2 border border-[#0D0D0D] p-2 text-xs font-bold uppercase hover:bg-green-50 hover:text-green-600 hover:border-green-600 transition-colors"
+                >
+                  Add Liquidity
+                </button>
               </div>
+
+              {showAddLiquidity && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                  <div className="max-w-md w-full">
+                    <AddLiquidityForm 
+                      positionId={selectedPos.id} 
+                      onSuccess={() => {
+                        setShowAddLiquidity(false);
+                        onSync();
+                      }}
+                      onCancel={() => setShowAddLiquidity(false)}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

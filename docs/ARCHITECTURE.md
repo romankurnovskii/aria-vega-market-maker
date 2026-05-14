@@ -183,7 +183,7 @@ When a position is closed, the system cannot fetch its state from the chain. The
 
 # Appendix B: Stateless Rebalancing (v2)
 
-> **Status**: Proposed for Issue #39  
+> **Status**: Implemented (May 14, 2026)  
 > **Goal**: Simplify the state machine by eliminating `awaiting_settlement` and the JIT polling loop
 
 ---
@@ -308,18 +308,18 @@ The current **JIT Re-Evaluation** (Section 5) becomes unnecessary under the stat
 
 ## B.7 Implementation Checklist
 
-- [ ] Update `packages/core/src/types/orchestration.ts`:
-  - Remove `awaiting_settlement` from `RebalanceTaskStatus`
-  - Add `POSITION_CLOSED` to `TaskEventStage`
-- [ ] Update `apps/engine/src/lifecycle.ts`:
-  - Modify `processTasks()` to delete `close` task immediately after success
-  - Remove balance polling loop (`pollBalances`)
-  - Remove JIT staleness checks (`MAX_SIGNAL_AGE_MS`)
-  - Add logic to create `open` task based on strategy decision on next tick
-- [ ] Update `docs/ARCHITECTURE.md`:
+- [x] Update `packages/core/src/types/orchestration.ts`:
+  - Remove `awaiting_settlement` from `RebalanceTaskStatus` (✓)
+  - Add `POSITION_CLOSED` to `TaskEventStage` (✓)
+- [x] Update `apps/engine/src/lifecycle.ts`:
+  - Modify `processTasks()` to delete `close` task immediately after success (✓)
+  - Remove balance polling loop (`pollBalances`) (✓)
+  - Remove JIT staleness checks (`MAX_SIGNAL_AGE_MS`) (✓)
+  - Add logic to create `open` task based on strategy decision on next tick (✓)
+- [x] Update `docs/ARCHITECTURE.md`:
   - This section added (✓)
-  - Deprecate Section 3.B (Stateful Rebalance Flow)
-  - Update Section 5 (JIT Re-Evaluation)
+  - Deprecate Section 3.B (Stateful Rebalance Flow) (✓)
+  - Update Section 5 (JIT Re-Evaluation) (✓)
 - [ ] Add tests for stateless flow
 - [ ] Update or close related issues
 
