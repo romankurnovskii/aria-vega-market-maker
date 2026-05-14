@@ -90,6 +90,7 @@ function createMocks() {
         activeBound: 1000,
         tokenXAddress: MOCK_PUBKEY_2,
         tokenYAddress: MOCK_PUBKEY_3,
+        binStep: 1,
       };
     },
     getMarketSnapshot: async (poolAddress): Promise<MarketSnapshot> => {
@@ -1015,6 +1016,7 @@ test('processTasks - Issue 13: WSOL uses ATA balance exclusively (not native SOL
       activeBound: 1000,
       tokenXAddress: WSOL_MINT,
       tokenYAddress: MOCK_PUBKEY_3,
+      binStep: 1,
     };
   };
 

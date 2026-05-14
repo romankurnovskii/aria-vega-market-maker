@@ -63,11 +63,11 @@ const mockPoolInfo: PoolInfo = {
   poolAddress: 'pool-abc123',
   chain: 'solana',
   protocol: 'meteora_dlmm',
-  feeRate: 3.95, // distinct from binStep to catch the bug
+  feeRate: 3.95, // distinct from binStep to surface the bug
   activeBound: 0,
   tokenXAddress: 'fake-mint-x-9decimals',
   tokenYAddress: 'fake-mint-y-6decimals',
-  binStep: 40,
+  binStep: 25, // any non‑40 value proves we don’t hard‑code 40
 };
 
 const mockMarketSnapshot: MarketSnapshot = {
@@ -156,11 +156,11 @@ test('ISSUE #47: /positions endpoint uses binStep (not feeRate) to compute price
   assert.ok(json.positions, 'Expected positions array in response');
   const enriched = json.positions[0];
 
-  // Compute expected prices using correct binStep (40)
+  // Compute expected prices using correct binStep (from mockPoolInfo)
   const decimalsX = mockPosition.tokenX.decimals;
   const decimalsY = mockPosition.tokenY.decimals;
-  const expectedLower = getPriceFromBinId(mockPosition.lowerBound, mockPoolInfo.binStep ?? 40, decimalsX, decimalsY);
-  const expectedUpper = getPriceFromBinId(mockPosition.upperBound, mockPoolInfo.binStep ?? 40, decimalsX, decimalsY);
+  const expectedLower = getPriceFromBinId(mockPosition.lowerBound, mockPoolInfo.binStep, decimalsX, decimalsY);
+  const expectedUpper = getPriceFromBinId(mockPosition.upperBound, mockPoolInfo.binStep, decimalsX, decimalsY);
 
   // Assertions: these will fail because current code uses feeRate (3.95) as binStep
   assert.ok(
