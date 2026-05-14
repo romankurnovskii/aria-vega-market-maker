@@ -1,0 +1,22 @@
+{
+  "skill": "issue-verify",
+  "timestamp": "2026-05-14T05:14:00Z",
+  "pr_url": "https://github.com/romankurnovskii/aria-vega-market-maker/pull/38",
+  "original_issue_url": "https://github.com/romankurnovskii/aria-vega-market-maker/issues/12",
+  "verdict": "needs_rework",
+  "all_failing_tests_now_pass": false,
+  "new_failures": [
+    {
+      "test_name": "ISSUE #12: SolanaExecutor.close should claim fees before removing liquidity",
+      "error": "AssertionError [ERR_ASSERTION]: buildClaimFeesTransactions should be called before removeLiquidity to claim accrued fees"
+    },
+    {
+      "test_name": "ISSUE #12: Verify shouldClaimAndClose: false still skips PDA close in removeLiquidity",
+      "error": "AssertionError [ERR_ASSERTION]: removeLiquidity should use shouldClaimAndClose: false"
+    }
+  ],
+  "diff_concerns": [],
+  "new_issues_found": [],
+  "rework_reason": "Reproduction tests in apps/engine/src/solana-executor-issue-12.test.ts assert that buildClaimFeesTransactions is called and shouldClaimAndClose is false, which conflicts with the fix agent's implementation of atomic close where shouldClaimAndClose is true.",
+  "rework_instructions": "Update the reproduction tests in apps/engine/src/solana-executor-issue-12.test.ts to align with the atomic close architecture. Specifically, assert that buildRemoveLiquidityTransactions is called with shouldClaimAndClose: true, and remove assertions expecting buildClaimFeesTransactions."
+}
