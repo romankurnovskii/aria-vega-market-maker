@@ -41,6 +41,16 @@ export const formatAmount = (amountStr: string, decimals: number): string => {
   return amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
 };
 
+export const getTokenSymbol = (tokenObj?: { mint?: string; tokenAddress?: string } | null): string => {
+  if (!tokenObj) return 'TOKEN';
+  const addr = tokenObj.tokenAddress || tokenObj.mint;
+  if (!addr) return 'TOKEN';
+  if (addr === 'So11111111111111111111111111111111111111112') return 'SOL';
+  if (addr === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v') return 'USDC';
+  if (addr === 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB') return 'USDT';
+  return addr.slice(0, 4).toUpperCase();
+};
+
 export interface HealthData {
   epoch: number;
   status: string;
@@ -163,7 +173,7 @@ export const AriaVegaContainer = () => {
       const mappedPositions = (positionsRes.positions || []).map((pos: any) => {
         const minBin = pos.lowerBinId !== undefined ? pos.lowerBinId : pos.lowerBound !== undefined ? pos.lowerBound : 0;
         const maxBin = pos.upperBinId !== undefined ? pos.upperBinId : pos.upperBound !== undefined ? pos.upperBound : 0;
-        const binCount = pos.binCount !== undefined ? pos.binCount : (maxBin >= minBin ? maxBin - minBin + 1 : 0);
+        const binCount = pos.binCount !== undefined ? pos.binCount : maxBin >= minBin ? maxBin - minBin + 1 : 0;
         const rangePercent = pos.rangePercent !== undefined ? pos.rangePercent : 0;
 
         return {
@@ -250,8 +260,7 @@ export const AriaVegaContainer = () => {
       } else {
         const errPayload = await res.json().catch(() => ({}));
       }
-    } catch (err: any) {
-    }
+    } catch (err: any) {}
   };
 
   /**
@@ -264,7 +273,6 @@ export const AriaVegaContainer = () => {
     try {
       const selectedPos = data.positions.find((p: any) => p.id === positionId);
       if (!selectedPos) return;
-
 
       const res = await fetch(`${API_URL}/strategies/${strategyId}/evaluate`, {
         method: 'POST',
@@ -281,8 +289,7 @@ export const AriaVegaContainer = () => {
         }
       } else {
       }
-    } catch (err: any) {
-    }
+    } catch (err: any) {}
   };
 
   /**
@@ -298,8 +305,7 @@ export const AriaVegaContainer = () => {
       } else {
         const errPayload = await res.json().catch(() => ({}));
       }
-    } catch (err: any) {
-    }
+    } catch (err: any) {}
   };
 
   if (loading) {
@@ -332,13 +338,9 @@ export const AriaVegaContainer = () => {
             {activeTab.replace('-', ' ')}
           </h2>
 
-<div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0 flex flex-col">
             {activeTab === 'positions' && (
-              <PositionsView
-                positions={data.positions}
-                assignments={data.assignments}
-                strategies={data.strategies}
-              />
+              <PositionsView positions={data.positions} assignments={data.assignments} strategies={data.strategies} />
             )}
             {activeTab === 'assignments' && (
               <AssignmentsView assignments={data.assignments} onDelete={handleDeleteAssignment} />
