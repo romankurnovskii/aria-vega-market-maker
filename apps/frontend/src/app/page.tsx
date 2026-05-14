@@ -88,8 +88,8 @@ export default function AriaVegaTerminal() {
       const mappedPositions = (positionsRes.positions || []).map((pos: any) => ({
         id: pos.id,
         pool: pos.poolAddress,
-        minBin: pos.lowerBinId !== undefined ? pos.lowerBinId : (pos.lowerBound !== undefined ? pos.lowerBound : 0),
-        maxBin: pos.upperBinId !== undefined ? pos.upperBinId : (pos.upperBound !== undefined ? pos.upperBound : 0),
+        minBin: pos.lowerBinId !== undefined ? pos.lowerBinId : pos.lowerBound !== undefined ? pos.lowerBound : 0,
+        maxBin: pos.upperBinId !== undefined ? pos.upperBinId : pos.upperBound !== undefined ? pos.upperBound : 0,
         status: pos.isInRange ? 'In Range' : 'Out of Range',
         state: pos.state || 'OPEN',
         tokenX: pos.tokenX,
@@ -408,12 +408,17 @@ function PositionsView({ positions, assignments, strategies, events, onAssign, o
                           {pos.id}
                         </span>
                         {pos.state && pos.state !== 'OPEN' && (
-                          <span className={`text-[8px] px-1 py-0.5 border scale-90 tracking-wide font-mono ${
-                            pos.state === 'REBALANCING' ? 'border-yellow-500 text-yellow-600 animate-pulse bg-yellow-50' :
-                            pos.state === 'CLOSING' ? 'border-orange-500 text-orange-600 animate-pulse bg-orange-50' :
-                            pos.state === 'CREATING' ? 'border-blue-500 text-blue-600 bg-blue-50' :
-                            'border-red-500 text-red-600 bg-red-50'
-                          }`}>
+                          <span
+                            className={`text-[8px] px-1 py-0.5 border scale-90 tracking-wide font-mono ${
+                              pos.state === 'REBALANCING'
+                                ? 'border-yellow-500 text-yellow-600 animate-pulse bg-yellow-50'
+                                : pos.state === 'CLOSING'
+                                  ? 'border-orange-500 text-orange-600 animate-pulse bg-orange-50'
+                                  : pos.state === 'CREATING'
+                                    ? 'border-blue-500 text-blue-600 bg-blue-50'
+                                    : 'border-red-500 text-red-600 bg-red-50'
+                            }`}
+                          >
                             {pos.state}
                           </span>
                         )}
@@ -458,14 +463,21 @@ function PositionsView({ positions, assignments, strategies, events, onAssign, o
                 </div>
                 {/* State machine premium badge */}
                 <div className="mt-2 flex items-center">
-                  <span className={`px-2 py-0.5 text-[9px] font-bold border uppercase tracking-widest font-mono-jb ${
-                    selectedPos.state === 'OPEN' ? 'border-green-500 text-green-600 bg-green-50' :
-                    selectedPos.state === 'CREATING' ? 'border-blue-500 text-blue-600 bg-blue-50 animate-pulse' :
-                    selectedPos.state === 'REBALANCING' ? 'border-yellow-500 text-yellow-600 bg-yellow-50 animate-pulse' :
-                    selectedPos.state === 'CLOSING' ? 'border-orange-500 text-orange-600 bg-orange-50 animate-pulse' :
-                    selectedPos.state === 'CLOSED' ? 'border-gray-500 text-gray-600 bg-gray-50' :
-                    'border-[#FF4500] text-[#FF4500] bg-red-50'
-                  }`}>
+                  <span
+                    className={`px-2 py-0.5 text-[9px] font-bold border uppercase tracking-widest font-mono-jb ${
+                      selectedPos.state === 'OPEN'
+                        ? 'border-green-500 text-green-600 bg-green-50'
+                        : selectedPos.state === 'CREATING'
+                          ? 'border-blue-500 text-blue-600 bg-blue-50 animate-pulse'
+                          : selectedPos.state === 'REBALANCING'
+                            ? 'border-yellow-500 text-yellow-600 bg-yellow-50 animate-pulse'
+                            : selectedPos.state === 'CLOSING'
+                              ? 'border-orange-500 text-orange-600 bg-orange-50 animate-pulse'
+                              : selectedPos.state === 'CLOSED'
+                                ? 'border-gray-500 text-gray-600 bg-gray-50'
+                                : 'border-[#FF4500] text-[#FF4500] bg-red-50'
+                    }`}
+                  >
                     {selectedPos.state}
                   </span>
                 </div>

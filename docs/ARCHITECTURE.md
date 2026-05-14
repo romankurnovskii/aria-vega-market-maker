@@ -205,6 +205,7 @@ This complexity makes the system harder to test, debug, and extend. The **Statel
 > **Each operation is an independent task. The strategy makes a fresh decision on each Tick, based on current on-chain state.**
 
 Instead of maintaining a complex task across multiple lifecycle phases, the system:
+
 - **Closes** a position → marks the task as complete → deletes it
 - **Discovers** the closed position on the next tick → strategy sees free balance → creates a new `open` task
 
@@ -244,24 +245,26 @@ sequenceDiagram
 
 **Key Differences from Stateful Flow:**
 
-| Aspect | Stateful (#3) | Stateless (Proposed) |
-|--------|---------------|---------------------|
-| Task lifecycle | Single task, 3 states | Two independent tasks |
-| Post-close state | `awaiting_settlement` | Task deleted |
-| Balance polling | Required before open | Strategy checks on next tick |
-| Signal freshness | Managed via `evaluatedAt` TTL | Fresh decision each tick |
-| Crash recovery | Resume task from `awaiting_settlement` | Strategy recreates intent |
+| Aspect           | Stateful (#3)                          | Stateless (Proposed)         |
+| ---------------- | -------------------------------------- | ---------------------------- |
+| Task lifecycle   | Single task, 3 states                  | Two independent tasks        |
+| Post-close state | `awaiting_settlement`                  | Task deleted                 |
+| Balance polling  | Required before open                   | Strategy checks on next tick |
+| Signal freshness | Managed via `evaluatedAt` TTL          | Fresh decision each tick     |
+| Crash recovery   | Resume task from `awaiting_settlement` | Strategy recreates intent    |
 
 ---
 
 ## B.4 Task Status Changes
 
 **Current (Section 3.A):**
+
 ```typescript
 type RebalanceTaskStatus = 'pending_close' | 'awaiting_settlement' | 'pending_open';
 ```
 
 **Proposed:**
+
 ```typescript
 type RebalanceTaskStatus = 'pending_close' | 'pending_open';
 ```
@@ -279,7 +282,7 @@ type TaskEventStage =
   | 'INIT'
   | 'CLOSE_BROADCAST'
   | 'CLOSE_CONFIRMED'
-  | 'POSITION_CLOSED'   // NEW: Event marker (no state change)
+  | 'POSITION_CLOSED' // NEW: Event marker (no state change)
   | 'OPEN_BROADCAST'
   | 'OPEN_CONFIRMED'
   | 'COMPLETED'
@@ -294,13 +297,14 @@ The `POSITION_CLOSED` event serves as a marker for audit logging, not state mach
 
 The current **JIT Re-Evaluation** (Section 5) becomes unnecessary under the stateless model:
 
-| Current JIT Behavior | Stateless Equivalent |
-|---------------------|---------------------|
-| Poll balances until settlement | Strategy sees balance on next tick |
-| Check `evaluatedAt` staleness | Fresh decision, always current |
-| Intent anchoring to original `task.intent` | New intent based on current state |
+| Current JIT Behavior                       | Stateless Equivalent               |
+| ------------------------------------------ | ---------------------------------- |
+| Poll balances until settlement             | Strategy sees balance on next tick |
+| Check `evaluatedAt` staleness              | Fresh decision, always current     |
+| Intent anchoring to original `task.intent` | New intent based on current state  |
 
 **If PR #33 (JIT retry bounds) is merged before this proposal:**
+
 - The bounded retry logic can be removed entirely during the #39 implementation
 - Or retained as a temporary safety net, deprecated with a TODO comment
 
@@ -330,4 +334,3 @@ The current **JIT Re-Evaluation** (Section 5) becomes unnecessary under the stat
 1. **Concurrent positions**: How does the strategy handle multiple positions closing simultaneously?
 2. **Partial fills**: Should the system track partial liquidity removals?
 3. **Emergency stops**: How does the circuit breaker interact with stateless tasks?
-

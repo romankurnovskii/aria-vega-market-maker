@@ -1,0 +1,41 @@
+{
+  "skill": "issue-reproduce",
+  "timestamp": "2026-05-14T16:00:30Z",
+  "issue_url": "https://github.com/romankurnovskii/aria-vega-market-maker/issues/31",
+  "triage_used": true,
+  "repro_confirmed": true,
+  "repro_steps": [
+    "Step 1: Instantiate SolanaExecutor with a mock RPC pool returning 5 SOL WSOL ATA balance but 0 native SOL balance.",
+    "Step 2: Call pollBalances for WSOL_MINT with expectedDeltaX. Observe timeout because it overwrites amountX with 0 native SOL balance.",
+    "Step 3: Call apply with an open decision for 1 WSOL deposit while wallet has 0.05 native SOL. Observe capping of tokenXAmount to 0."
+  ],
+  "repro_environment": {
+    "os": "macOS",
+    "runtime": "node 24.x",
+    "relevant_versions": {
+      "pnpm": "10.x"
+    }
+  },
+  "test_file_path": "apps/engine/src/solana-executor-issue-31.test.ts",
+  "failing_tests": [
+    {
+      "name": "ISSUE #31: pollBalances should not overwrite WSOL ATA balance with native SOL balance",
+      "expected": "false (does not throw timeout)",
+      "actual": "true (throws timeout error)"
+    },
+    {
+      "name": "ISSUE #31: apply (open) should not cap WSOL deposit amounts based on native SOL balance",
+      "expected": "1000000000",
+      "actual": "0"
+    }
+  ],
+  "edge_cases": [
+    {
+      "description": "Zero native SOL balance when depositing WSOL from ATA",
+      "expected_behavior": "Should use WSOL ATA balance directly and succeed without capping",
+      "covered": true
+    }
+  ],
+  "caveats": ["Tested via mock RPC provider to simulate divergence between WSOL ATA balance and native SOL balance."],
+  "out_of_scope": []
+}
