@@ -661,6 +661,21 @@ export async function processTasks(
           continue;
         }
 
+        if (task.intent.openParams && poolInfo.tokenXAddress === 'So11111111111111111111111111111111111111112') {
+          const nativeSolBalance = await rpcPool.execute(async (connection: Connection) => {
+            return await connection.getBalance(new PublicKey(walletAddress));
+          });
+          const RENT_BUFFER = 80_000_000n; // 0.08 SOL buffer
+          const maxDeposit = BigInt(nativeSolBalance) - RENT_BUFFER;
+          const currentAmount = BigInt(task.intent.openParams.tokenXAmount);
+          if (currentAmount > maxDeposit && maxDeposit > 0n) {
+            logger.warn(
+              `[Execution Monitor] SOL deposit capped by rent buffer. Original: ${currentAmount}, Capped: ${maxDeposit}`
+            );
+            task.intent.openParams.tokenXAmount = maxDeposit.toString();
+          }
+        }
+
         logger.info(`[Execution Monitor] Executing OPEN transaction for task ${task.id}...`);
         // --- Log OPEN_BROADCAST ---
         task.events.push({

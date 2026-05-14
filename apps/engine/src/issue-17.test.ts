@@ -10,17 +10,14 @@ import {
   MarketSnapshot,
   ExecutionRecord,
   IStore,
-  IExecutor,
   IPositionProvider,
-  IRpcPool,
   IOrchestratorRegistry,
   IPositionStore,
   IOrchestrator,
-  StrategyResult,
 } from '@lp-system/core';
 
-const MOCK_WALLET_ADDRESS = 'WALTqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTYUQh';
-const MOCK_PUBKEY_1 = 'POS1qv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTYUQh';
+const MOCK_WALLET_ADDRESS = 'HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTYUQh';
+const MOCK_PUBKEY_1 = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
 const MOCK_PUBKEY_2 = 'GpCoz6vVv9kH8R4sLWev4M7wD7vT1Kz2Ff7LveX8Pz9k';
 const MOCK_PUBKEY_3 = '3b9SrqR9yXnNnHe1Kz77aFeYV8nK9wZfL6tX8T3tX9tY';
 const WSOL_MINT = 'So11111111111111111111111111111111111111112';
@@ -62,9 +59,9 @@ function createMocks() {
     },
   };
 
-  const executor: IExecutor & { applyCalls: any[] } = {
+  const executor: any = {
     applyCalls: [],
-    apply: async (decision, _market) => {
+    apply: async (decision: any, _market: any) => {
       executor.applyCalls.push(decision);
       return {
         id: 'record_' + Date.now(),
@@ -105,9 +102,9 @@ function createMocks() {
     }),
   };
 
-  const rpcPool: IRpcPool = {
+  const rpcPool: any = {
     getConnection: () => ({}),
-    execute: async (fn) => {
+    execute: async (fn: any) => {
       const mockConnection = {
         getParsedTokenAccountsByOwner: async () => ({
           value: [{ account: { data: { parsed: { info: { mint: WSOL_MINT, tokenAmount: { amount: '1000000000' } } } } } }],
@@ -236,7 +233,7 @@ test('PV-JIT-03: Stale signal (> 180s) transitions back to awaiting_settlement',
 test('BUG-02: WSOL handling - uses WSOL ATA balance, not native SOL', async () => {
   const m = createMocks();
 
-  m.rpcPool.execute = async (fn) => {
+  m.rpcPool.execute = async (fn: any) => {
     const mockConnection = {
       getParsedTokenAccountsByOwner: async () => ({
         value: [{ account: { data: { parsed: { info: { mint: WSOL_MINT, tokenAmount: { amount: '100000000' } } } } } }],
@@ -248,13 +245,14 @@ test('BUG-02: WSOL handling - uses WSOL ATA balance, not native SOL', async () =
 
   const task: RebalanceTask = {
     id: 'task_abc',
-    assignmentId: 'assign_123',
+    assignmentId: 'assign_bug_02',
     status: 'awaiting_settlement',
     originalPositionId: MOCK_PUBKEY_1,
     intent: {
       positionId: MOCK_PUBKEY_1,
       action: 'open',
       openParams: { poolAddress: MOCK_PUBKEY_2, lowerBound: 1.0, upperBound: 2.0, tokenXAmount: '500', tokenYAmount: '500' },
+      sourceAssignmentId: 'assign_bug_02',
       evaluatedAt: Date.now(),
     },
     evaluatedAt: Date.now(),
@@ -262,6 +260,24 @@ test('BUG-02: WSOL handling - uses WSOL ATA balance, not native SOL', async () =
   };
 
   m.tasks.push(task);
+
+  m.orchestrators.push({
+    id: 'orch_bug_02',
+    assignmentId: 'assign_bug_02',
+    positionId: MOCK_PUBKEY_1,
+    strategyId: 'test-strategy',
+    mode: 'active',
+    tick: async () => ({
+      action: 'open',
+      params: {
+        poolAddress: MOCK_PUBKEY_2,
+        lowerBound: 1.0,
+        upperBound: 2.0,
+        tokenXAmount: '100000000',
+        tokenYAmount: '500',
+      },
+    }),
+  });
 
   m.positionProvider.getPoolInfo = async (poolAddress): Promise<PoolInfo> => ({
     poolAddress,
@@ -288,7 +304,7 @@ test('BUG-02: WSOL handling - uses WSOL ATA balance, not native SOL', async () =
 test('PV-CAPITAL-01: SOL amount capped when wallet balance is near rent buffer', async () => {
   const m = createMocks();
 
-  m.rpcPool.execute = async (fn) => {
+  m.rpcPool.execute = async (fn: any) => {
     const mockConnection = {
       getParsedTokenAccountsByOwner: async () => ({ value: [] }),
       getBalance: async () => 90_000_000, // 0.09 SOL
@@ -298,7 +314,7 @@ test('PV-CAPITAL-01: SOL amount capped when wallet balance is near rent buffer',
 
   const task: RebalanceTask = {
     id: 'task_abc',
-    assignmentId: 'assign_123',
+    assignmentId: 'assign_cap_01',
     status: 'awaiting_settlement',
     originalPositionId: MOCK_PUBKEY_1,
     intent: {
@@ -311,6 +327,7 @@ test('PV-CAPITAL-01: SOL amount capped when wallet balance is near rent buffer',
         tokenXAmount: '89000000',
         tokenYAmount: '0',
       },
+      sourceAssignmentId: 'assign_cap_01',
       evaluatedAt: Date.now(),
     },
     evaluatedAt: Date.now(),
@@ -318,6 +335,18 @@ test('PV-CAPITAL-01: SOL amount capped when wallet balance is near rent buffer',
   };
 
   m.tasks.push(task);
+
+  m.orchestrators.push({
+    id: 'orch_cap_01',
+    assignmentId: 'assign_cap_01',
+    positionId: MOCK_PUBKEY_1,
+    strategyId: 'test-strategy',
+    mode: 'active',
+    tick: async () => ({
+      action: 'open',
+      params: { poolAddress: MOCK_PUBKEY_2, lowerBound: 1.0, upperBound: 2.0, tokenXAmount: '89000000', tokenYAmount: '0' },
+    }),
+  });
 
   m.positionProvider.getPoolInfo = async (poolAddress): Promise<PoolInfo> => ({
     poolAddress,
