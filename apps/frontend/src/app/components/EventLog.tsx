@@ -1,0 +1,65 @@
+/**
+ * @file EventLog.tsx
+ * @description Presentational component for displaying strategy event logs.
+ * @features
+ * - Live CRT terminal styling
+ * - Error highlighting in orange/red
+ * - Success output in green
+ * - Timestamp and strategy ID headers
+ */
+
+'use client';
+
+import React from 'react';
+
+interface LogEntry {
+  id: string | number;
+  timestamp: string;
+  strategyId?: string;
+  positionId?: string;
+  error?: string;
+  result?: any;
+}
+
+interface EventLogProps {
+  logs: LogEntry[];
+}
+
+export const EventLog = ({ logs }: EventLogProps) => {
+  return (
+    <div className="flex-1 border border-[#0D0D0D] bg-[#0D0D0D] text-[#F4F4F0] p-4 font-mono text-[10px] overflow-hidden flex flex-col min-h-0 relative">
+      <div className="absolute top-0 right-0 p-2 opacity-20 pointer-events-none uppercase tracking-tighter text-xs">
+        Live CRT Terminal
+      </div>
+      <div className="flex items-center gap-2 border-b border-[#F4F4F0]/20 pb-2 mb-2 shrink-0">
+        <div className="w-2 h-2 bg-[#FF4500] animate-pulse"></div>
+        <span className="uppercase font-bold tracking-widest text-[#FF4500]">Strategy Event Log</span>
+      </div>
+
+      <div className="flex-1 overflow-y-auto flex flex-col gap-1 custom-scrollbar">
+        {logs.length === 0 ? (
+          <div className="text-gray-500 italic opacity-50">No events recorded. Click "Evaluate Ad-Hoc" to trigger.</div>
+        ) : (
+          logs.map((log) => (
+            <div
+              key={log.id}
+              className="border-b border-white/5 pb-1 mb-1 animate-in fade-in slide-in-from-left-2 duration-200"
+            >
+              <div className="flex justify-between opacity-60 text-[9px]">
+                <span>[{log.timestamp}]</span>
+                <span>{log.strategyId}</span>
+              </div>
+              {log.error ? (
+                <div className="text-[#FF4500] break-words uppercase font-bold mt-0.5">!! ERROR: {log.error}</div>
+              ) : (
+                <div className="text-green-400 break-words mt-0.5">
+                  &gt;&gt; {typeof log.result === 'object' ? JSON.stringify(log.result) : String(log.result)}
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
