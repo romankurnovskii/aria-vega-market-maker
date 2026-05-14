@@ -17,7 +17,7 @@
 import React, { useState, useEffect } from 'react';
 import { Zap, X, TerminalSquare, ChevronRight } from 'lucide-react';
 
-import { formatAmount } from '../containers/AriaVegaContainer';
+import { formatAmount, getTokenSymbol } from '../containers/AriaVegaContainer';
 import { EventLog } from './EventLog';
 
 interface PositionDetailProps {
@@ -104,13 +104,13 @@ export const PositionDetail = ({
           <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-1.5 font-bold">Position Balances</div>
           <div className="flex flex-col gap-1 font-mono-jb">
             <div className="flex justify-between">
-              <span className="text-gray-500">Token X:</span>
+              <span className="text-gray-500">{getTokenSymbol(position.tokenX)}:</span>
               <span className="font-bold text-[#0D0D0D]">
                 {position.tokenX ? `${formatAmount(position.tokenX.amount, position.tokenX.decimals)}` : '0.00'}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">Token Y:</span>
+              <span className="text-gray-500">{getTokenSymbol(position.tokenY)}:</span>
               <span className="font-bold text-[#0D0D0D]">
                 {position.tokenY ? `${formatAmount(position.tokenY.amount, position.tokenY.decimals)}` : '0.00'}
               </span>
