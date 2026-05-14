@@ -13,8 +13,8 @@ description: >
 **Role**: Quality gate. You confirm that the fix is correct, complete, and safe.
 You are the last checkpoint before a human reviews the PR.
 
-**Input**: `handoffs/pr.json` + the PR branch
-**Output**: `handoffs/verify.json` with verdict: `approved` or `needs_rework`
+**Input**: `.dev/handoffs/pr.json` + the PR branch
+**Output**: `.dev/handoffs/verify.json` with verdict: `approved` or `needs_rework`
 
 **Hard constraint**: Do NOT modify any code. Observe and report only.
 
@@ -23,7 +23,7 @@ You are the last checkpoint before a human reviews the PR.
 ## Step 0 — Read pr.json
 
 ```bash
-cat handoffs/pr.json
+cat .dev/handoffs/pr.json
 ```
 
 Also fetch the PR diff:
@@ -159,7 +159,8 @@ gh pr comment <pr_number> --body "..."
 ## Step 7 — Write verify.json
 
 ```bash
-cat > handoffs/verify.json << 'EOF'
+mkdir -p .dev/handoffs
+cat > .dev/handoffs/verify.json << 'EOF'
 {
   "skill": "issue-verify",
   "timestamp": "...",
@@ -187,6 +188,6 @@ Pass `verify.json` back to Skill 2 as additional context for the next cycle.
 - [ ] Issue test file specifically re-run
 - [ ] Full diff reviewed line-by-line
 - [ ] GitHub PR comment posted
-- [ ] verify.json written to `handoffs/`
+- [ ] verify.json written to `.dev/handoffs/`
 - [ ] If needs_rework: rework_instructions is specific and actionable
 - [ ] If new bugs found: documented with severity and action

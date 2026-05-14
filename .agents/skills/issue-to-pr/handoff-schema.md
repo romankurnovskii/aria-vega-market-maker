@@ -1,6 +1,6 @@
 # Handoff JSON Schemas
 
-All handoff files live in the workspace root (or a `handoffs/` subdirectory if specified).
+All handoff files live inside `.dev/handoffs/` to keep intermediate workflow state out of git commits and prevent root directory clutter.
 
 ---
 

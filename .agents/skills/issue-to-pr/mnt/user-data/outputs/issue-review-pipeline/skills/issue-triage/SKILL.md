@@ -14,7 +14,7 @@ description: >
 **Role**: Critical reader. Your job is to determine if the issue is valid and worth fixing,
 identify gaps in the issue description, and flag risks in any proposed solutions.
 
-**Output**: `triage.json` (see `../../references/handoff-schema.md` for full schema)
+**Output**: `.dev/handoffs/triage.json` (see `../../references/handoff-schema.md` for full schema)
 
 **Hard constraint**: Do NOT write code, run tests, or attempt a fix. Read only.
 
@@ -87,7 +87,8 @@ If `rejected`, write a clear explanation and stop — do NOT proceed to Skill 2.
 ## Step 5 — Write triage.json
 
 ```bash
-cat > handoffs/triage.json << 'EOF'
+mkdir -p .dev/handoffs
+cat > .dev/handoffs/triage.json << 'EOF'
 {
   "skill": "issue-triage",
   "timestamp": "...",
@@ -125,7 +126,7 @@ gh issue comment <N> --repo <owner/repo> --body "..."
 
 ## Checklist before handing off
 
-- [ ] triage.json written to `handoffs/`
+- [ ] triage.json written to `.dev/handoffs/`
 - [ ] verdict is one of: confirmed / rejected / needs_more_info
 - [ ] relevant_files lists actual paths (verify they exist)
 - [ ] new_bugs_risk addresses any proposed solutions in the issue

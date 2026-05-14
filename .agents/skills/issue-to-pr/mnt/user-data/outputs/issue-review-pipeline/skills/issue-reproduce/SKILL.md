@@ -13,8 +13,8 @@ description: >
 **Role**: Test engineer. Your job is to prove the bug exists via a failing test, then enumerate
 every edge case and caveat before the fix agent touches anything.
 
-**Input**: `handoffs/triage.json`
-**Output**: `handoffs/repro.json` + a new test file with failing tests
+**Input**: `.dev/handoffs/triage.json`
+**Output**: `.dev/handoffs/repro.json` + a new test file with failing tests
 
 **Hard constraint**: Tests must be **left failing**. Do NOT fix the bug. Do NOT modify source files.
 The fix agent (Skill 3) must be able to make the tests pass from a clean state.
@@ -24,7 +24,7 @@ The fix agent (Skill 3) must be able to make the tests pass from a clean state.
 ## Step 0 — Read triage.json
 
 ```bash
-cat handoffs/triage.json
+cat .dev/handoffs/triage.json
 ```
 
 Check: `verdict == "confirmed"`. If not, stop and report to user.
@@ -133,8 +133,8 @@ If ALL tests pass — the bug isn't reproducible as written. Update `repro_confi
 ## Step 6 — Write repro.json
 
 ```bash
-mkdir -p handoffs
-cat > handoffs/repro.json << 'EOF'
+mkdir -p .dev/handoffs
+cat > .dev/handoffs/repro.json << 'EOF'
 {
   "skill": "issue-reproduce",
   "timestamp": "...",
@@ -163,7 +163,7 @@ EOF
 - [ ] `npm test` (full suite) passes except for the new issue tests
 - [ ] New test file exists at `tests/issues/issue-<N>.*`
 - [ ] Each failing test has a `// ISSUE #N:` comment
-- [ ] repro.json written to `handoffs/`
+- [ ] repro.json written to `.dev/handoffs/`
 - [ ] All edge cases documented (covered or explicitly noted as not covered)
 - [ ] Caveats section explains any test simulation/mocking decisions
 - [ ] Out-of-scope issues documented — NOT fixed

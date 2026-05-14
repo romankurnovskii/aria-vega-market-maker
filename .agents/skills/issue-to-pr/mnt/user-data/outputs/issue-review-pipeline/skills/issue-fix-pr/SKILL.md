@@ -13,8 +13,8 @@ description: >
 **Role**: Implementer. Your job is narrow: make the failing tests pass without breaking anything else.
 The test file from Skill 2 is your spec — do not go beyond it.
 
-**Input**: `handoffs/repro.json` + the test file it references
-**Output**: `handoffs/pr.json` + branch + open PR
+**Input**: `.dev/handoffs/repro.json` + the test file it references
+**Output**: `.dev/handoffs/pr.json` + branch + open PR
 
 **Hard constraint**: Do NOT re-scope the fix. If you find additional bugs, document them in `pr.json`
 but do not fix them. Trust `repro.json.out_of_scope` — those are deliberate exclusions.
@@ -24,7 +24,7 @@ but do not fix them. Trust `repro.json.out_of_scope` — those are deliberate ex
 ## Step 0 — Read repro.json
 
 ```bash
-cat handoffs/repro.json
+cat .dev/handoffs/repro.json
 ```
 
 Check: `repro_confirmed == true`. If not, stop.
@@ -167,7 +167,8 @@ EOF
 ## Step 8 — Write pr.json
 
 ```bash
-cat > handoffs/pr.json << 'EOF'
+mkdir -p .dev/handoffs
+cat > .dev/handoffs/pr.json << 'EOF'
 {
   "skill": "issue-fix-pr",
   "timestamp": "...",
@@ -198,5 +199,5 @@ EOF
 - [ ] Full test suite passes (or pre-existing failures documented)
 - [ ] Lint passes
 - [ ] Diff reviewed — no debug code, no unintended changes
-- [ ] pr.json written to `handoffs/`
+- [ ] pr.json written to `.dev/handoffs/`
 - [ ] known_tradeoffs documents any compromises made

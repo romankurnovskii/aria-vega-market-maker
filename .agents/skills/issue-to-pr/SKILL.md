@@ -33,11 +33,11 @@ No single agent does everything. Each phase produces a JSON handoff artifact tha
 
 ## Handoff format
 
-Each phase writes a JSON file that the next phase reads as its input context.
-This prevents agents from re-doing prior work and keeps each agent's scope narrow.
+Each phase writes a JSON file inside `.dev/handoffs/` that the next phase reads as its input context.
+This prevents agents from re-doing prior work, keeps each agent's scope narrow, and prevents git root repository clutter in accordance with Rule #5 of `RULE[AGENTS.md]`.
 
 ```
-triage.json  →  repro.json  →  pr.json  →  verify.json
+.dev/handoffs/triage.json  →  .dev/handoffs/repro.json  →  .dev/handoffs/pr.json  →  .dev/handoffs/verify.json
 ```
 
 See `references/handoff-schema.md` for the full JSON schema for each file.
