@@ -459,224 +459,43 @@ export async function processTasks(
             await positionStore.saveKnown(remaining);
             logger.info(`[Execution Monitor] Pure closed position ${posId} archived and pruned from known positions cache.`);
           }
+          // Delete task immediately (stateless: no awaiting_settlement state)
           await tasksStore.deleteTask(task.id);
           continue; // Move to next task
         }
 
-        logger.info(`[Execution Monitor] Close transaction completed. Polling balances for settlement...`);
-        // --- Log SETTLEMENT_POLLING ---
-        task.events.push({
-          stage: 'SETTLEMENT_POLLING',
-          timestamp: Date.now(),
-          message: 'Starting polling for balance settlement...',
-        });
-        await tasksStore.saveTask(task);
+        // === STATELESS REBALANCING: close+open is split into two independent tasks ===
+        // After close, we DELETE the task. The strategy will create a new 'pending_open' task
+        // on the next tick based on fresh balance state.
 
-        const solanaExecutor = executor as unknown as {
-          pollBalances?: (
-            tx: string,
-            ty: string,
-            w: string,
-            ix: bigint,
-            iy: bigint,
-            timeoutMs?: number,
-            options?: { expectedDeltaX?: bigint; expectedDeltaY?: bigint }
-          ) => Promise<void>;
-        };
-        if (solanaExecutor.pollBalances && record && record.txSignatures && record.txSignatures.length > 0) {
-          await solanaExecutor.pollBalances(
-            poolInfo.tokenXAddress,
-            poolInfo.tokenYAddress,
-            walletAddress,
-            BigInt(initialBalances.amountX),
-            BigInt(initialBalances.amountY),
-            undefined, // default timeout
-            {
-              expectedDeltaX: task.expectedDeltaX ? BigInt(task.expectedDeltaX) : undefined,
-              expectedDeltaY: task.expectedDeltaY ? BigInt(task.expectedDeltaY) : undefined,
-            }
-          );
-        } else {
-          logger.info(
-            `[Execution Monitor] Skipping balance polling because position was already closed or no transaction signatures were generated.`
-          );
+        logger.info(`[Execution Monitor] Close completed for rebalance. Deleting task (strategy will create open task on next tick).`);
+
+        // --- Log POSITION_CLOSED ---
+        task.events.push({
+          stage: 'POSITION_CLOSED',
+          timestamp: Date.now(),
+          message: 'Position closed. Task deleted for stateless rebalancing.',
+        });
+
+        // Mark position as CLOSED in local cache
+        if (cachedPos) {
+          cachedPos.state = 'CLOSED';
+          cachedPos.closedAt = Date.now();
+          await positionStore.saveKnown(knownPositions);
         }
 
-        // --- Log SETTLEMENT_DETECTED ---
-        task.events.push({
-          stage: 'SETTLEMENT_DETECTED',
-          timestamp: Date.now(),
-          message: 'Settlement detected and balances verified.',
-        });
-
-        task.status = 'awaiting_settlement';
-        task.evaluatedAt = Date.now();
-        await tasksStore.saveTask(task);
-        logger.info(`[Execution Monitor] Task ${task.id} transitioned to 'awaiting_settlement'`);
+        // Delete task immediately (stateless: no intermediate state)
+        await tasksStore.deleteTask(task.id);
         continue;
       }
 
-      if (task.status === 'awaiting_settlement') {
-        const poolAddress = task.intent.openParams?.poolAddress || task.intent.positionId;
-        const poolInfo = await positionProvider.getPoolInfo(poolAddress);
-        const market = await positionProvider.getMarketSnapshot(poolInfo.poolAddress);
-
-        // Fetch decimals from cached known positions
-        const knownPositions = await positionStore.getKnown();
-        const cachedPos = knownPositions.find((p) => p.id === task.originalPositionId);
-        const decimalsX = cachedPos?.tokenX.decimals ?? 9;
-        const decimalsY = cachedPos?.tokenY.decimals ?? 6;
-
-        // Fetch fresh settled wallet balances
-        const walletBalances = await rpcPool.execute(async (connection: Connection) => {
-          return await getWalletBalances(connection, walletAddress, poolInfo.tokenXAddress, poolInfo.tokenYAddress);
-        });
-
-        logger.info(
-          `[Execution Monitor] Synthesizing Position with wallet balances: X=${walletBalances.amountX}, Y=${walletBalances.amountY}`
-        );
-
-        // Build synthetic position using pre-closure metadata and live balances
-        const syntheticPos: Position = {
-          id: task.originalPositionId,
-          poolAddress: poolInfo.poolAddress,
-          chain: 'solana' as const,
-          protocol: 'meteora_dlmm' as const,
-          lowerBound: task.intent.openParams?.lowerBound || 0,
-          upperBound: task.intent.openParams?.upperBound || 0,
-          tokenX: {
-            tokenAddress: poolInfo.tokenXAddress,
-            mint: poolInfo.tokenXAddress,
-            decimals: decimalsX,
-            amount: walletBalances.amountX,
-          },
-          tokenY: {
-            tokenAddress: poolInfo.tokenYAddress,
-            mint: poolInfo.tokenYAddress,
-            decimals: decimalsY,
-            amount: walletBalances.amountY,
-          },
-          isInRange: true,
-          openedAt: Date.now(),
-          metadata: {},
-        };
-
-        let openParamsToUse = task.intent.openParams;
-
-        // --- Log JIT_REEVALUATION ---
-        task.events.push({
-          stage: 'JIT_REEVALUATION',
-          timestamp: Date.now(),
-          message: 'Performing Just-In-Time evaluation on synthetic position...',
-        });
-        await tasksStore.saveTask(task);
-
-        logger.info(`[Execution Monitor] Re-evaluating strategy using synthetic position...`);
-        let reEvalResult: StrategyResult = { action: 'skip' };
-        let hasActiveOrchestrator = false;
-
-        try {
-          let strategyOrchestrator: IOrchestrator | undefined;
-
-          // 1. Decoupled JIT: Attempt to instantiate strategy from the task assignment directly
-          if (factory && task.assignmentId) {
-            if (typeof tasksStore.getAssignments === 'function') {
-              const assignments = await tasksStore.getAssignments();
-              const assignment = assignments.find((a) => a.id === task.assignmentId);
-              if (assignment) {
-                strategyOrchestrator = factory.create(assignment);
-                hasActiveOrchestrator = true;
-              } else {
-                logger.warn(`[Execution Monitor] Assignment ${task.assignmentId} not found in store for JIT evaluation.`);
-              }
-            }
-          }
-
-          if (strategyOrchestrator) {
-            reEvalResult = await strategyOrchestrator.tick(syntheticPos, market);
-          } else {
-            // 2. Fallback to registry if factory isn't available
-            for (const orch of orchestrators) {
-              hasActiveOrchestrator = true;
-              const res = await orch.tick(syntheticPos, market);
-              if (res.action !== 'skip') {
-                reEvalResult = res;
-                break;
-              }
-            }
-          }
-        } catch (err) {
-          logger.error(
-            `[Execution Monitor] Strategy re-evaluation failed: ${
-              err instanceof Error ? err.message : String(err)
-            }. Falling back to predefined open parameters.`
-          );
-        }
-
-        if (reEvalResult.action === 'open' || reEvalResult.action === 'close+open') {
-          const openParams = reEvalResult.action === 'close+open' ? reEvalResult.openParams : reEvalResult.params;
-          if (openParams) {
-            openParamsToUse = openParams;
-            logger.info(
-              `[Execution Monitor] Strategy re-evaluation successfully recalculated new range bounds for position ${task.originalPositionId}.`
-            );
-          }
-        } else if (hasActiveOrchestrator && reEvalResult.action === 'close') {
-          openParamsToUse = undefined;
-          logger.info(
-            `[Execution Monitor] Strategy re-evaluation recommended 'close'. Aborting open leg for position ${task.originalPositionId}.`
-          );
-        } else if (hasActiveOrchestrator && reEvalResult.action === 'skip') {
-          // A 'skip' signal on the synthetic position means the target range is currently in-range
-          // and does not need further rebalancing. We should proceed with opening it.
-          logger.info(
-            `[Execution Monitor] Strategy re-evaluation recommended 'skip', indicating target range is valid for position ${task.originalPositionId}. Proceeding with open leg.`
-          );
-        }
-
-        if (openParamsToUse) {
-          task.intent.openParams = openParamsToUse;
-          task.intent.action = 'open';
-          task.status = 'pending_open';
-          task.evaluatedAt = Date.now();
-          await tasksStore.saveTask(task);
-          logger.info(`[Execution Monitor] Task ${task.id} updated with open params (status: pending_open)`);
-          // Fall through to execute the open transaction immediately in the same tick cycle
-        } else {
-          logger.info(
-            `[Execution Monitor] No predefined open parameters and strategy re-evaluation recommended 'skip'. Deleting task and unlocking orchestrator.`
-          );
-          // --- Log JIT_SKIPPED ---
-          task.events.push({
-            stage: 'JIT_SKIPPED',
-            timestamp: Date.now(),
-            message: 'Strategy re-evaluation recommended skip. Skipping open leg.',
-          });
-          task.events.push({
-            stage: 'COMPLETED',
-            timestamp: Date.now(),
-            message: 'Rebalance task aborted due to JIT skip.',
-          });
-          await tasksStore.saveTask(task);
-          await tasksStore.deleteTask(task.id);
-        }
-      }
+      // Note: awaiting_settlement and JIT logic removed for stateless rebalancing.
+      // pending_open tasks proceed directly to execution without settlement polling
 
       if (task.status === 'pending_open') {
         const poolAddress = task.intent.openParams?.poolAddress || task.intent.positionId;
         const poolInfo = await positionProvider.getPoolInfo(poolAddress);
         const market = await positionProvider.getMarketSnapshot(poolInfo.poolAddress);
-
-        // JIT Signal Validation: check if signal is stale (e.g., > 180,000ms)
-        const MAX_SIGNAL_AGE_MS = 180000;
-        if (Date.now() - task.evaluatedAt > MAX_SIGNAL_AGE_MS) {
-          logger.warn(
-            `[Execution Monitor] Signal for task ${task.id} is stale (${Date.now() - task.evaluatedAt}ms). Re-triggering re-evaluation...`
-          );
-          task.status = 'awaiting_settlement';
-          await tasksStore.saveTask(task);
-          continue;
-        }
 
         logger.info(`[Execution Monitor] Executing OPEN transaction for task ${task.id}...`);
         // --- Log OPEN_BROADCAST ---
