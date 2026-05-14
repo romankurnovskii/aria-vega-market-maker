@@ -1,109 +1,84 @@
-# Architecture Decision: Manual Liquidity Management APIs
+# Architecture Decision: Unified Position Actions API
 
 ## Context and Problem Statement
 
-The current system manages liquidity positions exclusively through automated strategy-driven rebalancing. However, operators need the ability to manually intervene:
+The system manages liquidity positions through automated strategy-driven rebalancing. However, operators and control panels need the ability to perform unified manual actions:
 
-1. **Add Liquidity** — deposit additional tokens into an existing position to increase its size
-2. **Remove Liquidity** — withdraw liquidity from a position (claiming all accrued fees automatically)
-
-Currently, no REST API exists to perform these operations on demand.
+1. **Evaluate Strategy** — preview what the strategy recommends for a position
+2. **Remove Liquidity** — withdraw 100% liquidity from a position (claiming accrued fees automatically)
+3. **Add Liquidity** — optional future capability to add liquidity
 
 ---
 
 ## Decision
 
-We introduce two new REST API endpoints on the engine backend:
+We introduce a single unified REST API endpoint on the engine backend:
 
-### A. Add Liquidity API
+### Unified Actions API
 
-**Endpoint**: `POST /positions/{positionId}/add-liquidity`
+**Endpoint**: `POST /positions/{positionId}/actions`
 
-**Purpose**: Deposit additional token amounts into an existing position, increasing its liquidity allocation.
+**Purpose**: Execute a specified action type on a position.
+
+**Action Types**:
+
+- `evaluate` — Run strategy evaluation and return recommendation
+- `removeLiquidity` — Remove all liquidity and claim fees (closes position)
+- `addLiquidity` — Add liquidity to existing position (future use, optional)
+
+#### 1. Evaluate Action
 
 **Request Body**:
 
 ```json
 {
-  "tokenXAmount": "15000000",
-  "tokenYAmount": "12000000",
-  "slippageTolerance": 0.01
+  "action": "evaluate",
+  "strategyId": "trailing-usdc"
 }
 ```
-
-| Field               | Type   | Required | Description                                                                                                           |
-| ------------------- | ------ | -------- | --------------------------------------------------------------------------------------------------------------------- |
-| `tokenXAmount`      | string | Yes      | Raw integer token X amount to deposit (atomic units, e.g., lamports for SOL or micro-USDC). **Not decimal-adjusted.** |
-| `tokenYAmount`      | string | Yes      | Raw integer token Y amount to deposit (atomic units, e.g., lamports for SOL or micro-USDC). **Not decimal-adjusted.** |
-| `slippageTolerance` | number | No       | Slippage tolerance as decimal (0.01 = 1%, default: 0.01)                                                              |
 
 **Response** (200):
 
 ```json
 {
   "status": "success",
-  "transactionSignatures": ["...", "..."],
-  "positionId": "9tA6m91FvP35G9A7eS982Yhd6pE35Z678WjLmoB67Pqr",
-  "newLiquidity": {
-    "tokenX": "165000000",
-    "tokenY": "132000000"
+  "action": "evaluate",
+  "result": {
+    "action": "close+open",
+    "openParams": { ... }
   }
 }
 ```
 
-**Behavior**:
-
-- Uses Meteora SDK's `addLiquidityByStrategy()` method for adding to existing positions
-- Tokens are distributed across the existing position's bin range using Spot strategy
-- Multiple transactions may be returned if the operation exceeds Solana's size limits
-
----
-
-### B. Remove Liquidity API
-
-**Endpoint**: `POST /positions/{positionId}/remove-liquidity`
-
-**Purpose**: Remove liquidity from a position, optionally specifying the percentage to withdraw. Fees are **automatically claimed** upon removal.
+#### 2. Remove Liquidity Action
 
 **Request Body**:
 
 ```json
 {
-  "percentage": 100,
-  "closePosition": false
+  "action": "removeLiquidity"
 }
 ```
-
-| Field           | Type    | Required | Description                                                               |
-| --------------- | ------- | -------- | ------------------------------------------------------------------------- |
-| `percentage`    | number  | Yes      | Percentage of liquidity to remove (1-100)                                 |
-| `closePosition` | boolean | No       | If true and percentage=100, closes the position account and reclaims rent |
 
 **Response** (200):
 
 ```json
 {
   "status": "success",
-  "transactionSignatures": ["...", "..."],
-  "positionId": "9tA6m91FvP35G9A7eS982Yhd6pE35Z678WjLmoB67Pqr",
+  "action": "removeLiquidity",
+  "transactionSignatures": ["sig1...", "sig2..."],
   "claimedFees": {
     "tokenX": "2500000",
     "tokenY": "1800000"
   },
-  "removedLiquidity": {
-    "tokenX": "15000000",
-    "tokenY": "12000000"
-  },
-  "positionClosed": false
+  "positionClosed": true
 }
 ```
 
 **Behavior**:
 
-- Uses Meteora SDK's `removeLiquidity()` with `shouldClaimAndClose: false`
-- **Automatically claims accrued swap fees** as part of the removal transaction
-- If `closePosition: true` and `percentage: 100`, also calls `closePosition()` to reclaim rent
-- Multiple transactions may be returned for wide bin ranges
+- Uses Meteora SDK's `removeLiquidity()` to withdraw 100% liquidity.
+- Accrued swap fees are claimed automatically.
 
 ---
 

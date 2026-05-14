@@ -31,7 +31,6 @@ classDiagram
         +Position originalPosition
         +Balances closeBalances
         +Decision intent
-        +Timeline eventLog
     }
 
     MarketSnapshot --> Position : Evaluated Together
