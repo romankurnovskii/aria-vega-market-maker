@@ -17,7 +17,7 @@
 import React, { useState, useEffect } from 'react';
 import { Zap, X, TerminalSquare, ChevronRight } from 'lucide-react';
 
-import { formatAmount } from '../containers/AriaVegaContainer';
+import { formatAmount, getTokenSymbol } from '../containers/AriaVegaContainer';
 import { EventLog } from './EventLog';
 
 interface PositionDetailProps {
@@ -53,10 +53,28 @@ export const PositionDetail = ({
     }
   }, [position.id, orchestration, strategies]);
 
+  const pnl = position.pnlData || position.metadata?.pnl || position.raw || {};
+
+  const pnlUsd = pnl.pnlUsd !== undefined ? Number(pnl.pnlUsd) : undefined;
+  const pnlPctChange = pnl.pnlPctChange !== undefined ? Number(pnl.pnlPctChange) : undefined;
+  const minPrice = pnl.minPrice !== undefined ? Number(pnl.minPrice) : position.lowerBoundPrice;
+  const maxPrice = pnl.maxPrice !== undefined ? Number(pnl.maxPrice) : position.upperBoundPrice;
+  const poolActivePrice = pnl.poolActivePrice !== undefined ? Number(pnl.poolActivePrice) : undefined;
+  const feePerTvl24h = pnl.feePerTvl24h !== undefined ? Number(pnl.feePerTvl24h) : undefined;
+
+  const allTimeFeesTotalUsd = pnl.allTimeFees?.total?.usd !== undefined ? Number(pnl.allTimeFees.total.usd) : undefined;
+  const allTimeFeesXUsd = pnl.allTimeFees?.tokenX?.usd !== undefined ? Number(pnl.allTimeFees.tokenX.usd) : undefined;
+  const allTimeFeesXAmt = pnl.allTimeFees?.tokenX?.amount !== undefined ? pnl.allTimeFees.tokenX.amount : undefined;
+  const allTimeFeesYUsd = pnl.allTimeFees?.tokenY?.usd !== undefined ? Number(pnl.allTimeFees.tokenY.usd) : undefined;
+  const allTimeFeesYAmt = pnl.allTimeFees?.tokenY?.amount !== undefined ? pnl.allTimeFees.tokenY.amount : undefined;
+
+  const tokenXSym = getTokenSymbol(position.tokenX);
+  const tokenYSym = getTokenSymbol(position.tokenY);
+
   return (
     <div className="flex flex-col gap-4 w-full lg:w-5/12 h-full min-h-0 animate-in slide-in-from-right-4 duration-300">
       {/* Actions Pane */}
-      <div className="border border-[#0D0D0D] bg-white p-4 shrink-0 flex flex-col gap-4">
+      <div className="border border-[#0D0D0D] bg-white p-4 shrink-0 flex flex-col gap-4 overflow-y-auto">
         <div className="flex justify-between items-start border-b border-[#0D0D0D] pb-3">
           <div className="min-w-0">
             <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">Target Position</div>
@@ -104,17 +122,86 @@ export const PositionDetail = ({
           <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-1.5 font-bold">Position Balances</div>
           <div className="flex flex-col gap-1 font-mono-jb">
             <div className="flex justify-between">
-              <span className="text-gray-500">Token X:</span>
+              <span className="text-gray-500">{tokenXSym}:</span>
               <span className="font-bold text-[#0D0D0D]">
-                {position.tokenX ? `${formatAmount(position.tokenX.amount, position.tokenX.decimals)}` : '0.00'}
+                {pnl.unrealizedPnl?.balanceTokenX?.usd !== undefined && Number(pnl.unrealizedPnl.balanceTokenX.usd) > 0
+                  ? `$${Number(pnl.unrealizedPnl.balanceTokenX.usd).toFixed(4)}`
+                  : position.tokenX
+                  ? `${formatAmount(position.tokenX.amount, position.tokenX.decimals)}`
+                  : '0.00'}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-500">Token Y:</span>
+              <span className="text-gray-500">{tokenYSym}:</span>
               <span className="font-bold text-[#0D0D0D]">
-                {position.tokenY ? `${formatAmount(position.tokenY.amount, position.tokenY.decimals)}` : '0.00'}
+                {pnl.unrealizedPnl?.balanceTokenY?.usd !== undefined && Number(pnl.unrealizedPnl.balanceTokenY.usd) > 0
+                  ? `$${Number(pnl.unrealizedPnl.balanceTokenY.usd).toFixed(4)}`
+                  : position.tokenY
+                  ? `${formatAmount(position.tokenY.amount, position.tokenY.decimals)}`
+                  : '0.00'}
               </span>
             </div>
+          </div>
+        </div>
+
+        {/* Market & Price Analytics */}
+        <div className="bg-[#F4F4F0] p-2.5 border border-[#0D0D0D] text-xs flex flex-col gap-1.5">
+          <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Price Analytics</div>
+          <div className="flex justify-between font-mono-jb">
+            <span className="text-gray-500">Min / Max Price:</span>
+            <span className="font-bold text-[#0D0D0D]">
+              {minPrice !== undefined ? minPrice.toFixed(4) : '0.0000'} / {maxPrice !== undefined ? maxPrice.toFixed(4) : '0.0000'}
+            </span>
+          </div>
+          <div className="flex justify-between font-mono-jb">
+            <span className="text-gray-500">Pool Active Price:</span>
+            <span className="font-bold text-[#0D0D0D]">
+              {poolActivePrice !== undefined ? poolActivePrice.toFixed(4) : '0.0000'}
+            </span>
+          </div>
+          <div className="flex justify-between font-mono-jb">
+            <span className="text-gray-500">24h Fee / TVL:</span>
+            <span className="font-bold text-[#0D0D0D]">
+              {feePerTvl24h !== undefined ? `${feePerTvl24h.toFixed(2)}%` : '0.00%'}
+            </span>
+          </div>
+        </div>
+
+        {/* Realized PnL & All-Time Fees */}
+        <div className="bg-[#F4F4F0] p-2.5 border border-[#0D0D0D] text-xs flex flex-col gap-1.5">
+          <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">PnL & All-Time Fees</div>
+          <div className="flex justify-between font-mono-jb items-center">
+            <span className="text-gray-500">Realized PnL:</span>
+            <span className={`font-bold ${pnlUsd && pnlUsd >= 0 ? 'text-green-600' : pnlUsd && pnlUsd < 0 ? 'text-[#FF4500]' : 'text-[#0D0D0D]'}`}>
+              {pnlUsd !== undefined ? `$${pnlUsd.toFixed(4)}` : '$0.0000'}
+              {pnlPctChange !== undefined && ` (${pnlPctChange >= 0 ? '+' : ''}${(pnlPctChange * 100).toFixed(2)}%)`}
+            </span>
+          </div>
+          <div className="flex justify-between font-mono-jb">
+            <span className="text-gray-500">All-Time Fees (USD):</span>
+            <span className="font-bold text-[#0D0D0D]">
+              {allTimeFeesTotalUsd !== undefined ? `$${allTimeFeesTotalUsd.toFixed(4)}` : '$0.0000'}
+            </span>
+          </div>
+          <div className="flex justify-between font-mono-jb text-[11px] pl-2 border-l border-gray-300">
+            <span className="text-gray-500">{tokenXSym} Fees:</span>
+            <span className="font-bold text-[#0D0D0D]">
+              {allTimeFeesXUsd !== undefined && allTimeFeesXUsd > 0
+                ? `$${allTimeFeesXUsd.toFixed(4)}`
+                : allTimeFeesXAmt !== undefined
+                ? `${allTimeFeesXAmt} ${tokenXSym}`
+                : `$0.0000`}
+            </span>
+          </div>
+          <div className="flex justify-between font-mono-jb text-[11px] pl-2 border-l border-gray-300">
+            <span className="text-gray-500">{tokenYSym} Fees:</span>
+            <span className="font-bold text-[#0D0D0D]">
+              {allTimeFeesYUsd !== undefined && allTimeFeesYUsd > 0
+                ? `$${allTimeFeesYUsd.toFixed(4)}`
+                : allTimeFeesYAmt !== undefined
+                ? `${allTimeFeesYAmt} ${tokenYSym}`
+                : `$0.0000`}
+            </span>
           </div>
         </div>
 

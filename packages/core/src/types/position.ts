@@ -60,6 +60,7 @@ export interface Position {
   activeBin?: number;
   binCount?: number;
   rangePercent?: number;
+  pnlData?: any;
 
   /**
    * @deprecated Use `lowerBound` instead. Kept for legacy Solana/Meteora support.

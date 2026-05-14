@@ -41,6 +41,14 @@ export const formatAmount = (amountStr: string, decimals: number): string => {
   return amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
 };
 
+export const getTokenSymbol = (tokenObj: any): string => {
+  if (!tokenObj) return 'Token';
+  if (tokenObj.mint === 'So11111111111111111111111111111111111111112') return 'SOL';
+  if (tokenObj.mint === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v') return 'USDC';
+  if (tokenObj.mint === 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB') return 'USDT';
+  return tokenObj.mint ? `${tokenObj.mint.slice(0, 4)}...` : 'Token';
+};
+
 export interface HealthData {
   epoch: number;
   status: string;
@@ -58,6 +66,7 @@ interface Position {
   tokenX: { amount: string; decimals: number } | null | undefined;
   tokenY: { amount: string; decimals: string } | null | undefined;
   raw: any;
+  pnlData?: any;
 }
 
 export interface Assignment {
@@ -183,6 +192,7 @@ export const AriaVegaContainer = () => {
           tokenX: pos.tokenX,
           tokenY: pos.tokenY,
           raw: pos,
+          pnlData: pos.pnlData || pos.metadata?.pnl || pos.metadata || pos,
         };
       });
 
