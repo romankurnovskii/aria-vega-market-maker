@@ -22,6 +22,7 @@ We introduce two new REST API endpoints on the engine backend:
 **Purpose**: Deposit additional token amounts into an existing position, increasing its liquidity allocation.
 
 **Request Body**:
+
 ```json
 {
   "tokenXAmount": "15000000",
@@ -30,13 +31,14 @@ We introduce two new REST API endpoints on the engine backend:
 }
 ```
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `tokenXAmount` | string | Yes | Raw token X amount to deposit (as string for precision) |
-| `tokenYAmount` | string | Yes | Raw token Y amount to deposit |
-| `slippageTolerance` | number | No | Slippage tolerance (default: 0.01 = 1%) |
+| Field               | Type   | Required | Description                                                                                                           |
+| ------------------- | ------ | -------- | --------------------------------------------------------------------------------------------------------------------- |
+| `tokenXAmount`      | string | Yes      | Raw integer token X amount to deposit (atomic units, e.g., lamports for SOL or micro-USDC). **Not decimal-adjusted.** |
+| `tokenYAmount`      | string | Yes      | Raw integer token Y amount to deposit (atomic units, e.g., lamports for SOL or micro-USDC). **Not decimal-adjusted.** |
+| `slippageTolerance` | number | No       | Slippage tolerance as decimal (0.01 = 1%, default: 0.01)                                                              |
 
 **Response** (200):
+
 ```json
 {
   "status": "success",
@@ -50,6 +52,7 @@ We introduce two new REST API endpoints on the engine backend:
 ```
 
 **Behavior**:
+
 - Uses Meteora SDK's `addLiquidity()` method
 - Tokens are distributed across the existing position's bin range using Spot strategy
 - Multiple transactions may be returned if the operation exceeds Solana's size limits
@@ -63,6 +66,7 @@ We introduce two new REST API endpoints on the engine backend:
 **Purpose**: Remove liquidity from a position, optionally specifying the percentage to withdraw. Fees are **automatically claimed** upon removal.
 
 **Request Body**:
+
 ```json
 {
   "percentage": 100,
@@ -70,12 +74,13 @@ We introduce two new REST API endpoints on the engine backend:
 }
 ```
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `percentage` | number | Yes | Percentage of liquidity to remove (1-100) |
-| `closePosition` | boolean | No | If true and percentage=100, closes the position account and reclaims rent |
+| Field           | Type    | Required | Description                                                               |
+| --------------- | ------- | -------- | ------------------------------------------------------------------------- |
+| `percentage`    | number  | Yes      | Percentage of liquidity to remove (1-100)                                 |
+| `closePosition` | boolean | No       | If true and percentage=100, closes the position account and reclaims rent |
 
 **Response** (200):
+
 ```json
 {
   "status": "success",
@@ -94,6 +99,7 @@ We introduce two new REST API endpoints on the engine backend:
 ```
 
 **Behavior**:
+
 - Uses Meteora SDK's `removeLiquidity()` with `shouldClaimAndClose: false`
 - **Automatically claims accrued swap fees** as part of the removal transaction
 - If `closePosition: true` and `percentage: 100`, also calls `closePosition()` to reclaim rent
@@ -106,23 +112,34 @@ We introduce two new REST API endpoints on the engine backend:
 Both endpoints use an **open schema** pattern for extensibility:
 
 ```typescript
-// Request bodies accept additional properties
 interface AddLiquidityRequest {
   tokenXAmount: string;
   tokenYAmount: string;
   slippageTolerance?: number;
-  strategyType?: 'spot' | 'bidAsk'; // future extension
-  metadata?: Record<string, unknown>; // future extension
+  strategyType?: 'spot' | 'curve' | 'bidAsk'; // Meteora SDK StrategyType enum: Spot=0, Curve=1, BidAsk=2
+  metadata?: Record<string, unknown>;
 }
 
 interface RemoveLiquidityRequest {
   percentage: number;
   closePosition?: boolean;
-  claimFees?: boolean; // explicitly control fee claim behavior
-  destinationWallet?: string; // future: withdraw to different wallet
-  metadata?: Record<string, unknown>; // future extension
+  claimFees?: boolean;
+  destinationWallet?: string;
+  metadata?: Record<string, unknown>;
 }
 ```
+
+### StrategyType Enum Reference
+
+The Meteora DLMM SDK defines three strategy types:
+
+| Value | Name     | Description                              |
+| ----- | -------- | ---------------------------------------- |
+| `0`   | `Spot`   | Uniform distribution across bin range    |
+| `1`   | `Curve`  | Distribution following the bonding curve |
+| `2`   | `BidAsk` | Bid-ask distribution for market making   |
+
+See `packages/providers/src/meteora/meteora-onchain-provider.ts` and `@meteora-ag/dlmm` SDK for implementation.
 
 ---
 
@@ -140,14 +157,14 @@ public async buildRemoveLiquidityTransactions(params: RemoveLiquidityParams): Pr
 
 ### Executor Integration
 
-| Step | Action |
-|------|--------|
-| 1 | Validate position exists and belongs to operator's wallet |
-| 2 | Build transaction(s) via provider |
-| 3 | Sign and broadcast with priority fees |
-| 4 | Poll for confirmation |
-| 5 | Update local position cache |
-| 6 | Return tx signatures and updated position state |
+| Step | Action                                                    |
+| ---- | --------------------------------------------------------- |
+| 1    | Validate position exists and belongs to operator's wallet |
+| 2    | Build transaction(s) via provider                         |
+| 3    | Sign and broadcast with priority fees                     |
+| 4    | Poll for confirmation                                     |
+| 5    | Update local position cache                               |
+| 6    | Return tx signatures and updated position state           |
 
 ### State Machine Impact
 
