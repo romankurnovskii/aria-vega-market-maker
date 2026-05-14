@@ -79,13 +79,13 @@ export function startHttpServer(
 
             const lowerBoundPrice = getPriceFromBinId(
               pos.lowerBound,
-              poolInfo.feeRate,
+              poolInfo.binStep ?? 40,
               pos.tokenX.decimals,
               pos.tokenY.decimals
             );
             const upperBoundPrice = getPriceFromBinId(
               pos.upperBound,
-              poolInfo.feeRate,
+              poolInfo.binStep ?? 40,
               pos.tokenX.decimals,
               pos.tokenY.decimals
             );
