@@ -11,6 +11,7 @@ import {
   PoolInfo,
   MarketSnapshot,
 } from '@lp-system/core';
+import { OrchestratorFactory } from '@lp-system/orchestration';
 import { handlePositionsRouter } from './routes/positions.js';
 
 const MOCK_POSITION_ID = 'pos_12345';
@@ -61,7 +62,7 @@ function setupTestServer() {
   const positionProvider: IPositionProvider = {
     getPositions: async () => [position],
     getPosition: async (id) => {
-      if (id === MOCK_POSITION_ID) return position;
+      if (id === MOCK_POSITION_ID || id === 'pos_unassigned') return position;
       throw new Error(`Position ${id} not found`);
     },
     getPoolInfo: async () => poolInfo,
@@ -111,9 +112,26 @@ function setupTestServer() {
     getAll: () => [mockOrchestrator as unknown as IOrchestrator],
   };
 
+  const factory = new OrchestratorFactory({
+    'trailing-usdc': {
+      id: 'trailing-usdc',
+      description: 'Trailing USDC strategy',
+      execute: async () => ({
+        action: 'close+open' as const,
+        openParams: {
+          poolAddress: MOCK_POOL_ADDRESS,
+          lowerBound: 12,
+          upperBound: 18,
+          tokenXAmount: '500',
+          tokenYAmount: '500',
+        },
+      }),
+    },
+  });
+
   const app = express();
   app.use(express.json());
-  app.use('/positions', handlePositionsRouter(positionProvider, executor, registry, MOCK_WALLET));
+  app.use('/positions', handlePositionsRouter(positionProvider, executor, registry, factory, MOCK_WALLET));
 
   const server = http.createServer(app);
 
@@ -200,6 +218,25 @@ test('ISSUE #57: POST /positions/:id/actions with action=addLiquidity adds liqui
     assert.strictEqual(decision.positionId, MOCK_POSITION_ID);
     assert.strictEqual((decision.openParams as Record<string, unknown>).tokenXAmount, '100');
     assert.strictEqual((decision.openParams as Record<string, unknown>).tokenYAmount, '200');
+  } finally {
+    server.close();
+  }
+});
+
+test('ISSUE #57: POST /positions/:id/actions with action=evaluate on unassigned position creates ad-hoc orchestrator and returns strategy result', async () => {
+  const { server, url } = await setupTestServer();
+  try {
+    const res = await fetch(`${url}/pos_unassigned/actions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'evaluate', strategyId: 'trailing-usdc' }),
+    });
+
+    assert.strictEqual(res.status, 200);
+    const data = (await res.json()) as Record<string, unknown>;
+    assert.strictEqual(data.status, 'success');
+    assert.strictEqual(data.action, 'evaluate');
+    assert.strictEqual((data.result as Record<string, unknown>).action, 'close+open');
   } finally {
     server.close();
   }
