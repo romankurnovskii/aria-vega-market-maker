@@ -517,7 +517,11 @@ export async function processTasks(
           record = existingRecord;
         } else {
           try {
-            record = await executor.apply(task.intent, market, async () => {
+            const openIntent: Decision = {
+              ...task.intent,
+              positionId: poolAddress,
+            };
+            record = await executor.apply(openIntent, market, async () => {
               return { action: 'skip' };
             });
             if (record.status === 'failed') {
