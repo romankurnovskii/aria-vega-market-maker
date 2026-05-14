@@ -4,7 +4,7 @@
  *
  * @features
  * - Fetches health, positions, assignments, strategies, and steps from the API on mount + interval
- * - Manages active tab state, events log, and connection errors
+ * - Manages active tab state and connection errors
  * - Dispatches strategy assignment, evaluation, and revocation actions
  * - Passes typed data and callbacks to presentational child components
  *
@@ -23,7 +23,7 @@ import { PositionsView } from '../components/PositionsView';
 import { AssignmentsView } from '../components/AssignmentsView';
 import { StrategiesView } from '../components/StrategiesView';
 import { StepsView } from '../components/StepsView';
-import { EventLog } from '../components/EventLog';
+
 import { Footer } from '../components/Footer';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8441';
@@ -98,12 +98,7 @@ export const AriaVegaContainer = () => {
     health: { epoch: 0, status: '' },
   });
   const [loading, setLoading] = useState<boolean>(true);
-  const [events, setEvents] = useState<string[]>(['[SYSTEM] Aria Vega Terminal Initializing...']);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-
-  const logEvent = (msg: string): void => {
-    setEvents((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev].slice(0, 30));
-  };
 
   // Fetch all state from API
   const syncState = async (): Promise<void> => {
@@ -203,7 +198,6 @@ export const AriaVegaContainer = () => {
   };
 
   useEffect(() => {
-    logEvent('[SYS] Connecting to Aria Vega Control Server...');
     syncState();
 
     // Auto refresh every 5 seconds
@@ -227,21 +221,17 @@ export const AriaVegaContainer = () => {
       const existing = data.assignments.find((a: any) => a.positionId === positionId);
 
       if (existing) {
-        logEvent(`[ASSIGN] Removing existing assignment ${existing.id}...`);
         const delRes = await fetch(`${API_URL}/assignments/${existing.id}`, { method: 'DELETE' });
         if (!delRes.ok) {
-          logEvent(`[ASSIGN] Warning: failed to clear old assignment: ${delRes.statusText}`);
         }
       }
 
       if (strategyId === 'NONE') {
-        logEvent(`[ASSIGN] Unassigned strategy from position ${positionId}`);
         syncState();
         return;
       }
 
       const newId = `asg_${Math.random().toString(36).substr(2, 6)}`;
-      logEvent(`[ASSIGN] Requesting assignment for position ${positionId} with strategy ${strategyId}...`);
 
       const res = await fetch(`${API_URL}/assignments`, {
         method: 'POST',
@@ -256,14 +246,11 @@ export const AriaVegaContainer = () => {
 
       if (res.ok) {
         const payload = await res.json();
-        logEvent(`[ASSIGN] Strategy ${strategyId} bound successfully!`);
         syncState();
       } else {
         const errPayload = await res.json().catch(() => ({}));
-        logEvent(`[ASSIGN] Error: ${errPayload.error || 'Failed to bind strategy'}`);
       }
     } catch (err: any) {
-      logEvent(`[ASSIGN] Connection error: ${err.message || String(err)}`);
     }
   };
 
@@ -278,7 +265,6 @@ export const AriaVegaContainer = () => {
       const selectedPos = data.positions.find((p: any) => p.id === positionId);
       if (!selectedPos) return;
 
-      logEvent(`[EVALUATE] Triggering manual tick evaluation for strategy ${strategyId} on position ${positionId}...`);
 
       const res = await fetch(`${API_URL}/strategies/${strategyId}/evaluate`, {
         method: 'POST',
@@ -291,15 +277,11 @@ export const AriaVegaContainer = () => {
 
       const result = await res.json();
       if (res.ok) {
-        logEvent(`[EVALUATE] Evaluation complete. Result status: ${result.status || 'Success'}`);
         if (result.result) {
-          logEvent(`[EVALUATE] Yield: ${JSON.stringify(result.result)}`);
         }
       } else {
-        logEvent(`[EVALUATE] Rejected: ${result.error || 'Evaluation error occurred'}`);
       }
     } catch (err: any) {
-      logEvent(`[EVALUATE] Failed to execute: ${err.message || String(err)}`);
     }
   };
 
@@ -310,17 +292,13 @@ export const AriaVegaContainer = () => {
    */
   const handleDeleteAssignment = async (id: string): Promise<void> => {
     try {
-      logEvent(`[DELETE] Requesting revocation for assignment ${id}...`);
       const res = await fetch(`${API_URL}/assignments/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        logEvent(`[DELETE] Revocation confirmed.`);
         syncState();
       } else {
         const errPayload = await res.json().catch(() => ({}));
-        logEvent(`[DELETE] Revocation rejected: ${errPayload.error || 'Failed'}`);
       }
     } catch (err: any) {
-      logEvent(`[DELETE] Failed to contact server: ${err.message || String(err)}`);
     }
   };
 
@@ -354,15 +332,12 @@ export const AriaVegaContainer = () => {
             {activeTab.replace('-', ' ')}
           </h2>
 
-          <div className="flex-1 min-h-0 flex flex-col">
+<div className="flex-1 min-h-0 flex flex-col">
             {activeTab === 'positions' && (
               <PositionsView
                 positions={data.positions}
                 assignments={data.assignments}
                 strategies={data.strategies}
-                events={events}
-                onAssign={handleAssignStrategy}
-                onEvaluate={handleEvaluateStrategy}
               />
             )}
             {activeTab === 'assignments' && (
@@ -371,8 +346,6 @@ export const AriaVegaContainer = () => {
             {activeTab === 'strategies' && <StrategiesView strategies={data.strategies} />}
             {activeTab === 'steps' && <StepsView steps={data.steps} />}
           </div>
-
-          <EventLog events={events} />
         </main>
       </div>
 

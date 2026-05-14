@@ -15,16 +15,14 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Zap, X, TerminalSquare, ChevronRight } from 'lucide-react';
+import { Zap, X, ChevronRight } from 'lucide-react';
 
 import { formatAmount } from '../containers/AriaVegaContainer';
-import { EventLog } from './EventLog';
 
 interface PositionDetailProps {
   position: any;
   orchestration: { strategyId: string; mode: string } | null;
   strategies: any[];
-  events: string[];
   onAssign: (positionId: string, strategyId: string, mode: string) => Promise<void>;
   onEvaluate: (positionId: string, strategyId: string) => Promise<void>;
   onClose: () => void;
@@ -34,7 +32,6 @@ export const PositionDetail = ({
   position,
   orchestration,
   strategies,
-  events,
   onAssign,
   onEvaluate,
   onClose,
@@ -165,9 +162,6 @@ export const PositionDetail = ({
           </div>
         </div>
       </div>
-
-      {/* Events Log Pane */}
-      <EventLog events={events} />
     </div>
   );
 };
