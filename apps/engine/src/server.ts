@@ -63,7 +63,7 @@ export function startHttpServer(
   const PORT = process.env.PORT || 3000;
 
   app.use('/assignments', createAssignmentsRouter(store, registry, factory));
-  app.use('/strategies', createStrategiesRouter(registry, positionProvider));
+  app.use('/strategies', createStrategiesRouter(registry, factory, positionProvider));
   app.use('/', createIntrospectionRouter(factory));
 
   app.get('/positions', async (_req, res) => {
@@ -146,7 +146,7 @@ export function startHttpServer(
     }
   });
 
-  app.use('/positions', handlePositionsRouter(positionProvider, executor, registry, walletAddress, positionStore));
+  app.use('/positions', handlePositionsRouter(positionProvider, executor, registry, factory, walletAddress, positionStore));
 
   const swaggerDocument = YAML.load(path.join(__dirname, '../src/openapi.yaml'));
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));

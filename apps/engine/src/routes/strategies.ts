@@ -4,7 +4,13 @@ import { getLogger } from '@lp-system/logger';
 
 const logger = getLogger('server');
 
-export function createStrategiesRouter(registry: IOrchestratorRegistry, positionProvider: IPositionProvider): Router {
+import { OrchestratorFactory } from '@lp-system/orchestration';
+
+export function createStrategiesRouter(
+  registry: IOrchestratorRegistry,
+  factory: OrchestratorFactory,
+  positionProvider: IPositionProvider
+): Router {
   const router = Router();
 
   router.post('/:id/evaluate', async (req, res) => {
@@ -23,19 +29,34 @@ export function createStrategiesRouter(registry: IOrchestratorRegistry, position
       const market = await positionProvider.getMarketSnapshot(position.poolAddress);
 
       const orchestrators = registry.getForPosition(positionId);
-      const targetOrch = orchestrators.find((o) => o.strategyId === strategyId);
+      let targetOrch = orchestrators.find((o) => o.strategyId === strategyId);
 
       if (!targetOrch) {
-        res.status(404).json({
-          error: `No active orchestrator for strategy ${strategyId} and position ${positionId} exists in registry`,
-        });
-        return;
+        logger.info(
+          `[HTTP Server] No active orchestrator found for strategy ${strategyId} on position ${positionId}, creating ad-hoc orchestrator for evaluation.`
+        );
+        try {
+          targetOrch = factory.create({
+            id: `adhoc_${Date.now()}`,
+            positionId,
+            strategyId,
+            mode: 'monitoring',
+            createdAt: Date.now(),
+          });
+        } catch (factoryErr: unknown) {
+          const msg = factoryErr instanceof Error ? factoryErr.message : String(factoryErr);
+          res.status(404).json({
+            error: `Strategy ${strategyId} is not registered or cannot be instantiated: ${msg}`,
+          });
+          return;
+        }
       }
 
       const result = await targetOrch.tick(position, market);
       res.json({ status: 'success', result });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || String(error) });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: msg });
     }
   });
 
