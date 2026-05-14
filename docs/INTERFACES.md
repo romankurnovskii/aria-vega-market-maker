@@ -57,6 +57,8 @@ The `RebalanceTask` is the ultimate persistent anchor that guarantees system int
 - **Unique Identification**: Mapping the operational lifecycle to a unique workspace assignment.
 - **Task Phase**: The progression from `pending_close` to `awaiting_settlement` and finally `pending_open`.
 - **Identity Retention**: Holding the unique ID of the closed position to bridge state blindness.
+- **Pre/Post Close Balance Snapshots**: Capturing `preCloseBalances` before transaction broadcast and `postCloseBalances` immediately following confirmation (both with explicit timestamps). This dual-snapshot pattern ensures immutable recovery reference points across compound rebalance legs.
+- **Recovered Funds Tracking**: Capturing `recoveredFunds` during crash recovery when a position has been closed on-chain but the local process crashed before final settlement.
 - **Attributable Balance Snapshots**: Capturing exact token balances immediately following the `close` confirmation. This prevents collision during multi-position settlement tracking.
 - **Intent Anchoring**: Storing the precise boundaries and allocations of the target position to prevent signal drift.
 - **Audit Trails**: A sequence of timestamped event stages (`INIT`, `CLOSE_BROADCAST`, `SETTLEMENT_POLLING`, `JIT_REEVALUATION`, `OPEN_CONFIRMED`, etc.) for real-time observation.

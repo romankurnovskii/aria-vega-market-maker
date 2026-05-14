@@ -19,7 +19,8 @@ import {
   StrategyResult,
 } from '@lp-system/core';
 
-const MOCK_PUBKEY_1 = 'HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTYUQh';
+const MOCK_WALLET_ADDRESS = 'HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTYUQh';
+const MOCK_PUBKEY_1 = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
 const MOCK_PUBKEY_2 = 'GpCoz6vVv9kH8R4sLWev4M7wD7vT1Kz2Ff7LveX8Pz9k';
 const MOCK_PUBKEY_3 = '3b9SrqR9yXnNnHe1Kz77aFeYV8nK9wZfL6tX8T3tX9tY';
 
@@ -261,7 +262,7 @@ test('processTasks - Scenario A: Standard rebalance (close+open)', async () => {
   });
 
   // 1. Process 'pending_close'
-  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_PUBKEY_1, m.registry, m.positionStore);
+  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
 
   assert.strictEqual(task.status, 'awaiting_settlement');
   assert.ok(task.events?.some((e) => e.stage === 'CLOSE_BROADCAST'));
@@ -270,13 +271,13 @@ test('processTasks - Scenario A: Standard rebalance (close+open)', async () => {
   assert.ok(task.events?.some((e) => e.stage === 'SETTLEMENT_DETECTED'));
 
   // 2. Process 'awaiting_settlement' -> transition to 'pending_open'
-  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_PUBKEY_1, m.registry, m.positionStore);
+  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
 
   assert.strictEqual(task.status, 'pending_open');
   assert.ok(task.events?.some((e) => e.stage === 'JIT_REEVALUATION'));
 
   // 3. Process 'pending_open' -> completes and deletes
-  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_PUBKEY_1, m.registry, m.positionStore);
+  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
 
   assert.strictEqual(m.tasks.length, 0); // Task should be deleted
   assert.ok(task.events?.some((e) => e.stage === 'OPEN_BROADCAST'));
@@ -345,7 +346,7 @@ test('processTasks - Scenario B: Rebalance with JIT Abort', async () => {
     metadata: {},
   });
 
-  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_PUBKEY_1, m.registry, m.positionStore);
+  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
 
   assert.strictEqual(m.tasks.length, 0); // Task should be deleted on JIT abort
   assert.ok(task.events?.some((e) => e.stage === 'JIT_REEVALUATION'));
@@ -385,7 +386,7 @@ test('processTasks - Scenario C: Pure Close (close)', async () => {
   };
   m.orchestrators.push(mockOrchestrator);
 
-  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_PUBKEY_1, m.registry, m.positionStore);
+  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
 
   assert.strictEqual(m.tasks.length, 0); // Pure close should complete and delete immediately without settlement/open
   assert.ok(task.events?.some((e) => e.stage === 'CLOSE_BROADCAST'));
@@ -433,7 +434,7 @@ test('processTasks - Scenario D: Pure Open (open)', async () => {
   };
   m.orchestrators.push(mockOrchestrator);
 
-  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_PUBKEY_1, m.registry, m.positionStore);
+  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
 
   assert.strictEqual(m.tasks.length, 0); // Pure open should complete and delete
   assert.ok(task.events?.some((e) => e.stage === 'OPEN_BROADCAST'));
@@ -486,7 +487,7 @@ test('processTasks - Timeout Scenario', async () => {
   };
 
   // Run processTasks
-  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_PUBKEY_1, m.registry, m.positionStore);
+  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
 
   // 1. The task must have a TIMEOUT event appended
   assert.ok(task.events?.some((e) => e.stage === 'TIMEOUT'));
@@ -552,7 +553,7 @@ test('startDiscovery - Scenario E: Crash Recovery with newPositionId', async () 
   } as any;
 
   // Run startDiscovery
-  await startDiscovery(MOCK_PUBKEY_1, m.positionProvider, m.positionStore, factory, m.store, m.registry);
+  await startDiscovery(MOCK_WALLET_ADDRESS, m.positionProvider, m.positionStore, factory, m.store, m.registry);
 
   // Assignment positionId must be updated to newPositionId
   assert.strictEqual(assignmentsList[0].positionId, MOCK_PUBKEY_2);
@@ -630,7 +631,7 @@ test('startDiscovery - Scenario F: Lock Restoration with Active Task', async () 
   } as any;
 
   // Run startDiscovery
-  await startDiscovery(MOCK_PUBKEY_1, m.positionProvider, m.positionStore, factory, m.store, m.registry);
+  await startDiscovery(MOCK_WALLET_ADDRESS, m.positionProvider, m.positionStore, factory, m.store, m.registry);
 
   // Orchestrator must be registered
   const registeredOrchs = m.registry.getForPosition(MOCK_PUBKEY_1);
@@ -749,7 +750,7 @@ test('processTasks - Scenario G: Seamless Transition with newPositionId', async 
     m.executor,
     m.positionProvider,
     m.rpcPool,
-    MOCK_PUBKEY_1,
+    MOCK_WALLET_ADDRESS,
     m.registry,
     m.positionStore,
     factory
@@ -845,7 +846,7 @@ test('processTasks - Issue 1: Race Condition in Position State Updates', async (
   };
 
   // Run processTasks once (both tasks will be processed in the same loop)
-  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_PUBKEY_1, m.registry, m.positionStore);
+  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
 
   // Assert both positions were successfully archived as CLOSED.
   const archived1 = archivedPositionsList.find((p) => p.id === 'pos_1');
@@ -900,7 +901,7 @@ test('processTasks - Issue 3: Missing Error Handling in Archive Operations', asy
 
   // Run processTasks
   try {
-    await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_PUBKEY_1, m.registry, m.positionStore);
+    await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
   } catch {
     /* ignore expected error */
   }
@@ -994,11 +995,111 @@ test('processTasks - Issue 4: Duplicate Position After Rebalance (Failed cache u
   };
 
   try {
-    await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_PUBKEY_1, m.registry, m.positionStore);
+    await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
   } catch {
     /* ignore expected error */
   }
 
   // Under correct error handling, the task MUST NOT be deleted if saveKnown fails
   assert.strictEqual(m.tasks.length, 1, 'Task should not be deleted if saving known positions fails');
+});
+
+test('processTasks - Issue 13: WSOL uses ATA balance exclusively (not native SOL)', async () => {
+  const m = createMocks();
+
+  const WSOL_MINT = 'So11111111111111111111111111111111111111112';
+
+  m.positionProvider.getPoolInfo = async (_poolAddress): Promise<PoolInfo> => {
+    return {
+      poolAddress: MOCK_PUBKEY_2,
+      chain: 'solana',
+      protocol: 'meteora_dlmm',
+      feeRate: 100,
+      activeBound: 1000,
+      tokenXAddress: WSOL_MINT,
+      tokenYAddress: MOCK_PUBKEY_3,
+    };
+  };
+
+  m.rpcPool.execute = async (fn) => {
+    const mockConnection = {
+      getParsedTokenAccountsByOwner: async () => {
+        return {
+          value: [
+            {
+              account: {
+                data: {
+                  parsed: {
+                    info: {
+                      mint: WSOL_MINT,
+                      tokenAmount: { amount: '5000000000' },
+                    },
+                  },
+                },
+              },
+            },
+            {
+              account: {
+                data: {
+                  parsed: {
+                    info: {
+                      mint: MOCK_PUBKEY_3,
+                      tokenAmount: { amount: '2000000000' },
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        };
+      },
+      getBalance: async () => BigInt('1000000000'),
+    };
+    return fn(mockConnection as any);
+  };
+
+  const decision: Decision = {
+    positionId: MOCK_PUBKEY_1,
+    action: 'close+open',
+    openParams: {
+      poolAddress: MOCK_PUBKEY_2,
+      lowerBound: 1.0,
+      upperBound: 2.0,
+      tokenXAmount: '500',
+      tokenYAmount: '500',
+    },
+    sourceAssignmentId: 'assign_123',
+    evaluatedAt: Date.now(),
+  };
+
+  const task: RebalanceTask = {
+    id: 'task_wsol',
+    assignmentId: 'assign_123',
+    status: 'pending_close',
+    originalPositionId: MOCK_PUBKEY_1,
+    intent: decision,
+    evaluatedAt: Date.now(),
+    events: [{ stage: 'INIT', timestamp: Date.now(), message: 'Init task' }],
+  };
+
+  m.tasks.push(task);
+
+  m.knownPositions.push({
+    id: MOCK_PUBKEY_1,
+    poolAddress: MOCK_PUBKEY_2,
+    chain: 'solana',
+    protocol: 'meteora_dlmm',
+    lowerBound: 1.0,
+    upperBound: 2.0,
+    tokenX: { tokenAddress: WSOL_MINT, mint: WSOL_MINT, decimals: 9, amount: '0' },
+    tokenY: { tokenAddress: MOCK_PUBKEY_3, mint: MOCK_PUBKEY_3, decimals: 6, amount: '0' },
+    isInRange: true,
+    openedAt: Date.now(),
+    metadata: {},
+  });
+
+  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
+
+  assert.strictEqual(task.status, 'awaiting_settlement');
+  assert.ok(task.events?.some((e) => e.stage === 'SETTLEMENT_POLLING'));
 });

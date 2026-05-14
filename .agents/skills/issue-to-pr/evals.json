@@ -1,0 +1,47 @@
+{
+  "skill_name": "issue-review-pipeline",
+  "evals": [
+    {
+      "id": 1,
+      "phase": "triage",
+      "prompt": "Review this GitHub issue critically and find any gaps or risks: https://github.com/romankurnovskii/aria-vega-market-maker/issues/8. Check with the relevant codebase.",
+      "expected_output": "Produces triage.json with verdict, root_cause_hypothesis, relevant_files, gaps_found, and new_bugs_risk. Does NOT write any code or tests. Posts a comment on the issue.",
+      "must_not": "Write code, run tests, attempt a fix, or proceed to Phase 2 without explicit user approval."
+    },
+    {
+      "id": 2,
+      "phase": "triage",
+      "prompt": "Look at issue #8 in https://github.com/example/api-gateway — the rate limiter claim seems off. Review it against the codebase and tell me if it's a real bug.",
+      "expected_output": "triage.json with verdict confirmed or rejected. Clear explanation of whether the code matches the issue claim. relevant_files are actual paths from the repo.",
+      "must_not": "Invent file paths. Mark as confirmed without reading the code."
+    },
+    {
+      "id": 3,
+      "phase": "reproduce",
+      "prompt": "Reproduce the bug from triage.json and write failing tests. Don't fix anything.",
+      "expected_output": "repro.json with repro_confirmed, test_file_path pointing to a real new test file, failing_tests list, edge_cases. The new test file exists and tests are actually failing.",
+      "must_not": "Fix the bug. Modify source files. Create tests that pass."
+    },
+    {
+      "id": 4,
+      "phase": "fix",
+      "prompt": "Fix issue #8 based on repro.json and open a PR.",
+      "expected_output": "Branch created, PR opened, pr.json with pr_url, tests_all_pass true, regression_check_passed true. PR description links to issue and explains the fix.",
+      "must_not": "Fix bugs marked as out_of_scope in repro.json. Open PR if tests fail."
+    },
+    {
+      "id": 5,
+      "phase": "verify",
+      "prompt": "Verify that the PR from pr.json actually fixes the issue and doesn't introduce regressions.",
+      "expected_output": "verify.json with verdict approved or needs_rework. PR comment posted. If needs_rework, rework_instructions is specific and actionable.",
+      "must_not": "Modify any code. Approve if issue tests still fail. Ignore new bugs found in diff."
+    },
+    {
+      "id": 6,
+      "phase": "full_pipeline",
+      "prompt": "Review issue #42 end to end: https://github.com/example/payment-service/issues/42 — memory leak in webhook handler. Go through all phases.",
+      "expected_output": "All four handoff files produced in sequence. Each phase gates correctly. Final verify.json produced. No phase skips its input check.",
+      "must_not": "Skip triage before reproduce. Start fix without confirmed repro. Approve a PR with failing tests."
+    }
+  ]
+}

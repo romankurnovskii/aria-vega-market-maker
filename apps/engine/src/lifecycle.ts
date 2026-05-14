@@ -28,6 +28,7 @@ import {
   ExecutionRecord,
   Assignment,
   IOrchestrator,
+  PoolInfo,
 } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
@@ -74,25 +75,30 @@ async function getWalletBalances(
   await fetchForProgram(tokenProgramId);
   await fetchForProgram(token2022ProgramId);
 
-  const WSOL_MINT = 'So11111111111111111111111111111111111111112';
-  if (mintX === WSOL_MINT) {
-    try {
-      const nativeBal = await connection.getBalance(new PublicKey(walletAddress));
-      amountX = nativeBal.toString();
-    } catch (e) {
-      logger.warn(`[getWalletBalances] Failed to fetch native balance for mintX: ${e}`);
-    }
-  }
-  if (mintY === WSOL_MINT) {
-    try {
-      const nativeBal = await connection.getBalance(new PublicKey(walletAddress));
-      amountY = nativeBal.toString();
-    } catch (e) {
-      logger.warn(`[getWalletBalances] Failed to fetch native balance for mintY: ${e}`);
-    }
-  }
-
   return { amountX, amountY };
+}
+
+async function calculateRecoveredFunds(
+  task: RebalanceTask,
+  rpcPool: IRpcProvider,
+  walletAddress: string,
+  poolInfo: PoolInfo,
+  tasksStore: { saveTask: (t: RebalanceTask) => Promise<void> }
+): Promise<void> {
+  if (!task.preCloseBalances) return;
+  const currentBalances = await rpcPool.execute(async (connection: Connection) => {
+    return await getWalletBalances(connection, walletAddress, poolInfo.tokenXAddress, poolInfo.tokenYAddress);
+  });
+  const deltaX = BigInt(currentBalances.amountX) - BigInt(task.preCloseBalances.tokenX);
+  const deltaY = BigInt(currentBalances.amountY) - BigInt(task.preCloseBalances.tokenY);
+  task.recoveredFunds = {
+    tokenX: deltaX > 0n ? deltaX.toString() : '0',
+    tokenY: deltaY > 0n ? deltaY.toString() : '0',
+  };
+  logger.info(
+    `[Execution Monitor] Crash recovery detected. Recovered funds: X=${task.recoveredFunds.tokenX}, Y=${task.recoveredFunds.tokenY}`
+  );
+  await tasksStore.saveTask(task);
 }
 /**
  * Starts the one-time position discovery cycle.
@@ -300,15 +306,14 @@ export async function processTasks(
         const knownPositions = await positionStore.getKnown();
         const cachedPos = knownPositions.find((p) => p.id === task.originalPositionId);
         if (cachedPos) {
+          const posId = cachedPos.id;
           cachedPos.state = 'FAILED';
           cachedPos.closedAt = Date.now();
           await positionStore.archivePosition(cachedPos);
 
-          const remaining = knownPositions.filter((p) => p.id !== cachedPos.id);
+          const remaining = knownPositions.filter((p) => p.id !== posId);
           await positionStore.saveKnown(remaining);
-          logger.warn(
-            `[Execution Monitor] Auto-Heal: Archived cached position ${cachedPos.id} as FAILED due to task timeout.`
-          );
+          logger.warn(`[Execution Monitor] Auto-Heal: Archived cached position ${posId} as FAILED due to task timeout.`);
         }
 
         // Archive the task to the historical tasks history ledger
@@ -342,19 +347,33 @@ export async function processTasks(
         // Transition Position State in local cache
         const knownPositions = await positionStore.getKnown();
         const cachedPos = knownPositions.find((p) => p.id === task.originalPositionId);
+        const amountX = cachedPos?.tokenX.amount ?? '0';
+        const amountY = cachedPos?.tokenY.amount ?? '0';
         if (cachedPos) {
-          cachedPos.state = task.intent.action === 'close' ? 'CLOSING' : 'REBALANCING';
+          const newState = task.intent.action === 'close' ? 'CLOSING' : 'REBALANCING';
+          cachedPos.state = newState;
           await positionStore.saveKnown(knownPositions);
-          logger.info(`[Execution Monitor] Position ${task.originalPositionId} state updated to ${cachedPos.state}`);
+          logger.info(`[Execution Monitor] Position ${task.originalPositionId} state updated to ${newState}`);
         }
 
-        logger.info(`[Execution Monitor] Executing CLOSE transaction for task ${task.id}...`);
+        task.expectedDeltaX = amountX;
+        task.expectedDeltaY = amountY;
+
+        logger.info(
+          `[Execution Monitor] Executing CLOSE transaction for task ${task.id}... ` +
+            `(expectedDeltaX=${task.expectedDeltaX}, expectedDeltaY=${task.expectedDeltaY})`
+        );
         const closeDecision: Decision = {
           ...task.intent,
           action: 'close' as const,
         };
 
         // --- Log CLOSE_BROADCAST ---
+        task.preCloseBalances = {
+          tokenX: initialBalances.amountX,
+          tokenY: initialBalances.amountY,
+          timestamp: Date.now(),
+        };
         task.events.push({
           stage: 'CLOSE_BROADCAST',
           timestamp: Date.now(),
@@ -375,6 +394,7 @@ export async function processTasks(
               logger.warn(
                 `[Execution Monitor] Position ${task.originalPositionId} was not found on-chain (already closed). Proceeding with rebalance flow.`
               );
+              await calculateRecoveredFunds(task, rpcPool, walletAddress, poolInfo, tasksStore);
               record = { status: 'success' as const, txSignatures: [] };
             } else {
               throw new Error(`Close transaction failed: ${record.error}`);
@@ -386,6 +406,7 @@ export async function processTasks(
             logger.warn(
               `[Execution Monitor] Position ${task.originalPositionId} was not found on-chain (already closed). Proceeding with rebalance flow.`
             );
+            await calculateRecoveredFunds(task, rpcPool, walletAddress, poolInfo, tasksStore);
             record = { status: 'success' as const, txSignatures: [] };
           } else {
             task.events.push({
@@ -397,12 +418,13 @@ export async function processTasks(
             await tasksStore.saveTask(task);
 
             if (cachedPos) {
+              const posId = cachedPos.id;
               cachedPos.state = 'FAILED';
               cachedPos.closedAt = Date.now();
               await positionStore.archivePosition(cachedPos);
               await positionStore.saveKnown(knownPositions);
               logger.error(
-                `[Execution Monitor] Position ${cachedPos.id} state updated to FAILED and archived due to close failure.`
+                `[Execution Monitor] Position ${posId} state updated to FAILED and archived due to close failure.`
               );
             }
 
@@ -429,14 +451,13 @@ export async function processTasks(
           await tasksStore.saveTask(task);
 
           if (cachedPos) {
+            const posId = cachedPos.id;
             cachedPos.state = 'CLOSED';
             cachedPos.closedAt = Date.now();
             await positionStore.archivePosition(cachedPos);
-            const remaining = knownPositions.filter((p) => p.id !== cachedPos.id);
+            const remaining = knownPositions.filter((p) => p.id !== posId);
             await positionStore.saveKnown(remaining);
-            logger.info(
-              `[Execution Monitor] Pure closed position ${cachedPos.id} archived and pruned from known positions cache.`
-            );
+            logger.info(`[Execution Monitor] Pure closed position ${posId} archived and pruned from known positions cache.`);
           }
           await tasksStore.deleteTask(task.id);
           continue; // Move to next task
@@ -452,7 +473,15 @@ export async function processTasks(
         await tasksStore.saveTask(task);
 
         const solanaExecutor = executor as unknown as {
-          pollBalances?: (tx: string, ty: string, w: string, ix: bigint, iy: bigint) => Promise<void>;
+          pollBalances?: (
+            tx: string,
+            ty: string,
+            w: string,
+            ix: bigint,
+            iy: bigint,
+            timeoutMs?: number,
+            options?: { expectedDeltaX?: bigint; expectedDeltaY?: bigint }
+          ) => Promise<void>;
         };
         if (solanaExecutor.pollBalances && record && record.txSignatures && record.txSignatures.length > 0) {
           await solanaExecutor.pollBalances(
@@ -460,7 +489,12 @@ export async function processTasks(
             poolInfo.tokenYAddress,
             walletAddress,
             BigInt(initialBalances.amountX),
-            BigInt(initialBalances.amountY)
+            BigInt(initialBalances.amountY),
+            undefined, // default timeout
+            {
+              expectedDeltaX: task.expectedDeltaX ? BigInt(task.expectedDeltaX) : undefined,
+              expectedDeltaY: task.expectedDeltaY ? BigInt(task.expectedDeltaY) : undefined,
+            }
           );
         } else {
           logger.info(
@@ -653,37 +687,71 @@ export async function processTasks(
         });
         await tasksStore.saveTask(task);
 
+        let existingRecord: ExecutionRecord | undefined;
+        if (task.newPositionId) {
+          existingRecord = {
+            id: 'idemp_' + task.id,
+            decision: task.intent,
+            txSignatures: [],
+            status: 'success',
+            executedAt: Date.now(),
+            newPositionId: task.newPositionId,
+            recordVersion: 1,
+          };
+        } else {
+          const records = await store.getExecutionRecords();
+          existingRecord = records.find(
+            (r) =>
+              r.decision.sourceAssignmentId === task.assignmentId &&
+              r.decision.action === 'open' &&
+              r.status === 'success' &&
+              r.executedAt >= task.evaluatedAt
+          );
+          if (existingRecord && existingRecord.newPositionId) {
+            task.newPositionId = existingRecord.newPositionId;
+            await tasksStore.saveTask(task);
+          }
+        }
+
         let record: ExecutionRecord;
-        try {
-          record = await executor.apply(task.intent, market, async () => {
-            return { action: 'skip' };
-          });
-          if (record.status === 'failed') {
-            throw new Error(`Open transaction failed: ${record.error}`);
-          }
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          task.events.push({
-            stage: 'ERROR',
-            timestamp: Date.now(),
-            message: `Open transaction failed: ${msg}`,
-            error: msg,
-          });
-          await tasksStore.saveTask(task);
+        if (existingRecord && existingRecord.newPositionId) {
+          logger.info(
+            `[Execution Monitor] Idempotency check: Task ${task.id} already executed (newPositionId: ${existingRecord.newPositionId}). Skipping executor.apply.`
+          );
+          record = existingRecord;
+        } else {
+          try {
+            record = await executor.apply(task.intent, market, async () => {
+              return { action: 'skip' };
+            });
+            if (record.status === 'failed') {
+              throw new Error(`Open transaction failed: ${record.error}`);
+            }
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            task.events.push({
+              stage: 'ERROR',
+              timestamp: Date.now(),
+              message: `Open transaction failed: ${msg}`,
+              error: msg,
+            });
+            await tasksStore.saveTask(task);
 
-          const knownPositions = await positionStore.getKnown();
-          const cachedPos = knownPositions.find((p) => p.id === task.originalPositionId);
-          if (cachedPos) {
-            cachedPos.state = 'FAILED';
-            cachedPos.closedAt = Date.now();
-            await positionStore.archivePosition(cachedPos);
-            await positionStore.saveKnown(knownPositions);
-            logger.error(
-              `[Execution Monitor] Rebalance failed during open leg. Cached position ${cachedPos.id} state updated to FAILED and archived.`
-            );
-          }
+            const knownPositions = await positionStore.getKnown();
+            const cachedPos = knownPositions.find((p) => p.id === task.originalPositionId);
+            if (cachedPos) {
+              const posId = cachedPos.id;
+              cachedPos.state = 'FAILED';
+              cachedPos.closedAt = Date.now();
+              await positionStore.archivePosition(cachedPos);
+              await positionStore.saveKnown(knownPositions);
+              logger.error(
+                `[Execution Monitor] Rebalance failed during open leg. Cached position ${posId} state updated to FAILED and archived.`
+              );
+            }
 
-          throw err;
+            throw err;
+          }
         }
 
         await store.saveExecutionRecord(record);
@@ -1006,7 +1074,18 @@ export function startTickLoop(
               ],
             };
 
-            await tasksStore.saveTask(task);
+            try {
+              await tasksStore.saveTask(task);
+            } catch (saveErr: unknown) {
+              const msg = saveErr instanceof Error ? saveErr.message : String(saveErr);
+              if (msg.includes('Atomicity Violation')) {
+                logger.warn(
+                  `[Tick Loop] Atomicity Violation detected during task creation for position ${position.id}: ${msg}. Bypassing duplicate execution.`
+                );
+                continue;
+              }
+              throw saveErr;
+            }
 
             logger.info(
               `[Tick Loop] Stateful RebalanceTask ${task.id} created successfully on disk. Triggering Execution Monitor...`

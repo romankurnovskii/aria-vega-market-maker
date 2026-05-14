@@ -46,17 +46,41 @@ docker compose -f docker-compose.dev.yml up --build -d
 - **Trace the Lineage**: When the framework closes the target position and spawns a new one (via `close+open`), update the monitoring database and logs to track the new child position ID as the direct successor.
 - **Do Not Auto-Associate**: Never bind the strategy to other unrelated active positions found in the wallet. If the target position is no longer active and has no pending child task, halt and ask for user confirmation.
 
-### 5. Continuous Log Monitoring
+### 4. Position Lineage & Single-Target Enforcement (CRITICAL)
 
-Evaluate the strategy every 60 seconds. You must save an update for monitoring the provided position if the framework works successfully and as expected.
-Each report should be updated in a new document if one is not provided under the `.agents/skills/experimental-strategy-tester/logs` directory.
-The `data` directory is strictly for logs and persistent data, and can be used ONLY for analysis.
+- **Enforce Single Target**: Strictly monitor ONLY the specific target position ID requested by the user, and any child positions dynamically spawned from it.
+- **Trace the Lineage**: When the framework closes the target position and spawns a new one (via `close+open`), update the monitoring database and logs to track the new child position ID as the direct successor.
+- **Do Not Auto-Associate**: Never bind the strategy to other unrelated active positions found in the wallet. If the target position is no longer active and has no pending child task, halt and ask for user confirmation.
 
-You can use the monitoring script located at `.agents/skills/experimental-strategy-tester/scripts/monitor-strategy.sh` to extract data only related to the specific position without any mix. Read the container's standard output to check:
+### 5. Continuous Log Monitoring (Managed Scripts)
 
-- Pool Price vs Position Range Bounds.
-- Logic evaluations (e.g. "Price is above current range -> trigger close+open" or "Price is below range -> skip").
-- Write-ahead task queuing and execution tracking.
+Use the managed monitoring scripts with proper process lifecycle control:
+
+```bash
+# Position-based monitoring (static position ID)
+.agents/skills/experimental-strategy-tester/scripts/monitor-strategy.sh <POSITION_ID> start
+# => starts daemonized, creates PID file, rotates old logs (keep 10)
+
+# Dynamic monitoring (assignment-based, tracks lineage automatically)
+.agents/skills/experimental-strategy-tester/scripts/monitor-strategy-dynamic.sh <ASSIGNMENT_ID> start
+
+# Control
+monitor-strategy.sh <POSITION_ID> status        # show PID & report path
+monitor-strategy.sh <POSITION_ID> logs          # tail current report
+monitor-strategy.sh <POSITION_ID> stop          # stop gracefully
+monitor-strategy.sh <POSITION_ID> restart       # stop → start
+monitor-strategy.sh <POSITION_ID> clean         # delete logs >7d + stale PIDs
+```
+
+**Scripts features:**
+
+- `start` — daemonizes, writes PID to `.agents/skills/experimental-strategy-tester/logs/pids/monitor-<ID>.pid`, rotates old reports (keeps last 10)
+- `stop` — terminates by PID, removes PID file, detects and cleans stale PIDs
+- `status` — reports running state, paths (PID, stdout/stderr, report file)
+- `logs` — tails the current report in follow mode
+- `clean` — removes logs older than 7 days and stale PID files
+
+**Important**: Scripts append updates every 60 seconds to a **single report file**. Each invocation creates one file (not per-update). The dynamic variant automatically tracks position lineage through the assignment JSON in `data/*_assignments.json`. Never run multiple concurrent monitors for the same position/assignment — `start` guards against duplicates.
 
 ---
 

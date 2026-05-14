@@ -5,7 +5,6 @@ build/
 
 # Dependencies
 node_modules/
-pnpm-lock.yaml
 
 # Environmental secrets
 .env
@@ -15,6 +14,11 @@ pnpm-lock.yaml
 # Persistent local DB files
 data/
 *.json.bak
+
+# Runtime process state & logs
+.agents/skills/*/logs/pids/
+.agents/skills/*/logs/*.out
+.agents/skills/*/logs/*.err
 
 # IDE & system files
 .DS_Store

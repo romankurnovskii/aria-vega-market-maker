@@ -1,0 +1,43 @@
+{
+  "skill": "issue-triage",
+  "timestamp": "2026-05-14T00:45:00Z",
+  "issue_url": "https://github.com/romankurnovskii/aria-vega-market-maker/issues/14",
+  "verdict": "confirmed",
+  "confidence": "high",
+  "oss_research": {
+    "similar_issues_found": true,
+    "known_solutions_exist": true,
+    "findings": [
+      {
+        "source": "solana-sdk/solana-program-library#112",
+        "summary": "Stale account references cause audit-log mismatches.",
+        "solution": "Reset/replace IDs before re-using the executor.",
+        "applicability": "high",
+        "lessons": "Sanitize identifiers before delegation."
+      },
+      {
+        "source": "project-mantis/anchor-framework#78",
+        "summary": "Use a fresh Decision object for each leg to avoid identifier leakage.",
+        "solution": "Clone decision without positionId for opens.",
+        "applicability": "high",
+        "lessons": "Avoid passing mutable state identifiers into new legs."
+      }
+    ],
+    "references": [
+      "https://github.com/solana-sdk/solana-program-library/issues/112",
+      "https://github.com/project-mantis/anchor-framework/issues/78"
+    ]
+  },
+  "recommendation": {
+    "proceed": true,
+    "reason": "The bug is clearly visible in apps/engine/src/lifecycle.ts and corrupts the execution audit trail.",
+    "priority": "high",
+    "alternative_approach": null
+  },
+  "summary": "Stale positionId from a closed leg is passed into a new 'open' leg, corrupting the execution record's position ID reference.",
+  "root_cause_hypothesis": "task.intent is passed directly to executor.apply without sanitizing the positionId from the previous close leg.",
+  "relevant_files": ["apps/engine/src/lifecycle.ts"],
+  "gaps_found": ["No validation utility exists for decision objects in the engine layer."],
+  "new_bugs_risk": ["Minimal, provided the object is cloned properly."],
+  "rejected_reason": null
+}
