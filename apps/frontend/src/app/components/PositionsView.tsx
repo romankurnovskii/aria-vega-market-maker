@@ -22,12 +22,11 @@ interface Props {
   positions: any[];
   assignments: any[];
   strategies: any[];
-  events: string[];
   onAssign: (positionId: string, strategyId: string, mode: string) => Promise<void>;
   onEvaluate: (positionId: string, strategyId: string) => Promise<void>;
 }
 
-export const PositionsView = ({ positions, assignments, strategies, events, onAssign, onEvaluate }: Props) => {
+export const PositionsView = ({ positions, assignments, strategies, onAssign, onEvaluate }: Props) => {
   const [selectedPosId, setSelectedPosId] = useState<string | null>(null);
 
   const positionOrchestration = useMemo(() => {
@@ -55,7 +54,6 @@ export const PositionsView = ({ positions, assignments, strategies, events, onAs
           position={selectedPos}
           orchestration={selectedOrch}
           strategies={strategies}
-          events={events}
           onAssign={onAssign}
           onEvaluate={onEvaluate}
           onClose={() => setSelectedPosId(null)}
