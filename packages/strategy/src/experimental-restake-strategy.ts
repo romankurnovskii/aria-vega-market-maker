@@ -87,13 +87,13 @@ export class ExperimentalRestakeStrategy implements IStrategy {
       };
     }
 
-    if (finalContext.signal === 'open' && finalContext.openParams) {
-      logger.info(`[ExperimentalRestakeStrategy] Decision: open with params`);
-      return {
-        action: 'open',
-        params: finalContext.openParams,
-      };
-    }
+if (finalContext.signal === 'open' && finalContext.openParams) {
+       logger.info(`[ExperimentalRestakeStrategy] Decision: open with params`);
+       return {
+         action: 'open',
+         openParams: finalContext.openParams,
+       };
+     }
 
     logger.info(`[ExperimentalRestakeStrategy] Decision: skip`);
     return {

@@ -38,7 +38,7 @@ export interface StepContext {
 export type StrategyResult =
   | { action: StrategyAction.SKIP | 'skip' }
   | { action: StrategyAction.CLOSE | 'close' }
-  | { action: StrategyAction.OPEN | 'open'; params: OpenParams }
+  | { action: StrategyAction.OPEN | 'open'; openParams: OpenParams }
   | { action: StrategyAction.CLOSE_OPEN | 'close+open'; openParams: OpenParams };
 
 export interface Recommendation {
