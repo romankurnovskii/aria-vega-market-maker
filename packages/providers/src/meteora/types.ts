@@ -5,7 +5,7 @@
  * @features
  * - PoolResponse: Full pool metadata and current state (GET /pools/{address})
  * - ErrorResponse: API error response (400)
- * - CumulativeMetrics: Aggregate volume, trade fee, and protocol fee
+ * - CumulativeMetrics: Aggregate volume and total fees
  * - TimeWindowData: Time-windowed metrics (30m / 1h / 2h / 4h / 12h / 24h)
  * - PoolConfig: Pool configuration (bin step, fee rates)
  * - TokenMetrics: Token metadata (price, supply, holders, etc.)
@@ -49,7 +49,7 @@ export interface PoolResponse {
    */
   tvl: number;
   volume: TimeWindowData;
-  launchpad: string | null;
+  launchpad: string;
 }
 
 export interface ErrorResponse {
@@ -61,9 +61,8 @@ export interface ErrorResponse {
 // ---------------------------------------------------------------------------
 
 export interface CumulativeMetrics {
-  protocol_fee: number;
-  trade_fee: number;
   volume: number;
+  fees: number;
 }
 
 export interface TimeWindowData {
@@ -80,6 +79,7 @@ export interface PoolConfig {
   bin_step: number;
   max_fee_pct: number;
   protocol_fee_pct: number;
+  collect_fee_mode: number;
 }
 
 export interface TokenMetrics {
@@ -142,6 +142,7 @@ export interface DatapiPosition {
   position_address?: string;
   isOutOfRange?: boolean;
   createdAt?: number;
+  pool_data?: PoolResponse;
   unrealizedPnl?: {
     balances?: number;
     balancesSol?: string;

@@ -138,7 +138,7 @@ export class MeteoraOnChainProvider {
     );
 
     return await this.rpcProvider.execute(async () => {
-       const addLiquidityTxs = await dlmm.addLiquidity({
+      const addLiquidityTxs = await dlmm.addLiquidityByStrategy({
         positionPubKey: params.positionPubKey,
         user: params.userWallet,
         totalXAmount: params.tokenXAmount,
