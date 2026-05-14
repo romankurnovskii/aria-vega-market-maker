@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars, no-empty */
 // ISSUE #12: SolanaExecutor.close skips fee claim due to shouldClaimAndClose: false
 
 import { test, describe } from 'node:test';
@@ -67,7 +67,7 @@ function createMockRpcPool() {
 }
 
 describe('ISSUE #12: SolanaExecutor.close fee claim behavior', () => {
-  test('ISSUE #12: SolanaExecutor.close should claim fees before removing liquidity', async () => {
+  test('ISSUE #12: SolanaExecutor.close should use atomic shouldClaimAndClose: true', async () => {
     const provider = createMockProvider();
     const mockRpcPool = createMockRpcPool();
     const mockKeypair = { publicKey: { toBase58: () => MOCK_WALLET_ADDRESS } };
@@ -93,47 +93,11 @@ describe('ISSUE #12: SolanaExecutor.close fee claim behavior', () => {
       await executor.apply(decision, market as any);
     } catch (_e) {}
 
-    const claimCalls = provider.calls.filter(c => c.method === 'buildClaimFeesTransactions');
-
-
-    assert.strictEqual(
-      claimCalls.length > 0,
-      true,
-      'ISSUE #12: buildClaimFeesTransactions should be called before removeLiquidity to claim accrued fees'
-    );
-  });
-
-  test('ISSUE #12: Verify shouldClaimAndClose: false still skips PDA close in removeLiquidity', async () => {
-    const provider = createMockProvider();
-    const mockRpcPool = createMockRpcPool();
-    const mockKeypair = { publicKey: { toBase58: () => MOCK_WALLET_ADDRESS } };
-
-    const SolanaExecutor = (await import('@lp-system/executor')).SolanaExecutor;
-    const executor = new SolanaExecutor(mockRpcPool as any, mockKeypair as any, provider as any);
-
-    const decision = {
-      positionId: MOCK_POSITION_ID,
-      action: 'close' as const,
-      sourceAssignmentId: 'assign_test',
-      evaluatedAt: Date.now(),
-    };
-
-    const market = {
-      poolAddress: MOCK_POOL_ADDRESS,
-      chain: 'solana' as const,
-      protocol: 'meteora_dlmm' as const,
-      activeBound: 1000,
-    };
-
-    try {
-      await executor.apply(decision, market as any);
-    } catch (_e) {}
-
-    const removeCall = provider.calls.find(c => c.method === 'buildRemoveLiquidityTransactions');
+    const removeCall = provider.calls.find((c) => c.method === 'buildRemoveLiquidityTransactions');
     assert.strictEqual(
       removeCall?.args.shouldClaimAndClose,
-      false,
-      'removeLiquidity should use shouldClaimAndClose: false (separate closePosition call handles PDA)'
+      true,
+      'ISSUE #12: buildRemoveLiquidityTransactions should use shouldClaimAndClose: true for atomic fee claim and PDA closure'
     );
   });
 
@@ -190,7 +154,6 @@ describe('ISSUE #12: SolanaExecutor.close fee claim behavior', () => {
     const mockKeypair = { publicKey: { toBase58: () => MOCK_WALLET_ADDRESS } };
 
     const SolanaExecutor = (await import('@lp-system/executor')).SolanaExecutor;
-
 
     const decision = {
       positionId: MOCK_POSITION_ID,
