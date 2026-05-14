@@ -85,6 +85,8 @@ export interface RebalanceTask {
   newPositionId?: string;
   intent: Decision;
   evaluatedAt: number;
+  expectedDeltaX?: string;
+  expectedDeltaY?: string;
   events: TaskEvent[];
   lockedAt?: number;
   /** Snapshot of token balances taken immediately prior to broadcasting close transaction */
