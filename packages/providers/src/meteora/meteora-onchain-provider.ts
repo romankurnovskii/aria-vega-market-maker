@@ -138,7 +138,7 @@ export class MeteoraOnChainProvider {
     );
 
     return await this.rpcProvider.execute(async () => {
-      const addLiquidityTx = await dlmm.initializePositionAndAddLiquidityByStrategy({
+      const addLiquidityTxs = await dlmm.addLiquidityByStrategy({
         positionPubKey: params.positionPubKey,
         user: params.userWallet,
         totalXAmount: params.tokenXAmount,
@@ -153,7 +153,7 @@ export class MeteoraOnChainProvider {
 
       // Extract the raw instructions from the Meteora SDK transaction builder
       // This allows the Execution layer to bundle it with compute budget/priority fee instructions
-      return addLiquidityTx.instructions;
+      return addLiquidityTxs.instructions;
     });
   }
 
