@@ -202,6 +202,7 @@ export class MeteoraApiProvider implements IPositionProvider {
             },
             isInRange,
             openedAt,
+            pnlData: pos,
             metadata: {
               leverage: 10,
               feeX: pos.fee_x || '0',

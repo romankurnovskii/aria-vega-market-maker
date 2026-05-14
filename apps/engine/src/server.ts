@@ -70,6 +70,8 @@ export function startHttpServer(
         positions = await positionProvider.getPositions(walletAddress);
       }
 
+      const livePositions = await positionProvider.getPositions(walletAddress).catch(() => []);
+
       // Fetch and enrich positions with price/range data
       const positionsWithPriceData = await Promise.all(
         positions.map(async (pos) => {
@@ -93,6 +95,8 @@ export function startHttpServer(
             const binCount = pos.upperBound - pos.lowerBound + 1;
             const rangePercent = ((upperBoundPrice - lowerBoundPrice) / lowerBoundPrice) * 100;
 
+            const livePnl = livePositions.find((lp) => lp.id === pos.id)?.pnlData || pos.pnlData;
+
             return {
               ...pos,
               lowerBoundPrice,
@@ -100,6 +104,7 @@ export function startHttpServer(
               activeBin: market.activeBound,
               binCount,
               rangePercent,
+              pnlData: livePnl,
             };
           } catch (e) {
             logger.warn(`Failed to enrich position ${pos.id} with price data: ${e}`);
