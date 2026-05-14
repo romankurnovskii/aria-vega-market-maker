@@ -17,14 +17,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Zap, Trash2, ChevronRight, TerminalSquare, X } from 'lucide-react';
 
-import Header from './components/Header';
-import Sidebar from './components/Sidebar';
-import PositionsView from './components/PositionsView';
-import AssignmentsView from './components/AssignmentsView';
-import StrategiesView from './components/StrategiesView';
-import StepsView from './components/StepsView';
-import EventLog from './components/EventLog';
-import Footer from './components/Footer';
+import { Header } from '../components/Header';
+import { Sidebar } from '../components/Sidebar';
+import { PositionsView } from '../components/PositionsView';
+import { AssignmentsView } from '../components/AssignmentsView';
+import { StrategiesView } from '../components/StrategiesView';
+import { StepsView } from '../components/StepsView';
+import { EventLog } from '../components/EventLog';
+import { Footer } from '../components/Footer';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8441';
 
@@ -41,7 +41,7 @@ export const formatAmount = (amountStr: string, decimals: number): string => {
   return amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
 };
 
-interface HealthData {
+export interface HealthData {
   epoch: number;
   status: string;
 }
@@ -60,7 +60,7 @@ interface Position {
   raw: any;
 }
 
-interface Assignment {
+export interface Assignment {
   id: string;
   positionId: string;
   strategyId: string;
@@ -88,7 +88,7 @@ interface AriaVegaData {
   steps: Step[];
 }
 
-export const AriaVegaContainer = (): JSX.Element => {
+export const AriaVegaContainer = () => {
   const [activeTab, setActiveTab] = useState<string>('positions');
   const [data, setData] = useState<AriaVegaData>({
     assignments: [],

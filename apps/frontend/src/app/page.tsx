@@ -7,7 +7,7 @@
  * - Thin route shell with no logic of its own
  */
 
-import AriaVegaContainer from './containers/AriaVegaContainer';
+import { AriaVegaContainer } from './containers/AriaVegaContainer';
 
 export default function AriaVegaTerminalPage() {
   return <AriaVegaContainer />;

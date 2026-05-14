@@ -15,8 +15,8 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import PositionTable from './PositionTable';
-import PositionDetail from './PositionDetail';
+import { PositionTable } from './PositionTable';
+import { PositionDetail } from './PositionDetail';
 
 interface Props {
   positions: any[];
@@ -27,7 +27,7 @@ interface Props {
   onEvaluate: (positionId: string, strategyId: string) => Promise<void>;
 }
 
-export const PositionsView = ({ positions, assignments, strategies, events, onAssign, onEvaluate }: Props): JSX.Element => {
+export const PositionsView = ({ positions, assignments, strategies, events, onAssign, onEvaluate }: Props) => {
   const [selectedPosId, setSelectedPosId] = useState<string | null>(null);
 
   const positionOrchestration = useMemo(() => {

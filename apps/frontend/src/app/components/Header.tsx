@@ -10,14 +10,14 @@
  * @dependencies HealthData, Assignment (AriaVegaContainer)
  */
 
-import type { HealthData, Assignment } from '../containers/AriaVegaContainer';
+import { HealthData, Assignment } from '../containers/AriaVegaContainer';
 
 interface HeaderProps {
   health: HealthData;
   assignments: Assignment[];
 }
 
-export const Header = ({ health, assignments }: HeaderProps): JSX.Element => {
+export const Header = ({ health, assignments }: HeaderProps) => {
   return (
     <header className="border-b border-[#0D0D0D] pb-2 mb-4 flex flex-row justify-between items-end gap-4 relative z-10 shrink-0">
       <h1 className="font-syne text-2xl md:text-3xl font-extrabold uppercase leading-none tracking-tighter">

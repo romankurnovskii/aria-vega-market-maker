@@ -14,7 +14,7 @@ interface StepsViewProps {
   steps: any[];
 }
 
-export const StepsView = ({ steps }: StepsViewProps): JSX.Element => {
+export const StepsView = ({ steps }: StepsViewProps) => {
   if (steps.length === 0) return <div className="text-gray-500 italic text-xs">No active pipeline steps registered.</div>;
 
   return (

@@ -11,12 +11,14 @@
  * @sideEffects None
  */
 
+import { Trash2 } from 'lucide-react';
+
 interface AssignmentsViewProps {
   assignments: any[];
   onDelete: (id: string) => Promise<void>;
 }
 
-export const AssignmentsView = ({ assignments, onDelete }: AssignmentsViewProps): JSX.Element => {
+export const AssignmentsView = ({ assignments, onDelete }: AssignmentsViewProps) => {
   if (assignments.length === 0)
     return <div className="text-gray-500 italic text-xs">No active assignments found. Use positions pane to create.</div>;
 

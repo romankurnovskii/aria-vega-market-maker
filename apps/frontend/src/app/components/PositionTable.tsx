@@ -23,7 +23,7 @@ interface PositionTableProps {
   onSelect: (id: string | null) => void;
 }
 
-export const PositionTable = ({ positions, positionOrchestration, selectedPosId, onSelect }: PositionTableProps): JSX.Element => {
+export const PositionTable = ({ positions, positionOrchestration, selectedPosId, onSelect }: PositionTableProps) => {
   return (
     <div
       className={`flex flex-col border border-[#0D0D0D] bg-white transition-all duration-300 ${selectedPosId ? 'hidden lg:flex lg:w-7/12' : 'w-full h-full'}`}

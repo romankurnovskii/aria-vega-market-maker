@@ -14,7 +14,7 @@ interface StrategiesViewProps {
   strategies: any[];
 }
 
-export const StrategiesView = ({ strategies }: StrategiesViewProps): JSX.Element => {
+export const StrategiesView = ({ strategies }: StrategiesViewProps) => {
   if (strategies.length === 0)
     return <div className="text-gray-500 italic text-xs">No strategies registered in the system.</div>;
 

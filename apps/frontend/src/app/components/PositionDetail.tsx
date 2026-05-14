@@ -14,11 +14,11 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Zap, X, TerminalSquare, ChevronRight, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Zap, X, TerminalSquare, ChevronRight } from 'lucide-react';
 
 import { formatAmount } from '../containers/AriaVegaContainer';
-import EventLog from './EventLog';
+import { EventLog } from './EventLog';
 
 interface PositionDetailProps {
   position: any;
@@ -38,7 +38,7 @@ export const PositionDetail = ({
   onAssign,
   onEvaluate,
   onClose,
-}: PositionDetailProps): JSX.Element => {
+}: PositionDetailProps) => {
   const [selectedStrategyId, setSelectedStrategyId] = useState<string>('');
   const [selectedMode, setSelectedMode] = useState<string>('active');
 
