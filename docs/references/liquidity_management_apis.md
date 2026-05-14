@@ -53,7 +53,7 @@ We introduce two new REST API endpoints on the engine backend:
 
 **Behavior**:
 
-- Uses Meteora SDK's `addLiquidity()` method
+- Uses Meteora SDK's `addLiquidityByStrategy()` method for adding to existing positions
 - Tokens are distributed across the existing position's bin range using Spot strategy
 - Multiple transactions may be returned if the operation exceeds Solana's size limits
 
