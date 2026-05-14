@@ -124,6 +124,86 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /positions/{positionId}/actions:
+    post:
+      summary: Perform Position Action
+      description: Performs a unified action on a position (evaluate, removeLiquidity, addLiquidity).
+      parameters:
+        - name: positionId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The on-chain identifier/pubkey of the position.
+          example: '9tA6m91FvP35G9A7eS982Yhd6pE35Z678WjLmoB67Pqr'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - action
+              properties:
+                action:
+                  type: string
+                  enum: [evaluate, removeLiquidity, addLiquidity]
+                  example: 'evaluate'
+                strategyId:
+                  type: string
+                  description: Required for evaluate action.
+                  example: 'trailing-usdc'
+                tokenXAmount:
+                  type: string
+                  description: Required for addLiquidity action. Raw token amount.
+                  example: '1000000'
+                tokenYAmount:
+                  type: string
+                  description: Required for addLiquidity action. Raw token amount.
+                  example: '2000000'
+                slippageTolerance:
+                  type: integer
+                  description: Optional slippage tolerance in basis points. Defaults to 50 (0.5%).
+                  example: 50
+      responses:
+        '200':
+          description: Action executed successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: 'success'
+                  action:
+                    type: string
+                    example: 'evaluate'
+                  result:
+                    $ref: '#/components/schemas/StrategyResult'
+                  transactionSignatures:
+                    type: array
+                    items:
+                      type: string
+                  positionClosed:
+                    type: boolean
+                  positionOpened:
+                    type: boolean
+        '400':
+          description: Missing or invalid request parameters.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Target orchestrator not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /assignments:
     get:
       summary: List Persistent Assignments

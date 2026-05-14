@@ -11,7 +11,7 @@ import {
   PoolInfo,
   MarketSnapshot,
 } from '@lp-system/core';
-import { createPositionsRouter } from './routes/positions.js';
+import { handlePositionsRouter } from './routes/positions.js';
 
 const MOCK_POSITION_ID = 'pos_12345';
 const MOCK_POOL_ADDRESS = 'pool_67890';
@@ -113,7 +113,7 @@ function setupTestServer() {
 
   const app = express();
   app.use(express.json());
-  app.use('/positions', createPositionsRouter(positionProvider, executor, registry, MOCK_WALLET));
+  app.use('/positions', handlePositionsRouter(positionProvider, executor, registry, MOCK_WALLET));
 
   const server = http.createServer(app);
 
