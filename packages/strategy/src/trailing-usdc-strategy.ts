@@ -87,11 +87,18 @@ export class TrailingUsdcStrategy implements IStrategy {
       `[TrailingUsdcStrategy] Finished evaluation. Signal: ${finalContext.signal || 'skip'}. Reason: ${finalContext.reason || 'None'}`
     );
 
+    const resultBase = {
+      signal: finalContext.signal as string,
+      reason: finalContext.reason,
+      metrics: finalContext.calculations,
+    };
+
     if (finalContext.signal === 'close+open' && finalContext.openParams) {
       logger.info(`[TrailingUsdcStrategy] Decision: close+open with params`);
       return {
         action: 'close+open',
         openParams: finalContext.openParams,
+        ...resultBase,
       };
     }
 
@@ -99,6 +106,7 @@ export class TrailingUsdcStrategy implements IStrategy {
       logger.info(`[TrailingUsdcStrategy] Decision: close`);
       return {
         action: 'close',
+        ...resultBase,
       };
     }
 
@@ -107,12 +115,14 @@ export class TrailingUsdcStrategy implements IStrategy {
       return {
         action: 'open',
         openParams: finalContext.openParams,
+        ...resultBase,
       };
     }
 
     logger.info(`[TrailingUsdcStrategy] Decision: skip`);
     return {
       action: 'skip',
+      ...resultBase,
     };
   }
 }
