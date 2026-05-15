@@ -27,5 +27,6 @@ data/
 .dev
 .kilo
 .kilo/
+.worktrees/
 repomix-*
 review-me*
