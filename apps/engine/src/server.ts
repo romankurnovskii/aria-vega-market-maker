@@ -159,7 +159,7 @@ export function startHttpServer(
     }
   });
 
-  app.get('/positions/history', async (_req, res) => {
+  app.get(['/positions/history', '/positions/closed'], async (_req, res) => {
     try {
       let positions: Position[] = [];
       if (positionStore) {
