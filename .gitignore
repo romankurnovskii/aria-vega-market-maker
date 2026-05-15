@@ -30,3 +30,4 @@ data/
 .worktrees/
 repomix-*
 review-me*
+*.log

@@ -34,7 +34,6 @@ import { isDeepStrictEqual } from 'node:util';
 const logger = getLogger('lifecycle');
 
 let tickLoopRunning = false;
-let monitorInitialRun = true;
 
 import { PublicKey, Connection } from '@solana/web3.js';
 
@@ -234,8 +233,10 @@ export async function processTasks(
   executor: IExecutor,
   positionProvider: IPositionProvider,
   registry: IOrchestratorRegistry,
-  factory?: OrchestratorFactory
+  positionStore: IPositionStore,
+  options: { isInitialRun?: boolean; factory?: OrchestratorFactory } = {}
 ): Promise<void> {
+  const { isInitialRun = false, factory } = options;
   const tasksStore = store as unknown as {
     getTasks: () => Promise<RebalanceTask[]>;
     saveTask: (t: RebalanceTask) => Promise<void>;
@@ -244,37 +245,48 @@ export async function processTasks(
   };
   if (typeof tasksStore.getTasks !== 'function') return;
 
+  const storeId = (store as Record<string, unknown>).id || 'unknown';
   const tasks: RebalanceTask[] = await tasksStore.getTasks();
   if (tasks.length === 0) return;
 
-  logger.info(`[Execution Monitor] Found ${tasks.length} active task(s) in task store.`);
+  logger.info(`[Execution Monitor][${storeId}] Found ${tasks.length} active task(s) in task store.`);
 
   // Boot Recovery: Revert stuck executing tasks to pending states on first run
-  if (monitorInitialRun) {
-    let recoveredCount = 0;
+  if (isInitialRun) {
     for (const task of tasks) {
       if (task.status === 'executing_close') {
         task.status = 'pending_close';
         await tasksStore.saveTask(task);
-        recoveredCount++;
       } else if (task.status === 'executing_open') {
         task.status = 'pending_open';
         await tasksStore.saveTask(task);
-        recoveredCount++;
       }
     }
-    if (recoveredCount > 0) {
-      logger.info(`[Execution Monitor] Boot Recovery: Reverted ${recoveredCount} stuck task(s) to pending states.`);
-    }
-    monitorInitialRun = false;
   }
 
   for (const task of tasks) {
+    const currentKnown = await positionStore.getKnown();
+    logger.info(
+      `[Execution Monitor][${storeId}] Processing task ${task.id} (status: ${task.status}). Known positions in cache: [${currentKnown.map((p) => p.id).join(', ')}]`
+    );
     try {
       // 1. Timeout check (fail-safe)
       const MAX_TASK_AGE_MS = 10 * 60 * 1000; // 10 minutes
       if (Date.now() - task.evaluatedAt > MAX_TASK_AGE_MS) {
         logger.error(`[Execution Monitor] Task ${task.id} timed out. Archiving.`);
+
+        task.events.push({ stage: 'TIMEOUT', timestamp: Date.now() });
+
+        // Transition Position State in local cache to FAILED and archive
+        const knownPositions = await positionStore.getKnown();
+        const cachedPos = knownPositions.find((p) => p.id === task.originalPositionId);
+        if (cachedPos) {
+          cachedPos.state = 'FAILED';
+          await positionStore.archivePosition(cachedPos);
+          const remaining = knownPositions.filter((p) => p.id !== cachedPos.id);
+          await positionStore.saveKnown(remaining);
+        }
+
         await tasksStore.deleteTask(task.id);
         continue;
       }
@@ -307,6 +319,28 @@ export async function processTasks(
         }
 
         task.events.push({ stage: 'CLOSE_CONFIRMED', timestamp: Date.now(), txSignature: record.txSignatures[0] });
+
+        // Transition Position State in local cache
+        const knownPositions = await positionStore.getKnown();
+        const cachedPos = knownPositions.find((p) => p.id === task.intent.positionId);
+        logger.info(
+          `[Execution Monitor] Found ${knownPositions.length} known positions. Cached position for ${task.intent.positionId}: ${cachedPos ? 'found' : 'not found'}`
+        );
+        if (cachedPos) {
+          if (task.intent.action === 'close') {
+            cachedPos.state = 'CLOSED';
+            cachedPos.closedAt = Date.now();
+            await positionStore.archivePosition(cachedPos);
+            const remaining = knownPositions.filter((p) => p.id !== cachedPos.id);
+            await positionStore.saveKnown(remaining);
+            task.events.push({ stage: 'POSITION_CLOSED', timestamp: Date.now() });
+          } else {
+            // close+open
+            cachedPos.state = 'REBALANCING';
+            await positionStore.saveKnown(knownPositions);
+            task.events.push({ stage: 'POSITION_CLOSED', timestamp: Date.now() });
+          }
+        }
 
         if (task.intent.action === 'close+open') {
           task.status = 'pending_open';
@@ -355,6 +389,13 @@ export async function processTasks(
           if (factory) registry.register(factory.create(a));
         }
 
+        // Transition Position State in local cache: Add new position, remove old one
+        const knownPositions = await positionStore.getKnown();
+        const freshPosition = await positionProvider.getPosition(record.newPositionId!, task.intent.openParams!.poolAddress);
+        const remaining = knownPositions.filter((p) => p.id !== task.intent.positionId);
+        await positionStore.saveKnown([...remaining, freshPosition]);
+        task.events.push({ stage: 'POSITION_OPENED', timestamp: Date.now() });
+
         await tasksStore.deleteTask(task.id);
         logger.info(`[Execution Monitor] Task ${task.id} completed.`);
         continue;
@@ -394,6 +435,8 @@ export function startTickLoop(
     `[Tick Loop] Launching continuous evaluation tick loop for wallet ${walletAddress}. Interval: ${intervalMs}ms`
   );
 
+  let isInitialRun = true;
+
   const runCycle = async () => {
     if (tickLoopRunning) {
       let activeTasksInfo = '';
@@ -414,24 +457,19 @@ export function startTickLoop(
 
       // 1. Run Position Discovery to synchronize local state with on-chain reality
       if (factory) {
-        await startDiscovery(
-          walletAddress,
-          positionProvider,
-          positionStore,
-          factory,
-          store,
-          registry
-        ).catch((err) => {
+        await startDiscovery(walletAddress, positionProvider, positionStore, factory, store, registry).catch((err) => {
           logger.error(`[Tick Loop] Error in startDiscovery: ${err instanceof Error ? err.message : String(err)}`);
         });
       }
 
       // 2. Run Execution Monitor to process in-flight stateful tasks first
-      await processTasks(store, executor, positionProvider, registry, factory).catch(
-        (err) => {
-          logger.error(`[Tick Loop] Error in processTasks: ${err instanceof Error ? err.message : String(err)}`);
-        }
-      );
+      await processTasks(store, executor, positionProvider, registry, positionStore, {
+        isInitialRun,
+        factory,
+      }).catch((err) => {
+        logger.error(`[Tick Loop] Error in processTasks: ${err instanceof Error ? err.message : String(err)}`);
+      });
+      isInitialRun = false;
 
       const activeTasks = await store.getTasks();
 
@@ -614,13 +652,7 @@ export function startTickLoop(
             );
 
             // Run Task Monitor immediately to begin execution without waiting for next tick interval
-            await processTasks(
-              store,
-              executor,
-              positionProvider,
-              registry,
-              factory
-            ).catch((err) => {
+            await processTasks(store, executor, positionProvider, registry, positionStore, { factory }).catch((err) => {
               logger.error(
                 `[Tick Loop] Error in post-decision processTasks: ${err instanceof Error ? err.message : String(err)}`
               );
