@@ -274,7 +274,7 @@ export const AriaVegaContainer = () => {
    * uses the unified POST /positions/:id/actions endpoint.
    *
    * @param positionId - The target position ID
-   * @param action - The action string (evaluate, removeLiquidity)
+   * @param action - The action string (evaluate, removeLiquidity, applySuggestion)
    * @param body - Additional payload (e.g. strategyId)
    */
   const handlePositionAction = async (positionId: string, action: string, body: any = {}): Promise<void> => {
@@ -304,12 +304,12 @@ export const AriaVegaContainer = () => {
             positionId,
             result: result.result || result,
             transactionSignatures: result.transactionSignatures,
+            pendingSuggestion: body.pendingSuggestion,
           },
           ...prev.slice(0, 49),
         ]);
 
-        // If it was a destructive action, refresh the state
-        if (action === 'removeLiquidity' || action === 'addLiquidity') {
+        if (action === 'removeLiquidity' || action === 'addLiquidity' || action === 'applySuggestion') {
           syncState();
         }
       } else {
@@ -338,6 +338,21 @@ export const AriaVegaContainer = () => {
         ...prev.slice(0, 49),
       ]);
     }
+  };
+
+  /**
+   * Applies a strategy suggestion (close, open, or close+open with parameters).
+   */
+  const handleApplySuggestion = (
+    positionId: string,
+    strategyId: string,
+    suggestion: { action: string; openParams?: Record<string, unknown> }
+  ) => {
+    return handlePositionAction(positionId, 'applySuggestion', {
+      strategyId,
+      pendingSuggestion: suggestion,
+      ...suggestion,
+    });
   };
 
   /**
@@ -409,6 +424,7 @@ export const AriaVegaContainer = () => {
                 onAssign={handleAssignStrategy}
                 onEvaluate={handleEvaluateStrategy}
                 onRemoveLiquidity={handleRemoveLiquidity}
+                onApplySuggestion={handleApplySuggestion}
                 evalLogs={evalLogs}
               />
             )}
