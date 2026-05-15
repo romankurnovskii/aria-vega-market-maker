@@ -125,23 +125,23 @@ export const PositionDetail = ({
         />
 
         {!isClosed && (
-          <OrchestrationControls
-            strategies={strategies}
-            selectedStrategyId={selectedStrategyId}
-            selectedMode={selectedMode}
-            onStrategyChange={setSelectedStrategyId}
-            onModeChange={setSelectedMode}
-            onAssign={handleAssign}
-            onEvaluate={handleEvaluate}
-          />
-        )}
+          <>
+            <OrchestrationControls
+              strategies={strategies}
+              selectedStrategyId={selectedStrategyId}
+              selectedMode={selectedMode}
+              onStrategyChange={setSelectedStrategyId}
+              onModeChange={setSelectedMode}
+              onAssign={handleAssign}
+              onEvaluate={handleEvaluate}
+            />
 
-        {!isClosed && (
-          <PositionActionButtons
-            positionId={position.id}
-            state={position.state}
-            onRemoveLiquidity={onRemoveLiquidity}
-          />
+            <PositionActionButtons
+              positionId={position.id}
+              state={position.state}
+              onRemoveLiquidity={onRemoveLiquidity}
+            />
+          </>
         )}
       </div>
 
