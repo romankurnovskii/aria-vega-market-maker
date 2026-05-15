@@ -1,0 +1,20 @@
+{
+  "name": "@lp-system/cli",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "liqifduty": "./bin/liqifduty.js"
+  },
+  "dependencies": {
+    "@lp-system/core": "workspace:*",
+    "@lp-system/logger": "workspace:*",
+    "@lp-system/providers": "workspace:*",
+    "@lp-system/executor": "workspace:*"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "pnpm run build"
+  }
+}
