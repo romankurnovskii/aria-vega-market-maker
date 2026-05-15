@@ -43,6 +43,21 @@ importers:
         specifier: ^8.59.2
         version: 8.59.2(eslint@10.3.0(jiti@2.7.0))(typescript@6.0.3)
 
+  apps/cli:
+    dependencies:
+      '@lp-system/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@lp-system/executor':
+        specifier: workspace:*
+        version: link:../../packages/executor
+      '@lp-system/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
+      '@lp-system/providers':
+        specifier: workspace:*
+        version: link:../../packages/providers
+
   apps/engine:
     dependencies:
       '@lp-system/core':

@@ -44,3 +44,4 @@ pnpm test:watch
 - `packages/executor` — Transaction dispatching and callback re-evaluation.
 - `packages/persistence` — Safe filesystem state adapters.
 - `apps/engine` — Application daemon and HTTP control plane.
+- `apps/cli` — Command-line interface for manual liquidity duty operations.
