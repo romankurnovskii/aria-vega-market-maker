@@ -23,11 +23,18 @@ The HTTP server loads dynamic routers and exposes the following concrete REST en
 - **`POST /assignments`**: Creates and persists a new assignment, then registers and initiates standard tick loop tracking on its orchestrator.
 - **`DELETE /assignments/:id`**: Deletes the specified assignment from persistent storage and de-registers its orchestrator from the runtime.
 
-### B. Strategy Ad-Hoc Control
+### B. Unified Position Actions
 
-- **`POST /strategies/:id/evaluate`**: Triggers an immediate, ad-hoc strategy evaluation against a target position, bypassing the standard Tick Loop interval.
+- **`POST /positions/:positionId/actions`**: Performs a unified action on a position.
+  - `action: "evaluate"`: Runs strategy evaluation (includes price enrichment).
+  - `action: "removeLiquidity"`: Removes 100% liquidity and claims fees (closes position).
+  - `action: "addLiquidity"`: Adds liquidity to an existing position (manual).
 
-### C. System Introspection & Status
+### C. Strategy Ad-Hoc Control
+
+- **`POST /strategies/:id/evaluate`**: Triggers an immediate, ad-hoc strategy evaluation for a specific strategy on a target position.
+
+### D. System Introspection & Status
 
 - **`GET /positions`**: Lists all live, on-chain CLMM positions owned by the configured wallet address.
 - **`GET /health`**: Standard liveness probe returning system status (`healthy`) and current epoch timestamp.
