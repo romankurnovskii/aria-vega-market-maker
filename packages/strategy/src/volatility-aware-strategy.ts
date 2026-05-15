@@ -33,7 +33,7 @@ export class VolatilityAwareStrategy implements IStrategy {
     this.workflow = new Workflow([
       new InitializationCheckStep(),
       new HighFeeCheckStep(),
-      new VolatilityCheckStep(),
+      new VolatilityCheckStep(Number(defaultParams.volatilityThreshold) || 0.05),
       new TrailingRangeCheckStep(),
       new RangeCalculatorStep(),
       new AmountCalculatorStep(),

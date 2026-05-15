@@ -25,6 +25,9 @@ export class VolatilityCheckStep implements IStep {
    * @returns {Promise<StepContext>}
    */
   public async execute(context: StepContext): Promise<StepContext> {
+    // Do not override existing signal decisions
+    if (context.signal) return context;
+
     const maxVolatility = (context.params.maxVolatility as number) || 0.05; // Default 5% volatility threshold
     const priceHistory = context.market.priceHistory || [];
 
