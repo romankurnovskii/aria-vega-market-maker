@@ -15,10 +15,12 @@ import React from 'react';
 interface LogEntry {
   id: string | number;
   timestamp: string;
+  action?: string;
   strategyId?: string;
   positionId?: string;
   error?: string;
   result?: any;
+  transactionSignatures?: string[];
 }
 
 interface EventLogProps {
@@ -46,14 +48,26 @@ export const EventLog = ({ logs }: EventLogProps) => {
               className="border-b border-white/5 pb-1 mb-1 animate-in fade-in slide-in-from-left-2 duration-200"
             >
               <div className="flex justify-between opacity-60 text-[9px]">
-                <span>[{log.timestamp}]</span>
-                <span>{log.strategyId}</span>
+                <span>[{log.timestamp}] {log.action?.toUpperCase()}</span>
+                <span>{log.strategyId || 'SYSTEM'}</span>
               </div>
               {log.error ? (
                 <div className="text-[#FF4500] break-words uppercase font-bold mt-0.5">!! ERROR: {log.error}</div>
               ) : (
-                <div className="text-green-400 break-words mt-0.5">
-                  &gt;&gt; {typeof log.result === 'object' ? JSON.stringify(log.result) : String(log.result)}
+                <div className="flex flex-col gap-1 mt-0.5">
+                  <div className="text-green-400 break-words">
+                    &gt;&gt; {typeof log.result === 'object' ? JSON.stringify(log.result) : String(log.result)}
+                  </div>
+                  {log.transactionSignatures && log.transactionSignatures.length > 0 && (
+                    <div className="bg-[#1A1A1A] p-1 border-l-2 border-green-500 text-[8px] flex flex-col gap-0.5">
+                      <div className="font-bold text-green-500 uppercase">TX CONFIRMED:</div>
+                      {log.transactionSignatures.map((sig, idx) => (
+                        <div key={idx} className="opacity-70 break-all select-all">
+                          {sig}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

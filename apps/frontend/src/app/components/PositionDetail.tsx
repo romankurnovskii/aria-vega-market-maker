@@ -22,6 +22,7 @@ import { PositionBalances } from './PositionBalances';
 import { PriceAnalytics } from './PriceAnalytics';
 import { PnLAndFees } from './PnLAndFees';
 import { OrchestrationControls } from './OrchestrationControls';
+import { PositionActionButtons } from './PositionActionButtons';
 import { EventLog } from './EventLog';
 
 interface PositionDetailProps {
@@ -30,6 +31,7 @@ interface PositionDetailProps {
   strategies: any[];
   onAssign: (positionId: string, strategyId: string, mode: string) => Promise<void>;
   onEvaluate: (positionId: string, strategyId: string) => Promise<void>;
+  onRemoveLiquidity: (positionId: string) => Promise<void>;
   evalLogs: any[];
   onClose: () => void;
 }
@@ -40,6 +42,7 @@ export const PositionDetail = ({
   strategies,
   onAssign,
   onEvaluate,
+  onRemoveLiquidity,
   evalLogs,
   onClose,
 }: PositionDetailProps) => {
@@ -127,6 +130,12 @@ export const PositionDetail = ({
           onModeChange={setSelectedMode}
           onAssign={handleAssign}
           onEvaluate={handleEvaluate}
+        />
+
+        <PositionActionButtons
+          positionId={position.id}
+          state={position.state}
+          onRemoveLiquidity={onRemoveLiquidity}
         />
       </div>
 
