@@ -18,6 +18,8 @@ const logger = getLogger('volatility-check-step');
 export class VolatilityCheckStep implements IStep {
   public name = 'VolatilityCheckStep';
 
+  constructor(private maxVolatilityThreshold?: number) {}
+
   /**
    * Executes volatility check.
    *
@@ -28,7 +30,11 @@ export class VolatilityCheckStep implements IStep {
     // Do not override existing signal decisions
     if (context.signal) return context;
 
-    const maxVolatility = (context.params.maxVolatility as number) || 0.05; // Default 5% volatility threshold
+    const maxVolatility =
+      (context.params.maxVolatility as number) ||
+      (context.params.volatilityThreshold as number) ||
+      this.maxVolatilityThreshold ||
+      0.05; // Default 5% volatility threshold
     const priceHistory = context.market.priceHistory || [];
 
     if (priceHistory.length < 2) {
