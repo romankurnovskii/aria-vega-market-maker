@@ -236,7 +236,7 @@ test('processTasks - Scenario A: Standard rebalance (close+open)', async () => {
     tick: async (): Promise<StrategyResult> => {
       return {
         action: 'open',
-        params: {
+        openParams: {
           poolAddress: MOCK_PUBKEY_2,
           lowerBound: 1.1,
           upperBound: 2.1,

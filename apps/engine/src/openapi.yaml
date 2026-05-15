@@ -419,13 +419,13 @@ components:
         - type: object
           required:
             - action
-            - params
+            - openParams
           properties:
             action:
               type: string
               enum: [open]
               example: 'open'
-            params:
+            openParams:
               $ref: '#/components/schemas/OpenParams'
         - type: object
           required:

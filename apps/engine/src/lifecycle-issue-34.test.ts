@@ -236,7 +236,7 @@ test('ISSUE #34: RebalanceTask should split close and open into independent oper
     tick: async (): Promise<StrategyResult> => {
       return {
         action: 'open',
-        params: {
+        openParams: {
           poolAddress: MOCK_PUBKEY_2,
           lowerBound: 1.1,
           upperBound: 2.1,

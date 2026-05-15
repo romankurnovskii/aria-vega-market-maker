@@ -91,7 +91,7 @@ export class ExperimentalRestakeStrategy implements IStrategy {
       logger.info(`[ExperimentalRestakeStrategy] Decision: open with params`);
       return {
         action: 'open',
-        params: finalContext.openParams,
+        openParams: finalContext.openParams,
       };
     }
 
