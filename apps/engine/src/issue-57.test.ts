@@ -10,6 +10,7 @@ import {
   Position,
   PoolInfo,
   MarketSnapshot,
+  Decision,
 } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { handlePositionsRouter } from './routes/positions.js';
@@ -182,7 +183,7 @@ test('ISSUE #57: POST /positions/:id/actions with action=removeLiquidity removes
     assert.deepStrictEqual(data.transactionSignatures, ['sig_123', 'sig_456']);
     assert.strictEqual(data.positionClosed, true);
 
-    const decision = getDecision() as Record<string, unknown>;
+    const decision = getDecision() as Decision;
     assert.ok(decision);
     assert.strictEqual(decision.action, 'close');
     assert.strictEqual(decision.positionId, MOCK_POSITION_ID);
@@ -212,12 +213,13 @@ test('ISSUE #57: POST /positions/:id/actions with action=addLiquidity adds liqui
     assert.deepStrictEqual(data.transactionSignatures, ['sig_123', 'sig_456']);
     assert.strictEqual(data.positionOpened, true);
 
-    const decision = getDecision() as Record<string, unknown>;
+    const decision = getDecision() as Decision;
     assert.ok(decision);
     assert.strictEqual(decision.action, 'open');
     assert.strictEqual(decision.positionId, MOCK_POSITION_ID);
-    assert.strictEqual((decision.openParams as Record<string, unknown>).tokenXAmount, '100');
-    assert.strictEqual((decision.openParams as Record<string, unknown>).tokenYAmount, '200');
+    assert.ok(decision.openParams);
+    assert.strictEqual(decision.openParams.tokenXAmount, '100');
+    assert.strictEqual(decision.openParams.tokenYAmount, '200');
   } finally {
     server.close();
   }
