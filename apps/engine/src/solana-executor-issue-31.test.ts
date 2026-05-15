@@ -2,6 +2,7 @@
 // ISSUE #31: SolanaExecutor overwrites WSOL ATA balances with native SOL balances and caps WSOL deposits based on native SOL
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
+import type { Decision } from '@lp-system/core';
 
 const MOCK_WALLET_ADDRESS = 'HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTYUQh';
 const MOCK_POSITION_ID = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
@@ -104,7 +105,7 @@ describe('ISSUE #31: SolanaExecutor WSOL balance handling logic', () => {
     const SolanaExecutor = (await import('@lp-system/executor')).SolanaExecutor;
     const executor = new SolanaExecutor(mockRpcPool, mockKeypair, provider);
 
-    const decision = {
+    const decision: Decision = {
       positionId: MOCK_POSITION_ID,
       action: 'open' as const,
       sourceAssignmentId: 'assign_test',

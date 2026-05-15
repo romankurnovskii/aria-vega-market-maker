@@ -11,6 +11,7 @@ import {
   PoolInfo,
   MarketSnapshot,
   Decision,
+  StrategyResult,
 } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { handlePositionsRouter } from './routes/positions.js';
@@ -70,7 +71,7 @@ function setupTestServer() {
     getMarketSnapshot: async () => marketSnapshot,
   };
 
-  let lastAppliedDecision: unknown = null;
+  let lastAppliedDecision: Decision | null = null;
 
   const executor: IExecutor = {
     apply: async (decision) => {
@@ -92,8 +93,8 @@ function setupTestServer() {
     positionId: MOCK_POSITION_ID,
     strategyId: 'trailing-usdc',
     mode: 'active' as const,
-    tick: async () => ({
-      action: 'close+open' as const,
+    tick: async (): Promise<StrategyResult> => ({
+      action: 'close+open',
       openParams: {
         poolAddress: MOCK_POOL_ADDRESS,
         lowerBound: 12,
@@ -117,8 +118,8 @@ function setupTestServer() {
     'trailing-usdc': {
       id: 'trailing-usdc',
       description: 'Trailing USDC strategy',
-      execute: async () => ({
-        action: 'close+open' as const,
+      execute: async (): Promise<StrategyResult> => ({
+        action: 'close+open',
         openParams: {
           poolAddress: MOCK_POOL_ADDRESS,
           lowerBound: 12,
@@ -136,7 +137,7 @@ function setupTestServer() {
 
   const server = http.createServer(app);
 
-  return new Promise<{ server: http.Server; url: string; getDecision: () => unknown }>((resolve) => {
+  return new Promise<{ server: http.Server; url: string; getDecision: () => Decision | null }>((resolve) => {
     server.listen(0, () => {
       const port = (server.address() as { port: number }).port;
       resolve({
@@ -149,97 +150,97 @@ function setupTestServer() {
 }
 
 test('ISSUE #57: POST /positions/:id/actions with action=evaluate returns strategy result', async () => {
-  const { server, url } = await setupTestServer();
-  try {
-    const res = await fetch(`${url}/${MOCK_POSITION_ID}/actions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'evaluate', strategyId: 'trailing-usdc' }),
-    });
+   const { server, url } = await setupTestServer();
+   try {
+     const res = await fetch(`${url}/${MOCK_POSITION_ID}/actions`, {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({ action: 'evaluate', strategyId: 'trailing-usdc' }),
+     });
 
-    assert.strictEqual(res.status, 200);
-    const data = (await res.json()) as Record<string, unknown>;
-    assert.strictEqual(data.status, 'success');
-    assert.strictEqual(data.action, 'evaluate');
-    assert.strictEqual((data.result as Record<string, unknown>).action, 'close+open');
-  } finally {
-    server.close();
-  }
-});
+     assert.strictEqual(res.status, 200);
+     const data = (await res.json()) as { status: string; action: string; result: StrategyResult };
+     assert.strictEqual(data.status, 'success');
+     assert.strictEqual(data.action, 'evaluate');
+     assert.strictEqual(data.result.action, 'close+open');
+   } finally {
+     server.close();
+   }
+ });
 
 test('ISSUE #57: POST /positions/:id/actions with action=removeLiquidity removes liquidity', async () => {
-  const { server, url, getDecision } = await setupTestServer();
-  try {
-    const res = await fetch(`${url}/${MOCK_POSITION_ID}/actions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'removeLiquidity' }),
-    });
+   const { server, url, getDecision } = await setupTestServer();
+   try {
+     const res = await fetch(`${url}/${MOCK_POSITION_ID}/actions`, {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({ action: 'removeLiquidity' }),
+     });
 
-    assert.strictEqual(res.status, 200);
-    const data = (await res.json()) as Record<string, unknown>;
-    assert.strictEqual(data.status, 'success');
-    assert.strictEqual(data.action, 'removeLiquidity');
-    assert.deepStrictEqual(data.transactionSignatures, ['sig_123', 'sig_456']);
-    assert.strictEqual(data.positionClosed, true);
+     assert.strictEqual(res.status, 200);
+     const data = (await res.json()) as { status: string; action: string; transactionSignatures: string[]; positionClosed: boolean };
+     assert.strictEqual(data.status, 'success');
+     assert.strictEqual(data.action, 'removeLiquidity');
+     assert.deepStrictEqual(data.transactionSignatures, ['sig_123', 'sig_456']);
+     assert.strictEqual(data.positionClosed, true);
 
-    const decision = getDecision() as Decision;
-    assert.ok(decision);
-    assert.strictEqual(decision.action, 'close');
-    assert.strictEqual(decision.positionId, MOCK_POSITION_ID);
-  } finally {
-    server.close();
-  }
-});
+     const decision = getDecision();
+     assert.ok(decision);
+     assert.strictEqual(decision.action, 'close');
+     assert.strictEqual(decision.positionId, MOCK_POSITION_ID);
+   } finally {
+     server.close();
+   }
+ });
 
 test('ISSUE #57: POST /positions/:id/actions with action=addLiquidity adds liquidity', async () => {
-  const { server, url, getDecision } = await setupTestServer();
-  try {
-    const res = await fetch(`${url}/${MOCK_POSITION_ID}/actions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'addLiquidity',
-        tokenXAmount: '100',
-        tokenYAmount: '200',
-        slippageTolerance: 50,
-      }),
-    });
+   const { server, url, getDecision } = await setupTestServer();
+   try {
+     const res = await fetch(`${url}/${MOCK_POSITION_ID}/actions`, {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({
+         action: 'addLiquidity',
+         tokenXAmount: '100',
+         tokenYAmount: '200',
+         slippageTolerance: 50,
+       }),
+     });
 
-    assert.strictEqual(res.status, 200);
-    const data = (await res.json()) as Record<string, unknown>;
-    assert.strictEqual(data.status, 'success');
-    assert.strictEqual(data.action, 'addLiquidity');
-    assert.deepStrictEqual(data.transactionSignatures, ['sig_123', 'sig_456']);
-    assert.strictEqual(data.positionOpened, true);
+     assert.strictEqual(res.status, 200);
+     const data = (await res.json()) as { status: string; action: string; transactionSignatures: string[]; positionOpened: boolean };
+     assert.strictEqual(data.status, 'success');
+     assert.strictEqual(data.action, 'addLiquidity');
+     assert.deepStrictEqual(data.transactionSignatures, ['sig_123', 'sig_456']);
+     assert.strictEqual(data.positionOpened, true);
 
-    const decision = getDecision() as Decision;
-    assert.ok(decision);
-    assert.strictEqual(decision.action, 'open');
-    assert.strictEqual(decision.positionId, MOCK_POSITION_ID);
-    assert.ok(decision.openParams);
-    assert.strictEqual(decision.openParams.tokenXAmount, '100');
-    assert.strictEqual(decision.openParams.tokenYAmount, '200');
-  } finally {
-    server.close();
-  }
-});
+     const decision = getDecision();
+     assert.ok(decision);
+     assert.strictEqual(decision.action, 'open');
+     assert.strictEqual(decision.positionId, MOCK_POSITION_ID);
+     assert.ok(decision.openParams);
+     assert.strictEqual(decision.openParams.tokenXAmount, '100');
+     assert.strictEqual(decision.openParams.tokenYAmount, '200');
+   } finally {
+     server.close();
+   }
+ });
 
 test('ISSUE #57: POST /positions/:id/actions with action=evaluate on unassigned position creates ad-hoc orchestrator and returns strategy result', async () => {
-  const { server, url } = await setupTestServer();
-  try {
-    const res = await fetch(`${url}/pos_unassigned/actions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'evaluate', strategyId: 'trailing-usdc' }),
-    });
+   const { server, url } = await setupTestServer();
+   try {
+     const res = await fetch(`${url}/pos_unassigned/actions`, {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({ action: 'evaluate', strategyId: 'trailing-usdc' }),
+     });
 
-    assert.strictEqual(res.status, 200);
-    const data = (await res.json()) as Record<string, unknown>;
-    assert.strictEqual(data.status, 'success');
-    assert.strictEqual(data.action, 'evaluate');
-    assert.strictEqual((data.result as Record<string, unknown>).action, 'close+open');
-  } finally {
-    server.close();
-  }
-});
+     assert.strictEqual(res.status, 200);
+     const data = (await res.json()) as { status: string; action: string; result: StrategyResult };
+     assert.strictEqual(data.status, 'success');
+     assert.strictEqual(data.action, 'evaluate');
+     assert.strictEqual(data.result.action, 'close+open');
+   } finally {
+     server.close();
+   }
+ });
