@@ -267,53 +267,56 @@ export const AriaVegaContainer = () => {
   };
 
   /**
-   * Triggers a manual evaluation tick for a strategy on a given position.
+   * Generic handler for performing actions on a position (evaluate, removeLiquidity, etc.)
+   * uses the unified POST /positions/:id/actions endpoint.
    *
    * @param positionId - The target position ID
-   * @param strategyId - The strategy to evaluate
+   * @param action - The action string (evaluate, removeLiquidity)
+   * @param body - Additional payload (e.g. strategyId)
    */
-  const handleEvaluateStrategy = async (positionId: string, strategyId: string): Promise<void> => {
-    console.log(`[AriaVega] Triggering ad-hoc evaluation for strategy: ${strategyId}, position: ${positionId}`);
+  const handlePositionAction = async (positionId: string, action: string, body: any = {}): Promise<void> => {
+    console.log(`[AriaVega] Triggering position action '${action}' for position: ${positionId}`);
     try {
-      const selectedPos = data.positions.find((p: any) => p.id === positionId);
-      if (!selectedPos) {
-        console.warn(`[AriaVega] Evaluation failed: Position ${positionId} not found in state.`);
-        return;
-      }
-
-      const requestUrl = `${API_URL}/strategies/${strategyId}/evaluate`;
-      console.log(`[AriaVega] POST ${requestUrl}`);
+      const requestUrl = `${API_URL}/positions/${positionId}/actions`;
 
       const res = await fetch(requestUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          positionId,
-          poolAddress: selectedPos.pool,
+          action,
+          ...body,
         }),
       });
 
       const result = await res.json();
-      console.log(`[AriaVega] Evaluation result status: ${res.status}`, result);
+      console.log(`[AriaVega] Action result status: ${res.status}`, result);
 
       if (res.ok) {
         setEvalLogs((prev) => [
           {
             id: Date.now(),
             timestamp: new Date().toLocaleTimeString(),
-            strategyId,
+            action,
+            strategyId: body.strategyId,
             positionId,
-            result: result.result,
+            result: result.result || result,
+            transactionSignatures: result.transactionSignatures,
           },
           ...prev.slice(0, 49),
         ]);
+
+        // If it was a destructive action, refresh the state
+        if (action === 'removeLiquidity' || action === 'addLiquidity') {
+          syncState();
+        }
       } else {
         setEvalLogs((prev) => [
           {
             id: Date.now(),
             timestamp: new Date().toLocaleTimeString(),
-            error: result.message || 'Evaluation failed',
-            strategyId,
+            action,
+            error: result.error || result.message || 'Action failed',
+            strategyId: body.strategyId,
             positionId,
           },
           ...prev.slice(0, 49),
@@ -324,13 +327,28 @@ export const AriaVegaContainer = () => {
         {
           id: Date.now(),
           timestamp: new Date().toLocaleTimeString(),
+          action,
           error: err.message || 'Network error',
-          strategyId,
+          strategyId: body.strategyId,
           positionId,
         },
         ...prev.slice(0, 49),
       ]);
     }
+  };
+
+  /**
+   * Shorthand for evaluating a strategy.
+   */
+  const handleEvaluateStrategy = (positionId: string, strategyId: string) => {
+    return handlePositionAction(positionId, 'evaluate', { strategyId });
+  };
+
+  /**
+   * Shorthand for removing liquidity.
+   */
+  const handleRemoveLiquidity = (positionId: string) => {
+    return handlePositionAction(positionId, 'removeLiquidity');
   };
 
   /**
@@ -387,6 +405,7 @@ export const AriaVegaContainer = () => {
                 strategies={data.strategies}
                 onAssign={handleAssignStrategy}
                 onEvaluate={handleEvaluateStrategy}
+                onRemoveLiquidity={handleRemoveLiquidity}
                 evalLogs={evalLogs}
               />
             )}
