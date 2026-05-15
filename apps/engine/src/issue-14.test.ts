@@ -17,7 +17,6 @@ import {
   IPositionStore,
 } from '@lp-system/core';
 
-const MOCK_WALLET_ADDRESS = 'HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTYUQh';
 const MOCK_STALE_POSITION_ID = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
 const MOCK_POOL_ADDRESS = 'GpCoz6vVv9kH8R4sLWev4M7wD7vT1Kz2Ff7LveX8Pz9k';
 
@@ -187,7 +186,7 @@ test('Issue #14: should sanitize decision.positionId before calling executor.app
 
   m.tasks.push(task);
 
-  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
+  await processTasks(m.store, m.executor, m.positionProvider, m.registry);
 
   const appliedDecision = m.getAppliedDecision();
   assert.ok(appliedDecision, 'executor.apply should have been called');
@@ -231,7 +230,7 @@ test('Issue #14: regression guard - happy path open task completes successfully'
 
   m.tasks.push(task);
 
-  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
+  await processTasks(m.store, m.executor, m.positionProvider, m.registry);
 
   assert.strictEqual(m.tasks.length, 0, 'Task should be successfully completed and removed');
 });

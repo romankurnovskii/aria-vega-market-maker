@@ -7,7 +7,7 @@
  * - Constructs TransactionInstructions for liquidity provision and removal
  * * @dependencies @meteora-ag/dlmm, @solana/web3.js, bn.js
  */
-import { Connection, PublicKey, Transaction, TransactionInstruction } from '@solana/web3.js';
+import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 import DLMM, { StrategyType, LbPosition } from '@meteora-ag/dlmm';
 import BN from 'bn.js';
 import { IRpcProvider } from '@lp-system/core';
@@ -127,10 +127,10 @@ export class MeteoraOnChainProvider {
   }
 
   /**
-   * Builds the transaction instructions to open a new position or add liquidity.
+   * Builds the transaction to open a new position or add liquidity.
    * Uses Spot strategy for uniform distribution across the specified bins.
    */
-  public async buildAddLiquidityInstructions(params: AddLiquidityParams): Promise<TransactionInstruction[]> {
+  public async buildAddLiquidityTransaction(params: AddLiquidityParams): Promise<Transaction> {
     const dlmm = await this.getDlmmInstance(params.poolAddress);
 
     logger.info(
@@ -138,7 +138,7 @@ export class MeteoraOnChainProvider {
     );
 
     return await this.rpcProvider.execute(async () => {
-      const addLiquidityTxs = await dlmm.addLiquidityByStrategy({
+      return await dlmm.initializePositionAndAddLiquidityByStrategy({
         positionPubKey: params.positionPubKey,
         user: params.userWallet,
         totalXAmount: params.tokenXAmount,
@@ -146,14 +146,10 @@ export class MeteoraOnChainProvider {
         strategy: {
           maxBinId: params.upperBinId,
           minBinId: params.lowerBinId,
-          strategyType: StrategyType.Spot, // TODO good to suport all types once IStrategy suports that
+          strategyType: StrategyType.Spot,
         },
         slippage: params.slippageTolerance,
       });
-
-      // Extract the raw instructions from the Meteora SDK transaction builder
-      // This allows the Execution layer to bundle it with compute budget/priority fee instructions
-      return addLiquidityTxs.instructions;
     });
   }
 

@@ -234,11 +234,12 @@ export const AriaVegaContainer = () => {
    */
   const handleAssignStrategy = async (positionId: string, strategyId: string, mode: string): Promise<void> => {
     try {
-      const existing = data.assignments.find((a: any) => a.positionId === positionId);
+      const existing = data.assignments.find((a: Assignment) => a.positionId === positionId);
 
       if (existing) {
         const delRes = await fetch(`${API_URL}/assignments/${existing.id}`, { method: 'DELETE' });
         if (!delRes.ok) {
+          console.error('Failed to delete existing assignment');
         }
       }
 
@@ -261,12 +262,14 @@ export const AriaVegaContainer = () => {
       });
 
       if (res.ok) {
-        const payload = await res.json();
+        await res.json();
         syncState();
       } else {
-        const errPayload = await res.json().catch(() => ({}));
+        await res.json().catch(() => ({}));
       }
-    } catch (err: any) {}
+    } catch (error) {
+      console.error('Assign strategy failed', error);
+    }
   };
 
   /**
@@ -277,7 +280,11 @@ export const AriaVegaContainer = () => {
    * @param action - The action string (evaluate, removeLiquidity, applySuggestion)
    * @param body - Additional payload (e.g. strategyId)
    */
-  const handlePositionAction = async (positionId: string, action: string, body: any = {}): Promise<void> => {
+  const handlePositionAction = async (
+    positionId: string,
+    action: string,
+    body: Record<string, any> = {}
+  ): Promise<void> => {
     console.log(`[AriaVega] Triggering position action '${action}' for position: ${positionId}`);
     try {
       const requestUrl = `${API_URL}/positions/${positionId}/actions`;
@@ -350,8 +357,8 @@ export const AriaVegaContainer = () => {
   ) => {
     return handlePositionAction(positionId, 'applySuggestion', {
       strategyId,
-      pendingSuggestion: suggestion,
-      ...suggestion,
+      suggestion, // The backend expects 'suggestion' in req.body
+      pendingSuggestion: suggestion, // Keep for log display if needed
     });
   };
 
@@ -380,9 +387,11 @@ export const AriaVegaContainer = () => {
       if (res.ok) {
         syncState();
       } else {
-        const errPayload = await res.json().catch(() => ({}));
+        await res.json().catch(() => ({}));
       }
-    } catch (err: any) {}
+    } catch (error) {
+      console.error('Delete assignment failed', error);
+    }
   };
 
   if (loading) {

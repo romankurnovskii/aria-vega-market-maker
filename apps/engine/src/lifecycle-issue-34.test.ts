@@ -20,7 +20,6 @@ import {
   StrategyResult,
 } from '@lp-system/core';
 
-const MOCK_WALLET_ADDRESS = 'HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTYUQh';
 const MOCK_PUBKEY_1 = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
 const MOCK_PUBKEY_2 = 'GpCoz6vVv9kH8R4sLWev4M7wD7vT1Kz2Ff7LveX8Pz9k';
 const MOCK_PUBKEY_3 = '3b9SrqR9yXnNnHe1Kz77aFeYV8nK9wZfL6tX8T3tX9tY';
@@ -263,7 +262,7 @@ test('ISSUE #34: RebalanceTask should split close and open into independent oper
   });
 
   // 1. Process the close operation
-  await processTasks(m.store, m.executor, m.positionProvider, m.rpcPool, MOCK_WALLET_ADDRESS, m.registry, m.positionStore);
+  await processTasks(m.store, m.executor, m.positionProvider, m.registry);
 
   // Under decoupled semantics, after the close operation completes, the close task should be deleted immediately
   // and the position should be marked as CLOSED or awaiting independent open.

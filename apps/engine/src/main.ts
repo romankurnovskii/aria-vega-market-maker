@@ -156,7 +156,7 @@ async function main() {
     factory
   );
 
-  startHttpServer(store, registry, executor, factory, positionProvider, walletAddress, positionStore);
+  startHttpServer(store, registry, executor, factory, positionProvider, walletAddress, positionStore, rpcPool);
 
   // 7. Graceful Shutdown handlers
   process.on('SIGINT', () => {
