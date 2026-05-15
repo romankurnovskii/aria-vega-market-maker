@@ -1,11 +1,21 @@
 import { Router } from 'express';
-import { IPositionProvider, IExecutor, IOrchestratorRegistry, IPositionStore, OpenParams } from '@lp-system/core';
+import {
+  IPositionProvider,
+  IExecutor,
+  IOrchestratorRegistry,
+  IPositionStore,
+  OpenParams,
+  IStore,
+  RebalanceTask,
+  IRpcProvider,
+} from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
 
 const logger = getLogger('router-positions');
 
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getPriceFromBinId } from '@lp-system/providers';
+import { processTasks } from '../lifecycle.js';
 
 /**
  * Creates the positions router handling unified position actions.
@@ -16,10 +26,13 @@ export function handlePositionsRouter(
   registry: IOrchestratorRegistry,
   factory: OrchestratorFactory,
   walletAddress: string,
-  positionStore?: IPositionStore
+  positionStore?: IPositionStore,
+  store?: IStore,
+  rpcPool?: IRpcProvider
 ): Router {
   void walletAddress;
   void positionStore;
+  void rpcPool;
   const router = Router();
 
   /**
@@ -120,10 +133,7 @@ export function handlePositionsRouter(
             sourceAssignmentId: 'manual',
             evaluatedAt: Date.now(),
           },
-          await positionProvider.getMarketSnapshot(position.poolAddress),
-          async () => ({
-            action: 'close',
-          })
+          await positionProvider.getMarketSnapshot(position.poolAddress)
         );
 
         if (execRecord.status === 'failed') {
@@ -169,8 +179,7 @@ export function handlePositionsRouter(
               },
             },
           },
-          await positionProvider.getMarketSnapshot(position.poolAddress),
-          async () => ({ action: 'skip' })
+          await positionProvider.getMarketSnapshot(position.poolAddress)
         );
 
         if (execRecord.status === 'failed') {
@@ -182,6 +191,7 @@ export function handlePositionsRouter(
           status: 'success',
           action: 'addLiquidity',
           transactionSignatures: execRecord.txSignatures || [],
+          message: 'Add liquidity action queued successfully.',
           positionOpened: true,
         });
         return;
@@ -205,16 +215,63 @@ export function handlePositionsRouter(
         // Determine the actual action to perform based on the suggestion
         const actualAction = suggestion.action === 'close+open' ? 'close+open' : suggestion.action;
 
+        // If it's a compound action (close+open), we MUST use the stateful RebalanceTask system
+        if (actualAction === 'close+open' && store) {
+          logger.info(`[HTTP Server] Creating stateful RebalanceTask for manual suggestion: ${actualAction}`);
+          const tasksStore = store as unknown as { saveTask: (t: RebalanceTask) => Promise<void> };
+          const task: RebalanceTask = {
+            id: `manual_task_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+            assignmentId: 'manual',
+            status: 'pending_close',
+            originalPositionId: positionId,
+            intent: {
+              positionId,
+              action: 'close+open',
+              openParams: suggestion.openParams,
+              sourceAssignmentId: 'manual',
+              evaluatedAt: Date.now(),
+            },
+            evaluatedAt: Date.now(),
+            events: [
+              {
+                stage: 'INIT',
+                timestamp: Date.now(),
+                message: `Manual task initialized for suggestion application: ${actualAction}`,
+              },
+            ],
+          };
+
+          await tasksStore.saveTask(task);
+
+          // Trigger Execution Monitor immediately for responsiveness
+          processTasks(
+            store,
+            executor,
+            positionProvider,
+            registry,
+            factory
+          ).catch((err) => logger.error(`[HTTP Server] Error triggering processTasks: ${err.message}`));
+
+          res.json({
+            status: 'success',
+            action: 'applySuggestion',
+            appliedAction: actualAction,
+            message: 'Rebalance task successfully queued. The engine will now execute the close and open legs asynchronously. Monitor the Event Log for real-time progress.',
+            taskId: task.id,
+            suggestionApplied: false, // Changed to false to reflect it is queued, not finished
+          });
+          return;
+        }
+
         const execRecord = await executor.apply(
           {
             positionId,
-            action: actualAction,
+            action: actualAction as 'close' | 'open',
             sourceAssignmentId: 'manual',
             evaluatedAt: Date.now(),
             openParams: suggestion.openParams,
           },
-          await positionProvider.getMarketSnapshot(position.poolAddress),
-          async () => ({ action: suggestion.action })
+          await positionProvider.getMarketSnapshot(position.poolAddress)
         );
 
         if (execRecord.status === 'failed') {

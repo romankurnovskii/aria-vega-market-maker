@@ -2,7 +2,6 @@
  * @file route.ts
  * @description API route for adding liquidity to a position.
  */
-'use server';
 import { NextRequest, NextResponse } from 'next/server';
 import { getLogger } from '@lp-system/logger';
 
@@ -17,13 +16,14 @@ export async function POST(request: NextRequest) {
 
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8441';
 
-    const response = await fetch(`${API_URL}/positions/${positionId}/addLiquidity`, {
+    const response = await fetch(`${API_URL}/positions/${positionId}/actions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        action: 'addLiquidity',
         tokenXAmount,
         tokenYAmount,
-        slippage,
+        slippageTolerance: slippage,
       }),
     });
 

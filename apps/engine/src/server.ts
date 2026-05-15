@@ -28,6 +28,7 @@ import {
   Position,
   PoolInfo,
   MarketSnapshot,
+  IRpcProvider,
 } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
@@ -63,7 +64,8 @@ export function startHttpServer(
   factory: OrchestratorFactory,
   positionProvider: IPositionProvider,
   walletAddress: string,
-  positionStore?: IPositionStore
+  positionStore?: IPositionStore,
+  rpcPool?: IRpcProvider
 ): express.Application {
   const app = express();
   app.use(cors());
@@ -176,7 +178,7 @@ export function startHttpServer(
     }
   });
 
-  app.use('/positions', handlePositionsRouter(positionProvider, executor, registry, factory, walletAddress, positionStore));
+  app.use('/positions', handlePositionsRouter(positionProvider, executor, registry, factory, walletAddress, positionStore, store, rpcPool));
 
   const swaggerDocument = YAML.load(path.join(__dirname, '../src/openapi.yaml'));
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));

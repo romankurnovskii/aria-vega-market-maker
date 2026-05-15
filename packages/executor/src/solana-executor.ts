@@ -169,8 +169,8 @@ export class SolanaExecutor implements IExecutor {
 
         const finalTokenXAmount = new BN(openParams.tokenXAmount);
 
-        // 1. Build add liquidity instructions
-        const instructions = await this.provider.buildAddLiquidityInstructions({
+        // 1. Build add liquidity transaction using the SDK
+        const openTx = await this.provider.buildAddLiquidityTransaction({
           poolAddress: market.poolAddress,
           userWallet: this.keypair.publicKey,
           tokenXAmount: finalTokenXAmount,
@@ -180,9 +180,6 @@ export class SolanaExecutor implements IExecutor {
           slippageTolerance,
           positionPubKey: positionKeypair.publicKey,
         });
-
-        // 2. Bundle instructions into a new Transaction
-        const openTx = new Transaction().add(...instructions);
 
         // 3. Submit and confirm with custom position signer
         const openSig = await this.executeTx(openTx, [positionKeypair], {

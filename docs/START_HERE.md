@@ -10,6 +10,7 @@ Start here. Every doc in this directory is listed below.
 ## Decisions
 
 - [decisions_position_lifecycle.md](decisions_position_lifecycle.md) — Design and state rules for the Position Lifecycle State Machine.
+- [SOLANA_CLMM_FINDINGS.md](SOLANA_CLMM_FINDINGS.md) — Critical technical findings, SDK quirks, and anti-patterns discovered.
 - [references/liquidity_management_apis.md](references/liquidity_management_apis.md) — Architecture for manual add/remove liquidity REST APIs.
 
 ## Q&A

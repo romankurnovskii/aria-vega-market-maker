@@ -61,3 +61,7 @@ Scaffold these files immediately:
 ```
 
 Then add a reference to the new package's `docs/START_HERE.md` in the **root** `docs/START_HERE.md`.
+
+### 7. Avoid Repeating Known Bugs
+
+Before modifying Solana or Meteora integration logic, you **must** read [docs/SOLANA_CLMM_FINDINGS.md](docs/SOLANA_CLMM_FINDINGS.md). This document contains critical anti-patterns and SDK quirks discovered in this repository.
