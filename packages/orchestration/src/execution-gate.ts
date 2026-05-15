@@ -46,7 +46,7 @@ export class ExecutionGate implements IExecutionGate {
           match.result.action === 'close+open'
             ? match.result.openParams
             : match.result.action === 'open'
-              ? match.result.params
+              ? match.result.openParams
               : undefined;
 
         logger.info(`[ExecutionGate] Decision Gated: Approved '${action}' triggered by assignment ${match.assignmentId}`);

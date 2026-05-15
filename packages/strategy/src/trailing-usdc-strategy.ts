@@ -103,7 +103,7 @@ export class TrailingUsdcStrategy implements IStrategy {
       logger.info(`[TrailingUsdcStrategy] Decision: open with params`);
       return {
         action: 'open',
-        params: finalContext.openParams,
+        openParams: finalContext.openParams,
       };
     }
 
