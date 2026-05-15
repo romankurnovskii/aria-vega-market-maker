@@ -429,7 +429,12 @@ export const AriaVegaContainer = () => {
               />
             )}
             {activeTab === 'assignments' && (
-              <AssignmentsView assignments={data.assignments} onDelete={handleDeleteAssignment} />
+              <AssignmentsView
+                assignments={data.assignments}
+                onDelete={handleDeleteAssignment}
+                evalLogs={evalLogs}
+                onApplySuggestion={handleApplySuggestion}
+              />
             )}
             {activeTab === 'strategies' && <StrategiesView strategies={data.strategies} />}
             {activeTab === 'steps' && <StepsView steps={data.steps} />}
