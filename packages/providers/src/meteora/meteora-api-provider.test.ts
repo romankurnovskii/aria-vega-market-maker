@@ -329,6 +329,8 @@ test('integration: getPositions with real API structure', async () => {
           mint: 'onChainTokenYMint',
           tokenAddress: 'onChainTokenYMint',
         },
+        state: 'OPEN',
+        closedAt: undefined,
         upperBinId: 200,
         upperBound: 200,
       },
