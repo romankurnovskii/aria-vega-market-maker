@@ -106,6 +106,9 @@ importers:
 
   apps/frontend:
     dependencies:
+      '@lp-system/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
       lucide-react:
         specifier: ^0.468.0
         version: 0.468.0(react@19.2.6)
