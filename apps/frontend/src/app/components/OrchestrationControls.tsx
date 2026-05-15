@@ -34,7 +34,7 @@ export const OrchestrationControls = ({
 }: OrchestrationControlsProps) => {
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-[10px] font-bold uppercase tracking-widest text-[#FF4500]">Orchestration & Strategy</div>
+      <div className="text-[11px] font-bold uppercase tracking-widest text-[#FF4500]">Orchestration & Strategy</div>
       <div className="flex flex-col gap-2">
         <select
           value={selectedStrategyId}

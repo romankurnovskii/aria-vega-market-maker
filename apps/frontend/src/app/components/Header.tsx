@@ -29,15 +29,15 @@ export const Header = ({ health, assignments }: HeaderProps) => {
 
       <div className="flex gap-6 text-xs border-l border-[#0D0D0D] pl-4">
         <div>
-          <div className="text-gray-500 mb-0.5 uppercase tracking-wider text-[10px]">Epoch</div>
+          <div className="text-gray-500 mb-0.5 uppercase tracking-wider text-[11px]">Epoch</div>
           <div className="font-bold">{health.epoch}</div>
         </div>
         <div>
-          <div className="text-gray-500 mb-0.5 uppercase tracking-wider text-[10px]">Active Tasks</div>
+          <div className="text-gray-500 mb-0.5 uppercase tracking-wider text-[11px]">Active Tasks</div>
           <div className="font-bold">{assignments.length}</div>
         </div>
         <div>
-          <div className="text-gray-500 mb-0.5 uppercase tracking-wider text-[10px]">Engine Status</div>
+          <div className="text-gray-500 mb-0.5 uppercase tracking-wider text-[11px]">Engine Status</div>
           <div className={`font-bold uppercase ${health.status === 'healthy' ? 'text-green-600' : 'text-[#FF4500]'}`}>
             {health.status}
           </div>
