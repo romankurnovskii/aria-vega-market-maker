@@ -33,3 +33,4 @@ Start here. Every doc in this directory is listed below.
 - [@lp-system/executor docs](../packages/executor/docs/START_HERE.md) — Transaction dispatchers & re-evaluation loops Documentation
 - [@lp-system/engine docs](../apps/engine/docs/START_HERE.md) — Composition root & loop runner Documentation
 - [@lp-system/frontend docs](../apps/frontend/docs/START_HERE.md) — Next.js Control Panel Frontend Interface Documentation
+- [@lp-system/cli docs](../apps/cli/docs/START_HERE.md) — Command-line interface for manual liquidity duty operations
