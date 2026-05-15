@@ -3,9 +3,10 @@
  * @description Trailing USDC strategy: rebalances CLMM position when price moves out of range.
  *
  * @features
- * - Executes multi-step workflow: init check → trailing range check → range calculator → amount calculator
+ * - Executes multi-step workflow: init check → high fee check → trailing range check → range calculator → amount calculator
  * - Maintains configurable trailing percent (rangePercent) defining bin width around active price
  * - Emits close+open recommendation when active bin drifts outside current position range
+ * - Emits close when accrued fees exceed threshold (suggest closing to collect fees)
  * - Emits skip when position remains healthy; emits close for zero-liquidity positions
  *
  * @dependencies IStrategy interface, Workflow (pipeline orchestration), all step classes from @lp-system/steps
@@ -17,6 +18,7 @@ import {
   TrailingRangeCheckStep,
   RangeCalculatorStep,
   AmountCalculatorStep,
+  HighFeeCheckStep,
 } from '@lp-system/steps';
 import { Workflow } from './workflow.js';
 import { getLogger } from '@lp-system/logger';
@@ -41,6 +43,7 @@ export class TrailingUsdcStrategy implements IStrategy {
     // Set up the static workflow pipeline using reusable steps
     this.workflow = new Workflow([
       new InitializationCheckStep(),
+      new HighFeeCheckStep(),
       new TrailingRangeCheckStep(),
       new RangeCalculatorStep(),
       new AmountCalculatorStep(),
