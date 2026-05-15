@@ -30,6 +30,11 @@ export interface OpenParams {
    * @deprecated Use `upperBound` instead. Kept for legacy Solana/Meteora support.
    */
   upperBinId?: number;
+
+  lowerBoundPrice?: number;
+  upperBoundPrice?: number;
+  binCount?: number;
+  rangePercent?: number;
 }
 
 export type PositionState =
@@ -60,7 +65,7 @@ export interface Position {
   activeBin?: number;
   binCount?: number;
   rangePercent?: number;
-  pnlData?: any;
+  pnlData?: unknown;
 
   /**
    * @deprecated Use `lowerBound` instead. Kept for legacy Solana/Meteora support.
