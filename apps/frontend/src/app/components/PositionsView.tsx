@@ -25,6 +25,7 @@ interface Props {
   onAssign: (positionId: string, strategyId: string, mode: string) => Promise<void>;
   onEvaluate: (positionId: string, strategyId: string) => Promise<void>;
   onRemoveLiquidity: (positionId: string) => Promise<void>;
+  onApplySuggestion: (positionId: string, strategyId: string, suggestion: { action: string; openParams?: Record<string, unknown> }) => void;
   evalLogs: any[];
 }
 
@@ -35,6 +36,7 @@ export const PositionsView = ({
   onAssign,
   onEvaluate,
   onRemoveLiquidity,
+  onApplySuggestion,
   evalLogs,
 }: Props) => {
   const [selectedPosId, setSelectedPosId] = useState<string | null>(null);
@@ -67,6 +69,7 @@ export const PositionsView = ({
           onAssign={onAssign}
           onEvaluate={onEvaluate}
           onRemoveLiquidity={onRemoveLiquidity}
+          onApplySuggestion={onApplySuggestion}
           evalLogs={evalLogs}
           onClose={() => setSelectedPosId(null)}
         />
