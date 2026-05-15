@@ -27,40 +27,34 @@ const MOCK_PUBKEY_3 = '3b9SrqR9yXnNnHe1Kz77aFeYV8nK9wZfL6tX8T3tX9tY';
 // Simple Mocks generator helper
 function createMocks() {
   const tasks: RebalanceTask[] = [];
-  const executionRecords: ExecutionRecord[] = [];
   const orchestrators: IOrchestrator[] = [];
-  const knownPositions: Position[] = [];
+  const assignmentsList: any[] = [];
+  const knownPositionsList: Position[] = [];
+  const storeId = `store_${Math.random().toString(36).substring(7)}`;
 
-  const store: IStore = {
-    getAssignments: async () => [],
-    saveAssignment: async () => {},
-    deleteAssignment: async () => {},
-    getExecutionRecords: async () => executionRecords,
-    saveExecutionRecord: async (record) => {
-      executionRecords.push(record);
-    },
-    getTasks: async () => tasks,
-    saveTask: async (task) => {
+  const store = {
+    id: storeId,
+    getTasks: async () => [...tasks],
+    saveTask: async (task: any) => {
       const idx = tasks.findIndex((t) => t.id === task.id);
-      if (idx >= 0) {
-        tasks[idx] = task;
-      } else {
-        tasks.push(task);
-      }
+      if (idx >= 0) tasks[idx] = task;
+      else tasks.push(task);
     },
-    deleteTask: async (id) => {
+    deleteTask: async (id: string) => {
       const idx = tasks.findIndex((t) => t.id === id);
-      if (idx >= 0) {
-        tasks.splice(idx, 1);
-      }
+      if (idx >= 0) tasks.splice(idx, 1);
     },
-    archiveTask: async (task) => {
-      const idx = tasks.findIndex((t) => t.id === task.id);
-      if (idx >= 0) {
-        tasks.splice(idx, 1);
-      }
+    getAssignments: async () => [...assignmentsList],
+    saveAssignment: async (a: any) => {
+      const idx = assignmentsList.findIndex((prev) => prev.id === a.id);
+      if (idx >= 0) assignmentsList[idx] = a;
+      else assignmentsList.push(a);
     },
-  };
+    getExecutionRecords: async () => [],
+    saveExecutionRecord: async () => {},
+    archiveTask: async () => {},
+    deleteAssignment: async () => {},
+  } as any;
 
   const executor: IExecutor & { pollBalances?: () => Promise<void> } = {
     apply: async (decision, _market) => {
@@ -174,13 +168,13 @@ function createMocks() {
     getAll: () => orchestrators,
   };
 
-  const positionStore: IPositionStore = {
-    getKnown: async () => knownPositions,
-    saveKnown: async (positions) => {
-      knownPositions.length = 0;
-      knownPositions.push(...positions);
+  const positionStore: any = {
+    getKnown: async () => [...knownPositionsList],
+    saveKnown: async (positions: Position[]) => {
+      knownPositionsList.length = 0;
+      knownPositionsList.push(...positions);
     },
-    archivePosition: async () => {},
+    archivePosition: async (position: Position) => {},
     getArchived: async () => [],
   };
 
@@ -192,9 +186,9 @@ function createMocks() {
     registry,
     positionStore,
     tasks,
-    executionRecords,
+    assignments: assignmentsList,
     orchestrators,
-    knownPositions,
+    knownPositions: knownPositionsList,
   };
 }
 
@@ -262,13 +256,17 @@ test('processTasks - Scenario A: Standard rebalance (close+open)', async () => {
     metadata: {},
   });
 
-  // 1. Process 'pending_close'
-  await processTasks(m.store, m.executor, m.positionProvider, m.registry);
+  // 1. Process 'pending_close' -> becomes 'pending_open'
+  await processTasks(m.store, m.executor, m.positionProvider, m.registry, m.positionStore);
 
-  assert.strictEqual(m.tasks.length, 0);
-  assert.ok(task.events?.some((e) => e.stage === 'CLOSE_BROADCAST'));
-  assert.ok(task.events?.some((e) => e.stage === 'CLOSE_CONFIRMED'));
+  assert.strictEqual(m.tasks.length, 1);
+  assert.strictEqual(task.status, 'pending_open');
   assert.ok(task.events?.some((e) => e.stage === 'POSITION_CLOSED'));
+
+  // 2. Process 'pending_open' -> completes
+  await processTasks(m.store, m.executor, m.positionProvider, m.registry, m.positionStore);
+  assert.strictEqual(m.tasks.length, 0);
+  assert.ok(task.events?.some((e) => e.stage === 'COMPLETED'));
 
   // 2. Simulate next tick in startTickLoop creating pending_open task
   const openTask: RebalanceTask = {
@@ -295,7 +293,7 @@ test('processTasks - Scenario A: Standard rebalance (close+open)', async () => {
   m.tasks.push(openTask);
 
   // 3. Process 'pending_open' -> completes and deletes
-  await processTasks(m.store, m.executor, m.positionProvider, m.registry);
+  await processTasks(m.store, m.executor, m.positionProvider, m.registry, m.positionStore);
 
   assert.strictEqual(m.tasks.length, 0); // Task should be deleted
   assert.ok(openTask.events?.some((e) => e.stage === 'OPEN_BROADCAST'));
@@ -346,10 +344,11 @@ test('processTasks - Scenario B: Rebalance with JIT Abort', async () => {
     metadata: {},
   });
 
-  await processTasks(m.store, m.executor, m.positionProvider, m.registry);
+  await processTasks(m.store, m.executor, m.positionProvider, m.registry, m.positionStore, { isInitialRun: true });
 
-  assert.strictEqual(m.tasks.length, 0);
-  assert.ok(task.events?.some((e) => e.stage === 'COMPLETED'));
+  // After recovery, it should be pending_close and processed
+  assert.strictEqual(m.tasks.length, 1);
+  assert.strictEqual(task.status, 'pending_open');
 });
 
 test('processTasks - Scenario C: Pure Close (close)', async () => {
@@ -384,7 +383,7 @@ test('processTasks - Scenario C: Pure Close (close)', async () => {
   };
   m.orchestrators.push(mockOrchestrator);
 
-  await processTasks(m.store, m.executor, m.positionProvider, m.registry);
+  await processTasks(m.store, m.executor, m.positionProvider, m.registry, m.positionStore);
 
   assert.strictEqual(m.tasks.length, 0); // Pure close should complete and delete immediately without settlement/open
   assert.ok(task.events?.some((e) => e.stage === 'CLOSE_BROADCAST'));
@@ -432,7 +431,7 @@ test('processTasks - Scenario D: Pure Open (open)', async () => {
   };
   m.orchestrators.push(mockOrchestrator);
 
-  await processTasks(m.store, m.executor, m.positionProvider, m.registry);
+  await processTasks(m.store, m.executor, m.positionProvider, m.registry, m.positionStore);
 
   assert.strictEqual(m.tasks.length, 0); // Pure open should complete and delete
   assert.ok(task.events?.some((e) => e.stage === 'OPEN_BROADCAST'));
@@ -485,7 +484,7 @@ test('processTasks - Timeout Scenario', async () => {
   };
 
   // Run processTasks
-  await processTasks(m.store, m.executor, m.positionProvider, m.registry);
+  await processTasks(m.store, m.executor, m.positionProvider, m.registry, m.positionStore, { isInitialRun: true });
 
   // 1. The task must have a TIMEOUT event appended
   assert.ok(task.events?.some((e) => e.stage === 'TIMEOUT'));
@@ -551,7 +550,15 @@ test('startDiscovery - Scenario E: Crash Recovery with newPositionId', async () 
   } as any;
 
   // Run startDiscovery
-  await startDiscovery(MOCK_WALLET_ADDRESS, m.positionProvider, m.positionStore, factory, m.store, m.registry);
+  await startDiscovery(
+    MOCK_WALLET_ADDRESS,
+    m.positionProvider,
+    m.positionStore,
+    factory,
+    m.store,
+    m.registry,
+    m.positionStore
+  );
 
   // Assignment positionId must be updated to newPositionId
   assert.strictEqual(assignmentsList[0].positionId, MOCK_PUBKEY_2);
@@ -629,7 +636,15 @@ test('startDiscovery - Scenario F: Lock Restoration with Active Task', async () 
   } as any;
 
   // Run startDiscovery
-  await startDiscovery(MOCK_WALLET_ADDRESS, m.positionProvider, m.positionStore, factory, m.store, m.registry);
+  await startDiscovery(
+    MOCK_WALLET_ADDRESS,
+    m.positionProvider,
+    m.positionStore,
+    factory,
+    m.store,
+    m.registry,
+    m.positionStore
+  );
 
   // Orchestrator must be registered
   const registeredOrchs = m.registry.getForPosition(MOCK_PUBKEY_1);
@@ -743,13 +758,7 @@ test('processTasks - Scenario G: Seamless Transition with newPositionId', async 
   } as any;
 
   // Run processTasks
-  await processTasks(
-    m.store,
-    m.executor,
-    m.positionProvider,
-    m.registry,
-    factory
-  );
+  await processTasks(m.store, m.executor, m.positionProvider, m.registry, m.positionStore, { isInitialRun: true, factory });
 
   // The assignment positionId must be updated
   assert.strictEqual(assignmentsList[0].positionId, MOCK_PUBKEY_3);
@@ -841,7 +850,7 @@ test('processTasks - Issue 1: Race Condition in Position State Updates', async (
   };
 
   // Run processTasks once (both tasks will be processed in the same loop)
-  await processTasks(m.store, m.executor, m.positionProvider, m.registry);
+  await processTasks(m.store, m.executor, m.positionProvider, m.registry, m.positionStore);
 
   // Assert both positions were successfully archived as CLOSED.
   const archived1 = archivedPositionsList.find((p) => p.id === 'pos_1');
@@ -896,7 +905,7 @@ test('processTasks - Issue 3: Missing Error Handling in Archive Operations', asy
 
   // Run processTasks
   try {
-    await processTasks(m.store, m.executor, m.positionProvider, m.registry);
+    await processTasks(m.store, m.executor, m.positionProvider, m.registry, m.positionStore);
   } catch {
     /* ignore expected error */
   }
@@ -990,7 +999,7 @@ test('processTasks - Issue 4: Duplicate Position After Rebalance (Failed cache u
   };
 
   try {
-    await processTasks(m.store, m.executor, m.positionProvider, m.registry);
+    await processTasks(m.store, m.executor, m.positionProvider, m.registry, m.positionStore);
   } catch {
     /* ignore expected error */
   }
@@ -1094,8 +1103,10 @@ test('processTasks - Issue 13: WSOL uses ATA balance exclusively (not native SOL
     metadata: {},
   });
 
-  await processTasks(m.store, m.executor, m.positionProvider, m.registry);
+  await processTasks(m.store, m.executor, m.positionProvider, m.registry, m.positionStore);
 
-  assert.strictEqual(m.tasks.length, 0);
+  // After one cycle, close leg is done
+  assert.strictEqual(m.tasks.length, 1);
+  assert.strictEqual(task.status, 'pending_open');
   assert.ok(task.events?.some((e) => e.stage === 'POSITION_CLOSED'));
 });

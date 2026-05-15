@@ -2,7 +2,7 @@
   "name": "@lp-system/engine",
   "version": "1.0.0",
   "private": true,
-  "main": "dist/main.js",
+  "main": "src/main.ts",
   "type": "module",
   "dependencies": {
     "@lp-system/core": "workspace:*",
@@ -30,8 +30,8 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "start": "node dist/main.js",
-    "test": "tsc && node --test dist/**/*.test.js",
-    "test:coverage": "tsc && node --experimental-test-coverage --test dist/**/*.test.js"
+    "start": "tsx src/main.ts",
+    "test": "tsx --test src/**/*.test.ts",
+    "test:coverage": "tsx --test --experimental-test-coverage src/**/*.test.ts"
   }
 }
