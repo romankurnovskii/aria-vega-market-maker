@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "bin": {
-    "liqifduty": "./bin/liqifduty.js"
+    "lp": "./bin/lp.js"
   },
   "dependencies": {
     "@lp-system/core": "workspace:*",

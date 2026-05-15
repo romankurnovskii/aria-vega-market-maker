@@ -17,11 +17,11 @@ interface CliOptions {
 }
 
 const HELP_TEXT = `
-Liquidity Duty CLI Tool
+Liquidity Provision CLI Tool
 ========================
 
 Usage:
-  liqifduty --pool <address> --tokenX <mint> --tokenY <mint> --amountX <amount> --amountY <amount> --rangeLower <pct> --rangeUpper <pct>
+  lp --pool <address> --tokenX <mint> --tokenY <mint> --amountX <amount> --amountY <amount> --rangeLower <pct> --rangeUpper <pct>
 
 Options:
   --pool        Pool address (required)
@@ -34,13 +34,13 @@ Options:
   --help        Show this help message
 
 Example:
-  liqifduty \\
-    --pool 7nTABH6GfWrVvrsKxnKVQaZjnEgEwkAoTxv6UrsS1uZ \\
-    --tokenX So11111111111111111111111111111111111111112 \\
-    --tokenY EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v \\
-    --amountX 10 \\
-    --amountY 1000 \\
-    --rangeLower -0.2 \\
+  lp \
+    --pool 7nTABH6GfWrVvrsKxnKVQaZjnEgEwkAoTxv6UrsS1uZ \
+    --tokenX So11111111111111111111111111111111111111112 \
+    --tokenY EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v \
+    --amountX 10 \
+    --amountY 1000 \
+    --rangeLower -0.2 \
     --rangeUpper 0
 `;
 
