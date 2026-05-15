@@ -14,7 +14,7 @@ import React from 'react';
 import { Zap } from 'lucide-react';
 
 interface OrchestrationControlsProps {
-  strategies: any[];
+  strategies: Array<{ id: string; name: string }>;
   selectedStrategyId: string;
   selectedMode: string;
   onStrategyChange: (value: string) => void;
@@ -42,7 +42,7 @@ export const OrchestrationControls = ({
           className="w-full bg-[#F4F4F0] border border-[#0D0D0D] p-2 text-xs uppercase outline-none focus:border-[#FF4500]"
         >
           <option value="NONE">-- No Strategy (Unassign) --</option>
-          {strategies.map((s: any) => (
+          {strategies.map((s) => (
             <option key={s.id} value={s.id}>
               {s.name} ({s.id})
             </option>
@@ -75,7 +75,7 @@ export const OrchestrationControls = ({
           disabled={selectedStrategyId === 'NONE'}
           className="w-full flex items-center justify-center gap-2 border border-[#0D0D0D] p-2 text-xs font-bold uppercase hover:bg-[#F4F4F0] hover:text-[#FF4500] hover:border-[#FF4500] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Zap size={14} /> Evaluate Ad-Hoc
+          <Zap size={14} /> Evaluate Strategy
         </button>
       </div>
     </div>

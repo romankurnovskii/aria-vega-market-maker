@@ -37,4 +37,6 @@ The dashboard permits write-operations directly modifying the engine state:
 
 - **Create Assignments**: When a user selects a strategy and clicks "Set Assignment", the frontend first requests to `DELETE /assignments/:id` for any existing assignment on that position (to avoid conflicts), followed by a `POST /assignments` request registering the new strategy and triggering its orchestrator.
 - **Delete Assignments**: Deleting an assignment triggers `DELETE /assignments/:id`, which cleans up the persistence files and deregisters the orchestrator on the engine.
-- **Evaluate Ad-Hoc**: For active strategy assignments, users can click "Evaluate Ad-Hoc" to run manual strategy ticks using `POST /strategies/:id/evaluate` with the position and pool details. Results are streamed in real time to the live CRT Events Log console on the screen.
+- **Unified Position Actions**: The dashboard supports direct manual actions on positions via the `POST /positions/:positionId/actions` endpoint:
+  - **Evaluate Strategy**: Run a manual strategy evaluation tick. Results (Action, Signal, Reason) are displayed in the CRT Events Log.
+  - **Remove Liquidity**: A one-click "Danger Zone" action to withdraw 100% liquidity and claim accrued fees, effectively closing the position on-chain.

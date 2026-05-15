@@ -19,7 +19,7 @@ interface LogEntry {
   strategyId?: string;
   positionId?: string;
   error?: string;
-  result?: any;
+  result?: unknown;
   transactionSignatures?: string[];
 }
 
@@ -48,7 +48,9 @@ export const EventLog = ({ logs }: EventLogProps) => {
               className="border-b border-white/5 pb-1 mb-1 animate-in fade-in slide-in-from-left-2 duration-200"
             >
               <div className="flex justify-between opacity-60 text-[9px]">
-                <span>[{log.timestamp}] {log.action?.toUpperCase()}</span>
+                <span>
+                  [{log.timestamp}] {log.action?.toUpperCase()}
+                </span>
                 <span>{log.strategyId || 'SYSTEM'}</span>
               </div>
               {log.error ? (
@@ -56,7 +58,28 @@ export const EventLog = ({ logs }: EventLogProps) => {
               ) : (
                 <div className="flex flex-col gap-1 mt-0.5">
                   <div className="text-green-400 break-words">
-                    &gt;&gt; {typeof log.result === 'object' ? JSON.stringify(log.result) : String(log.result)}
+                    {(() => {
+                      if (!log.result) return '';
+                      if (typeof log.result !== 'object') return `>> ${log.result}`;
+
+                      const res = (log.result as Record<string, unknown>)?.result || log.result;
+                      const action = (res as Record<string, unknown>).action || 'unknown';
+                      const signal = (res as Record<string, unknown>).signal || '';
+                      const reason = (res as Record<string, unknown>).reason || '';
+                      const metrics = (res as Record<string, unknown>).metrics
+                        ? ` | METRICS: ${JSON.stringify((res as Record<string, unknown>).metrics)}`
+                        : '';
+
+                      return (
+                        <div className="flex flex-col gap-0.5">
+                          <div className="font-bold">
+                            &gt;&gt; ACTION: {action.toUpperCase()} {signal && `[${signal}]`}
+                          </div>
+                          {reason && <div className="opacity-80 italic">&gt; REASON: {reason}</div>}
+                          {metrics && <div className="text-[8px] opacity-60 truncate">{metrics}</div>}
+                        </div>
+                      );
+                    })()}
                   </div>
                   {log.transactionSignatures && log.transactionSignatures.length > 0 && (
                     <div className="bg-[#1A1A1A] p-1 border-l-2 border-green-500 text-[8px] flex flex-col gap-0.5">
