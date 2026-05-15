@@ -218,6 +218,8 @@ export class MeteoraApiProvider implements IPositionProvider {
             isInRange,
             openedAt,
             pnlData: pos,
+            state: pos.isClosed ? 'CLOSED' : 'OPEN',
+            closedAt: pos.closedAt || undefined,
             metadata: {
               leverage: 10,
               feeX: pos.fee_x || '0',
