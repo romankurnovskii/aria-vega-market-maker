@@ -19,7 +19,16 @@ import YAML from 'yamljs';
 import { fileURLToPath } from 'url';
 import path, { dirname } from 'path';
 
-import { IStore, IOrchestratorRegistry, IExecutor, IPositionProvider, IPositionStore, Position } from '@lp-system/core';
+import {
+  IStore,
+  IOrchestratorRegistry,
+  IExecutor,
+  IPositionProvider,
+  IPositionStore,
+  Position,
+  PoolInfo,
+  MarketSnapshot,
+} from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
 import { getPriceFromBinId } from '@lp-system/providers';
