@@ -28,6 +28,8 @@ export class MeteoraApiProvider implements IPositionProvider {
   >();
 
   private getPositionsCache = new Map<string, { data: Position[]; timestamp: number }>();
+  private poolInfoCache = new Map<string, { data: PoolInfo; timestamp: number }>();
+  private marketSnapshotCache = new Map<string, { data: MarketSnapshot; timestamp: number }>();
 
   /**
    * Constructs the provider with the Meteora API base URL.
@@ -85,7 +87,7 @@ export class MeteoraApiProvider implements IPositionProvider {
    * Can accept an optional poolAddress parameter. If not provided, it attempts
    * to fetch open portfolio information to discover the pools.
    *
-   * Implements a 3-second LRU cache to prevent redundant requests during batch calls.
+   * Implements a 30-second LRU cache to prevent redundant requests during batch calls.
    *
    * @param {string} walletAddress - Solana wallet public key.
    * @param {string} [poolAddress] - Optional specific pool address to query.
@@ -96,7 +98,8 @@ export class MeteoraApiProvider implements IPositionProvider {
     const cached = this.getPositionsCache.get(cacheKey);
     const now = Date.now();
 
-    if (cached && now - cached.timestamp < 3000) {
+    // Cache TTL: 30 seconds
+    if (cached && now - cached.timestamp < 30000) {
       return cached.data;
     }
 
@@ -269,6 +272,13 @@ export class MeteoraApiProvider implements IPositionProvider {
    * @returns {Promise<PoolInfo>} Pool configuration and token addresses.
    */
   public async getPoolInfo(poolAddress: string): Promise<PoolInfo> {
+    const cached = this.poolInfoCache.get(poolAddress);
+    const now = Date.now();
+
+    if (cached && now - cached.timestamp < 10000) {
+      return cached.data;
+    }
+
     logger.info(`[MeteoraApiProvider] Fetching pool metadata for ${poolAddress}`);
     const url = `${this.apiUrl}/pools/${poolAddress}`;
 
@@ -295,7 +305,7 @@ export class MeteoraApiProvider implements IPositionProvider {
 
     const feeRate = data.dynamic_fee_pct > 0 ? data.dynamic_fee_pct : data.pool_config.base_fee_pct / 100;
 
-    return {
+    const poolInfo: PoolInfo = {
       poolAddress: data.address,
       chain: 'solana',
       protocol: 'meteora_dlmm',
@@ -308,6 +318,9 @@ export class MeteoraApiProvider implements IPositionProvider {
       tokenXMint: data.token_x.address,
       tokenYMint: data.token_y.address,
     };
+
+    this.poolInfoCache.set(poolAddress, { data: poolInfo, timestamp: now });
+    return poolInfo;
   }
 
   /**
@@ -317,6 +330,13 @@ export class MeteoraApiProvider implements IPositionProvider {
    * @returns {Promise<MarketSnapshot>} Live market data including price history.
    */
   public async getMarketSnapshot(poolAddress: string): Promise<MarketSnapshot> {
+    const cached = this.marketSnapshotCache.get(poolAddress);
+    const now = Date.now();
+
+    if (cached && now - cached.timestamp < 10000) {
+      return cached.data;
+    }
+
     logger.info(`[MeteoraApiProvider] Assembling Market Snapshot for pool ${poolAddress}`);
 
     const poolInfoUrl = `${this.apiUrl}/pools/${poolAddress}`;
@@ -378,7 +398,7 @@ export class MeteoraApiProvider implements IPositionProvider {
       `[MeteoraApiProvider] Assembling Market Snapshot for pool ${poolAddress} - price=${poolData.current_price}, activeBinId=${activeBinId}, feeRate=${feeRate}`
     );
 
-    return {
+    const snapshot: MarketSnapshot = {
       poolAddress: poolData.address,
       chain: 'solana',
       protocol: 'meteora_dlmm',
@@ -389,5 +409,8 @@ export class MeteoraApiProvider implements IPositionProvider {
       feeRate,
       capturedAt: Date.now(),
     };
+
+    this.marketSnapshotCache.set(poolAddress, { data: snapshot, timestamp: now });
+    return snapshot;
   }
 }

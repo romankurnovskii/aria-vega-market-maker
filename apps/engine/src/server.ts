@@ -75,48 +75,69 @@ export function startHttpServer(
         positions = await positionProvider.getPositions(walletAddress);
       }
 
-      const livePositions = await positionProvider.getPositions(walletAddress).catch(() => []);
+      // Reuse positions if we just fetched them from provider, otherwise fetch live for PnL
+      const livePositions = positionStore ? await positionProvider.getPositions(walletAddress).catch(() => []) : positions;
 
-      // Fetch and enrich positions with price/range data
-      const positionsWithPriceData = await Promise.all(
-        positions.map(async (pos) => {
+      // Batch fetch pool metadata and market snapshots to avoid N+1 redundancy
+      const uniquePools = [...new Set(positions.map((p) => p.poolAddress))];
+      const poolDataMap = new Map<string, { poolInfo: PoolInfo; market: MarketSnapshot }>();
+
+      await Promise.all(
+        uniquePools.map(async (poolAddress) => {
           try {
-            const poolInfo = await positionProvider.getPoolInfo(pos.poolAddress);
-            const market = await positionProvider.getMarketSnapshot(pos.poolAddress);
-
-            const lowerBoundPrice = getPriceFromBinId(
-              pos.lowerBound,
-              poolInfo.binStep,
-              pos.tokenX.decimals,
-              pos.tokenY.decimals
-            );
-            const upperBoundPrice = getPriceFromBinId(
-              pos.upperBound,
-              poolInfo.binStep,
-              pos.tokenX.decimals,
-              pos.tokenY.decimals
-            );
-
-            const binCount = pos.upperBound - pos.lowerBound + 1;
-            const rangePercent = ((upperBoundPrice - lowerBoundPrice) / lowerBoundPrice) * 100;
-
-            const livePnl = livePositions.find((lp) => lp.id === pos.id)?.pnlData || pos.pnlData;
-
-            return {
-              ...pos,
-              lowerBoundPrice,
-              upperBoundPrice,
-              activeBin: market.activeBound,
-              binCount,
-              rangePercent,
-              pnlData: livePnl,
-            };
+            const [poolInfo, market] = await Promise.all([
+              positionProvider.getPoolInfo(poolAddress),
+              positionProvider.getMarketSnapshot(poolAddress),
+            ]);
+            poolDataMap.set(poolAddress, { poolInfo, market });
           } catch (e) {
-            logger.warn(`Failed to enrich position ${pos.id} with price data: ${e}`);
-            return pos;
+            logger.warn(`Failed to fetch metadata for pool ${poolAddress}: ${e}`);
           }
         })
       );
+
+      // Enrich positions with price/range data using the batched metadata
+      const positionsWithPriceData = positions.map((pos) => {
+        try {
+          const poolData = poolDataMap.get(pos.poolAddress);
+          if (!poolData) {
+            return pos;
+          }
+
+          const { poolInfo, market } = poolData;
+
+          const lowerBoundPrice = getPriceFromBinId(
+            pos.lowerBound,
+            poolInfo.binStep,
+            pos.tokenX.decimals,
+            pos.tokenY.decimals
+          );
+          const upperBoundPrice = getPriceFromBinId(
+            pos.upperBound,
+            poolInfo.binStep,
+            pos.tokenX.decimals,
+            pos.tokenY.decimals
+          );
+
+          const binCount = pos.upperBound - pos.lowerBound + 1;
+          const rangePercent = lowerBoundPrice > 0 ? ((upperBoundPrice - lowerBoundPrice) / lowerBoundPrice) * 100 : 0;
+
+          const livePnl = livePositions.find((lp) => lp.id === pos.id)?.pnlData || pos.pnlData;
+
+          return {
+            ...pos,
+            lowerBoundPrice,
+            upperBoundPrice,
+            activeBin: market.activeBound,
+            binCount,
+            rangePercent,
+            pnlData: livePnl,
+          };
+        } catch (e) {
+          logger.warn(`Failed to enrich position ${pos.id} with price data: ${e}`);
+          return pos;
+        }
+      });
 
       res.json({
         wallet: walletAddress,
