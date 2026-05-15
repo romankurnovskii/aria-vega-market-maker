@@ -255,6 +255,22 @@ export class JsonFileStore implements IStore {
 
       const index = tasks.findIndex((t) => t.id === task.id);
       if (index >= 0) {
+        const existing = tasks[index];
+        // Concurrency Guard: Prevent double-claiming
+        const isExecuting = (s: string) => s === 'executing_close' || s === 'executing_open';
+        
+        if (isExecuting(task.status) && isExecuting(existing.status)) {
+          // If we are already executing on disk, we only allow saving if this is an update (more events)
+          // and NOT a fresh claim attempt from another process that still thinks it's claiming.
+          const taskEvents = task.events?.length || 0;
+          const existingEvents = existing.events?.length || 0;
+          
+          if (taskEvents <= existingEvents && task.status === existing.status) {
+            throw new Error(
+              `Concurrency Violation: Task ${task.id} is already being executed by another process (Status: ${existing.status}).`
+            );
+          }
+        }
         tasks[index] = task;
       } else {
         tasks.push(task);

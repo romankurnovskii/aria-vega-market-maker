@@ -24,9 +24,7 @@ import {
   Decision,
   Position,
   RebalanceTask,
-  ExecutionRecord,
   Assignment,
-  PoolInfo,
 } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
@@ -36,6 +34,7 @@ import { isDeepStrictEqual } from 'node:util';
 const logger = getLogger('lifecycle');
 
 let tickLoopRunning = false;
+let monitorInitialRun = true;
 
 import { PublicKey, Connection } from '@solana/web3.js';
 
@@ -76,28 +75,6 @@ async function getWalletBalances(
   return { amountX, amountY };
 }
 
-async function calculateRecoveredFunds(
-  task: RebalanceTask,
-  rpcPool: IRpcProvider,
-  walletAddress: string,
-  poolInfo: PoolInfo,
-  tasksStore: { saveTask: (t: RebalanceTask) => Promise<void> }
-): Promise<void> {
-  if (!task.preCloseBalances) return;
-  const currentBalances = await rpcPool.execute(async (connection: Connection) => {
-    return await getWalletBalances(connection, walletAddress, poolInfo.tokenXAddress, poolInfo.tokenYAddress);
-  });
-  const deltaX = BigInt(currentBalances.amountX) - BigInt(task.preCloseBalances.tokenX);
-  const deltaY = BigInt(currentBalances.amountY) - BigInt(task.preCloseBalances.tokenY);
-  task.recoveredFunds = {
-    tokenX: deltaX > 0n ? deltaX.toString() : '0',
-    tokenY: deltaY > 0n ? deltaY.toString() : '0',
-  };
-  logger.info(
-    `[Execution Monitor] Crash recovery detected. Recovered funds: X=${task.recoveredFunds.tokenX}, Y=${task.recoveredFunds.tokenY}`
-  );
-  await tasksStore.saveTask(task);
-}
 /**
  * Starts the one-time position discovery cycle.
  * Fetches live on-chain positions, identifies new vs closed, and registers new orchestrators.
@@ -256,10 +233,7 @@ export async function processTasks(
   store: IStore,
   executor: IExecutor,
   positionProvider: IPositionProvider,
-  rpcPool: IRpcProvider,
-  walletAddress: string,
   registry: IOrchestratorRegistry,
-  positionStore: IPositionStore,
   factory?: OrchestratorFactory
 ): Promise<void> {
   const tasksStore = store as unknown as {
@@ -275,419 +249,118 @@ export async function processTasks(
 
   logger.info(`[Execution Monitor] Found ${tasks.length} active task(s) in task store.`);
 
-  for (const task of [...tasks]) {
+  // Boot Recovery: Revert stuck executing tasks to pending states on first run
+  if (monitorInitialRun) {
+    let recoveredCount = 0;
+    for (const task of tasks) {
+      if (task.status === 'executing_close') {
+        task.status = 'pending_close';
+        await tasksStore.saveTask(task);
+        recoveredCount++;
+      } else if (task.status === 'executing_open') {
+        task.status = 'pending_open';
+        await tasksStore.saveTask(task);
+        recoveredCount++;
+      }
+    }
+    if (recoveredCount > 0) {
+      logger.info(`[Execution Monitor] Boot Recovery: Reverted ${recoveredCount} stuck task(s) to pending states.`);
+    }
+    monitorInitialRun = false;
+  }
+
+  for (const task of tasks) {
     try {
-      logger.info(`[Execution Monitor] Processing task ${task.id} (${task.status}) for position ${task.originalPositionId}`);
-
-      // Ensure events array is initialized
-      if (!task.events) {
-        task.events = [];
-      }
-
-      // 1. Timeout check (fail-safe) with Auto-Heal Timeout Pruning
-      const MAX_TASK_AGE_MS = 5 * 60 * 1000; // 5 minutes
+      // 1. Timeout check (fail-safe)
+      const MAX_TASK_AGE_MS = 10 * 60 * 1000; // 10 minutes
       if (Date.now() - task.evaluatedAt > MAX_TASK_AGE_MS) {
-        logger.error(
-          `[Execution Monitor] [ALERT] RebalanceTask ${task.id} has been active for over 5 minutes. Idle capital warning!`
-        );
-        if (!task.events.some((e) => e.stage === 'TIMEOUT')) {
-          task.events.push({
-            stage: 'TIMEOUT',
-            timestamp: Date.now(),
-            message: 'Task exceeded maximum age. Auto-heal initiated.',
-          });
-        }
-
-        // Auto-Heal Pruning: Archive the position as FAILED to prevent ghost position leakage
-        const knownPositions = await positionStore.getKnown();
-        const cachedPos = knownPositions.find((p) => p.id === task.originalPositionId);
-        if (cachedPos) {
-          const posId = cachedPos.id;
-          cachedPos.state = 'FAILED';
-          cachedPos.closedAt = Date.now();
-          await positionStore.archivePosition(cachedPos);
-
-          const remaining = knownPositions.filter((p) => p.id !== posId);
-          await positionStore.saveKnown(remaining);
-          logger.warn(`[Execution Monitor] Auto-Heal: Archived cached position ${posId} as FAILED due to task timeout.`);
-        }
-
-        // Archive the task to the historical tasks history ledger
-        const storeWithArchive = store as unknown as {
-          archiveTask?: (t: RebalanceTask) => Promise<void>;
-          deleteTask: (id: string) => Promise<void>;
-        };
-
-        if (typeof storeWithArchive.archiveTask === 'function') {
-          await storeWithArchive.archiveTask(task);
-          logger.info(`[Execution Monitor] Stuck task ${task.id} archived successfully.`);
-        } else {
-          await storeWithArchive.deleteTask(task.id);
-          logger.warn(`[Execution Monitor] archiveTask not available; deleted stuck task ${task.id} from queue.`);
-        }
-
-        continue; // Abort processing this task, move to next task
-      }
-
-      if (task.status === 'pending_close') {
-        const poolAddress = task.intent.openParams?.poolAddress || task.intent.positionId;
-        const poolInfo = await positionProvider.getPoolInfo(poolAddress);
-        const market = await positionProvider.getMarketSnapshot(poolInfo.poolAddress);
-
-        // Fetch initial balances to detect changes/increases later
-        const initialBalances = await rpcPool.execute(async (connection: Connection) => {
-          logger.info('Wallet: ' + walletAddress + ' ' + poolInfo.tokenXAddress + ' ' + poolInfo.tokenYAddress);
-          return await getWalletBalances(connection, walletAddress, poolInfo.tokenXAddress, poolInfo.tokenYAddress);
-        });
-
-        // Transition Position State in local cache
-        const knownPositions = await positionStore.getKnown();
-        const cachedPos = knownPositions.find((p) => p.id === task.originalPositionId);
-        const amountX = cachedPos?.tokenX.amount ?? '0';
-        const amountY = cachedPos?.tokenY.amount ?? '0';
-        if (cachedPos) {
-          const newState = task.intent.action === 'close' ? 'CLOSING' : 'REBALANCING';
-          cachedPos.state = newState;
-          await positionStore.saveKnown(knownPositions);
-          logger.info(`[Execution Monitor] Position ${task.originalPositionId} state updated to ${newState}`);
-        }
-
-        task.expectedDeltaX = amountX;
-        task.expectedDeltaY = amountY;
-
-        logger.info(
-          `[Execution Monitor] Executing CLOSE transaction for task ${task.id}... ` +
-            `(expectedDeltaX=${task.expectedDeltaX}, expectedDeltaY=${task.expectedDeltaY})`
-        );
-        const closeDecision: Decision = {
-          ...task.intent,
-          action: 'close' as const,
-        };
-
-        // --- Log CLOSE_BROADCAST ---
-        task.preCloseBalances = {
-          tokenX: initialBalances.amountX,
-          tokenY: initialBalances.amountY,
-          timestamp: Date.now(),
-        };
-        task.events.push({
-          stage: 'CLOSE_BROADCAST',
-          timestamp: Date.now(),
-          message: `Broadcasting close transaction for position ${task.originalPositionId}`,
-        });
-        await tasksStore.saveTask(task);
-
-        let record;
-        try {
-          record = await executor.apply(closeDecision, market, async () => {
-            return { action: 'skip' };
-          });
-          if (record.status === 'failed') {
-            if (
-              record.error &&
-              (record.error.includes('not found on-chain') || record.error.includes('Cannot close position'))
-            ) {
-              logger.warn(
-                `[Execution Monitor] Position ${task.originalPositionId} was not found on-chain (already closed). Proceeding with rebalance flow.`
-              );
-              await calculateRecoveredFunds(task, rpcPool, walletAddress, poolInfo, tasksStore);
-              record = { status: 'success' as const, txSignatures: [] };
-            } else {
-              throw new Error(`Close transaction failed: ${record.error}`);
-            }
-          }
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          if (msg.includes('not found on-chain') || msg.includes('Cannot close position')) {
-            logger.warn(
-              `[Execution Monitor] Position ${task.originalPositionId} was not found on-chain (already closed). Proceeding with rebalance flow.`
-            );
-            await calculateRecoveredFunds(task, rpcPool, walletAddress, poolInfo, tasksStore);
-            record = { status: 'success' as const, txSignatures: [] };
-          } else {
-            task.events.push({
-              stage: 'ERROR',
-              timestamp: Date.now(),
-              message: `Close transaction failed: ${msg}`,
-              error: msg,
-            });
-            await tasksStore.saveTask(task);
-
-            if (cachedPos) {
-              const posId = cachedPos.id;
-              cachedPos.state = 'FAILED';
-              cachedPos.closedAt = Date.now();
-              await positionStore.archivePosition(cachedPos);
-              await positionStore.saveKnown(knownPositions);
-              logger.error(
-                `[Execution Monitor] Position ${posId} state updated to FAILED and archived due to close failure.`
-              );
-            }
-
-            throw err;
-          }
-        }
-
-        // --- Log CLOSE_CONFIRMED ---
-        task.events.push({
-          stage: 'CLOSE_CONFIRMED',
-          timestamp: Date.now(),
-          message: `Close transaction confirmed. Signatures: ${record.txSignatures?.join(', ') || 'none'}`,
-          txSignature: record.txSignatures?.[0],
-        });
-        await tasksStore.saveTask(task);
-        task.events.push({
-          stage: 'POSITION_CLOSED',
-          timestamp: Date.now(),
-          message: 'Position closed successfully. Decoupling open leg for stateless rebalancing.',
-        });
-        task.events.push({
-          stage: 'COMPLETED',
-          timestamp: Date.now(),
-          message: 'Close leg completed successfully.',
-        });
-        await tasksStore.saveTask(task);
-
-        if (cachedPos) {
-          const posId = cachedPos.id;
-          if (task.intent.action === 'close') {
-            cachedPos.state = 'CLOSED';
-            cachedPos.closedAt = Date.now();
-            await positionStore.archivePosition(cachedPos);
-            const remaining = knownPositions.filter((p) => p.id !== posId);
-            await positionStore.saveKnown(remaining);
-            logger.info(`[Execution Monitor] Pure closed position ${posId} archived and pruned from known positions cache.`);
-          } else {
-            cachedPos.state = 'REBALANCING';
-            await positionStore.saveKnown(knownPositions);
-            logger.info(
-              `[Execution Monitor] Position ${posId} closed. Marked as REBALANCING for stateless open on next tick.`
-            );
-          }
-        }
+        logger.error(`[Execution Monitor] Task ${task.id} timed out. Archiving.`);
         await tasksStore.deleteTask(task.id);
         continue;
       }
 
-      if (task.status === 'pending_open') {
-        const poolAddress = task.intent.openParams?.poolAddress || task.intent.positionId;
-        const poolInfo = await positionProvider.getPoolInfo(poolAddress);
-        const market = await positionProvider.getMarketSnapshot(poolInfo.poolAddress);
+      // Leg 1: The Close
+      if (task.status === 'pending_close') {
+        // ATOMIC CLAIM
+        try {
+          task.status = 'executing_close';
+          await tasksStore.saveTask(task);
+          logger.info(`[Execution Monitor] Claimed task ${task.id} for close.`);
+        } catch {
+          logger.warn(`[Execution Monitor] Task ${task.id} already claimed.`);
+          continue;
+        }
 
-        logger.info(`[Execution Monitor] Executing OPEN transaction for task ${task.id}...`);
-        // --- Log OPEN_BROADCAST ---
-        task.events.push({
-          stage: 'OPEN_BROADCAST',
-          timestamp: Date.now(),
-          message: `Broadcasting open transaction with params: ${JSON.stringify(task.intent.openParams)}`,
-        });
+        const poolAddress = task.intent.openParams?.poolAddress || task.intent.positionId;
+        const market = await positionProvider.getMarketSnapshot(poolAddress);
+
+        const closeDecision: Decision = { ...task.intent, action: 'close' as const };
+        task.events.push({ stage: 'CLOSE_BROADCAST', timestamp: Date.now() });
         await tasksStore.saveTask(task);
 
-        let existingRecord: ExecutionRecord | undefined;
-        if (task.newPositionId) {
-          existingRecord = {
-            id: 'idemp_' + task.id,
-            decision: task.intent,
-            txSignatures: [],
-            status: 'success',
-            executedAt: Date.now(),
-            newPositionId: task.newPositionId,
-            recordVersion: 1,
-          };
-        } else {
-          const records = await store.getExecutionRecords();
-          existingRecord = records.find(
-            (r) =>
-              r.decision.sourceAssignmentId === task.assignmentId &&
-              r.decision.action === 'open' &&
-              r.status === 'success' &&
-              r.executedAt >= task.evaluatedAt
-          );
-          if (existingRecord && existingRecord.newPositionId) {
-            task.newPositionId = existingRecord.newPositionId;
-            await tasksStore.saveTask(task);
-          }
-        }
-
-        let record: ExecutionRecord;
-        if (existingRecord && existingRecord.newPositionId) {
-          logger.info(
-            `[Execution Monitor] Idempotency check: Task ${task.id} already executed (newPositionId: ${existingRecord.newPositionId}). Skipping executor.apply.`
-          );
-          record = existingRecord;
-        } else {
-          try {
-            const openIntent: Decision = {
-              ...task.intent,
-              positionId: poolAddress,
-            };
-            record = await executor.apply(openIntent, market, async () => {
-              return { action: 'skip' };
-            });
-            if (record.status === 'failed') {
-              throw new Error(`Open transaction failed: ${record.error}`);
-            }
-          } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : String(err);
-            task.events.push({
-              stage: 'ERROR',
-              timestamp: Date.now(),
-              message: `Open transaction failed: ${msg}`,
-              error: msg,
-            });
-            await tasksStore.saveTask(task);
-
-            const knownPositions = await positionStore.getKnown();
-            const cachedPos = knownPositions.find((p) => p.id === task.originalPositionId);
-            if (cachedPos) {
-              const posId = cachedPos.id;
-              cachedPos.state = 'FAILED';
-              cachedPos.closedAt = Date.now();
-              await positionStore.archivePosition(cachedPos);
-              await positionStore.saveKnown(knownPositions);
-              logger.error(
-                `[Execution Monitor] Rebalance failed during open leg. Cached position ${posId} state updated to FAILED and archived.`
-              );
-            }
-
-            throw err;
-          }
-        }
-
-        await store.saveExecutionRecord(record);
-
-        logger.info(`[Execution Monitor] 🎉 SUCCESS: RebalanceTask ${task.id} has successfully completed!`);
-        logger.info(
-          `[Execution Monitor] Transmitted transaction signature(s): ${record.txSignatures?.join(', ') || 'none'}`
-        );
-
-        // --- Log OPEN_CONFIRMED ---
-        task.events.push({
-          stage: 'OPEN_CONFIRMED',
-          timestamp: Date.now(),
-          message: `Open transaction confirmed. Signatures: ${record.txSignatures?.join(', ') || 'none'}`,
-          txSignature: record.txSignatures?.[0],
-        });
-        // --- Log COMPLETED ---
-        task.events.push({
-          stage: 'COMPLETED',
-          timestamp: Date.now(),
-          message: 'Rebalance task completed successfully.',
-        });
-
-        // Update task and assignments with newPositionId on successful open
-        const newPositionId = record.newPositionId;
-        if (newPositionId) {
-          task.newPositionId = newPositionId;
+        const record = await executor.apply(closeDecision, market);
+        if (record.status === 'failed') {
+          task.status = 'pending_close'; // Revert to allow retry
+          task.events.push({ stage: 'ERROR', timestamp: Date.now(), error: record.error });
           await tasksStore.saveTask(task);
+          continue;
+        }
 
-          const assignmentsList = await store.getAssignments();
-          const matchingAssignments = assignmentsList.filter(
-            (a) => a.id === task.assignmentId || a.positionId === task.originalPositionId
-          );
+        task.events.push({ stage: 'CLOSE_CONFIRMED', timestamp: Date.now(), txSignature: record.txSignatures[0] });
 
-          for (const assignment of matchingAssignments) {
-            logger.info(
-              `[Execution Monitor] Updating assignment ${assignment.id} position ID from ${assignment.positionId} to ${newPositionId}`
-            );
-            assignment.positionId = newPositionId;
-            await store.saveAssignment(assignment);
+        if (task.intent.action === 'close+open') {
+          task.status = 'pending_open';
+          await tasksStore.saveTask(task);
+        } else {
+          await tasksStore.deleteTask(task.id);
+        }
+        continue;
+      }
 
-            // Register a new orchestrator for the new position ID if factory is available
-            if (factory) {
-              const newOrch = factory.create(assignment);
-              registry.register(newOrch);
-            }
-          }
+      // Leg 2: The Open
+      if (task.status === 'pending_open') {
+        // ATOMIC CLAIM
+        try {
+          task.status = 'executing_open';
+          await tasksStore.saveTask(task);
+          logger.info(`[Execution Monitor] Claimed task ${task.id} for open.`);
+        } catch {
+          logger.warn(`[Execution Monitor] Task ${task.id} already claimed.`);
+          continue;
+        }
 
-          // Fetch the fresh position and update positionStore cache seamlessly
-          try {
-            let freshNewPos: Position | undefined;
-            try {
-              freshNewPos = await positionProvider.getPosition(newPositionId, poolInfo.poolAddress);
-            } catch {
-              logger.warn(
-                `[Execution Monitor] Position ${newPositionId} not yet indexed by API. Synthesizing temporary position to prevent blind rebalances.`
-              );
-              const openParams = task.intent.openParams;
-              if (openParams) {
-                const lowerBinId =
-                  openParams.lowerBinId !== undefined ? openParams.lowerBinId : (openParams.lowerBound ?? 0);
-                const upperBoundId =
-                  openParams.upperBinId !== undefined ? openParams.upperBinId : (openParams.upperBound ?? 0);
-                const decimalsX = poolInfo.tokenXAddress === 'So11111111111111111111111111111111111111112' ? 9 : 6;
-                const decimalsY = poolInfo.tokenYAddress === 'So11111111111111111111111111111111111111112' ? 9 : 6;
-                freshNewPos = {
-                  id: newPositionId,
-                  poolAddress: poolInfo.poolAddress,
-                  chain: 'solana',
-                  protocol: 'meteora_dlmm',
-                  lowerBound: lowerBinId,
-                  upperBound: upperBoundId,
-                  lowerBinId,
-                  upperBinId: upperBoundId,
-                  tokenX: {
-                    amount: openParams.tokenXAmount || '0',
-                    decimals: decimalsX,
-                    mint: poolInfo.tokenXAddress || '',
-                    tokenAddress: poolInfo.tokenXAddress || '',
-                  },
-                  tokenY: {
-                    amount: openParams.tokenYAmount || '0',
-                    decimals: decimalsY,
-                    mint: poolInfo.tokenYAddress || '',
-                    tokenAddress: poolInfo.tokenYAddress || '',
-                  },
-                  isInRange: true,
-                  openedAt: Date.now(),
-                  metadata: {
-                    leverage: 10,
-                    feeX: '0',
-                    feeY: '0',
-                  },
-                };
-              }
-            }
+        const openPoolAddress = task.intent.openParams?.poolAddress || task.intent.positionId;
+        const market = await positionProvider.getMarketSnapshot(openPoolAddress);
+        const openIntent: Decision = { ...task.intent, action: 'open' };
 
-            if (freshNewPos) {
-              freshNewPos.state = 'OPEN';
+        task.events.push({ stage: 'OPEN_BROADCAST', timestamp: Date.now() });
+        await tasksStore.saveTask(task);
 
-              const knownPositions = await positionStore.getKnown();
-              const filteredKnown = knownPositions.filter((p) => p.id !== task.originalPositionId);
+        const record = await executor.apply(openIntent, market);
+        if (record.status === 'failed') {
+          task.status = 'pending_open'; // Revert
+          task.events.push({ stage: 'ERROR', timestamp: Date.now(), error: record.error });
+          await tasksStore.saveTask(task);
+          continue;
+        }
 
-              // Archive old position as CLOSED
-              const oldPos = knownPositions.find((p) => p.id === task.originalPositionId);
-              if (oldPos) {
-                oldPos.state = 'CLOSED';
-                oldPos.closedAt = Date.now();
-                await positionStore.archivePosition(oldPos);
-                logger.info(`[Execution Monitor] Rebalanced old position ${oldPos.id} archived as CLOSED.`);
-              }
+        task.events.push({ stage: 'OPEN_CONFIRMED', timestamp: Date.now(), txSignature: record.txSignatures[0] });
 
-              filteredKnown.push(freshNewPos);
-              await positionStore.saveKnown(filteredKnown);
-              logger.info(
-                `[Execution Monitor] Successfully cached new position ${newPositionId} and pruned old position ${task.originalPositionId}`
-              );
-            }
-          } catch (cacheError) {
-            logger.error(
-              `[Execution Monitor] Failed to update positionStore cache immediately for new position ${newPositionId}: ${
-                cacheError instanceof Error ? cacheError.message : String(cacheError)
-              }. Aborting task deletion.`
-            );
-            throw cacheError; // Propagate so task is not deleted
-          }
+        // Update assignments
+        const assignments = await tasksStore.getAssignments();
+        const matching = assignments.filter((a) => a.id === task.assignmentId);
+        for (const a of matching) {
+          a.positionId = record.newPositionId!;
+          await store.saveAssignment(a);
+          if (factory) registry.register(factory.create(a));
         }
 
         await tasksStore.deleteTask(task.id);
+        logger.info(`[Execution Monitor] Task ${task.id} completed.`);
+        continue;
       }
-    } catch (err: unknown) {
-      logger.error(
-        `[Execution Monitor] Error processing task ${task.id}: ${
-          err instanceof Error ? err.stack || err.message : String(err)
-        }`
-      );
+    } catch (err) {
+      logger.error(`[Execution Monitor] Error processing task ${task.id}: ${err}`);
     }
   }
 }
@@ -739,8 +412,22 @@ export function startTickLoop(
     try {
       logger.info('[Tick Loop] Starting tick execution cycle...');
 
-      // 1. Run Execution Monitor to process in-flight stateful tasks first
-      await processTasks(store, executor, positionProvider, rpcPool, walletAddress, registry, positionStore, factory).catch(
+      // 1. Run Position Discovery to synchronize local state with on-chain reality
+      if (factory) {
+        await startDiscovery(
+          walletAddress,
+          positionProvider,
+          positionStore,
+          factory,
+          store,
+          registry
+        ).catch((err) => {
+          logger.error(`[Tick Loop] Error in startDiscovery: ${err instanceof Error ? err.message : String(err)}`);
+        });
+      }
+
+      // 2. Run Execution Monitor to process in-flight stateful tasks first
+      await processTasks(store, executor, positionProvider, registry, factory).catch(
         (err) => {
           logger.error(`[Tick Loop] Error in processTasks: ${err instanceof Error ? err.message : String(err)}`);
         }
@@ -931,10 +618,7 @@ export function startTickLoop(
               store,
               executor,
               positionProvider,
-              rpcPool,
-              walletAddress,
               registry,
-              positionStore,
               factory
             ).catch((err) => {
               logger.error(

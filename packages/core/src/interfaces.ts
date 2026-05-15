@@ -58,11 +58,7 @@ export interface IExecutionGate {
 }
 
 export interface IExecutor {
-  apply(
-    decision: Decision,
-    market: MarketSnapshot,
-    reEvaluate: (positionId: string) => Promise<StrategyResult>
-  ): Promise<ExecutionRecord>;
+  apply(decision: Decision, market: MarketSnapshot): Promise<ExecutionRecord>;
   setReEvaluate(reEvaluate: (positionId: string) => Promise<StrategyResult>): void;
 }
 
