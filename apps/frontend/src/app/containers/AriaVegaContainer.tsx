@@ -115,11 +115,14 @@ export const AriaVegaContainer = () => {
   // Fetch all state from API
   const syncState = async (): Promise<void> => {
     try {
-      const [healthRes, positionsRes, assignmentsRes, strategiesRes, stepsRes] = await Promise.all([
+      const [healthRes, positionsRes, closedPositionsRes, assignmentsRes, strategiesRes, stepsRes] = await Promise.all([
         fetch(`${API_URL}/health`)
           .then((r) => r.json())
           .catch(() => ({ status: 'offline', timestamp: Date.now() })),
         fetch(`${API_URL}/positions`)
+          .then((r) => r.json())
+          .catch(() => ({ count: 0, positions: [] })),
+        fetch(`${API_URL}/positions/closed`)
           .then((r) => r.json())
           .catch(() => ({ count: 0, positions: [] })),
         fetch(`${API_URL}/assignments`)

@@ -87,6 +87,8 @@ export const PositionDetail = ({
     onEvaluate(position.id, selectedStrategyId);
   };
 
+  const isClosed = position.state === 'CLOSED';
+
   return (
     <div className="flex flex-col gap-4 w-full lg:w-5/12 h-full min-h-0 animate-in slide-in-from-right-4 duration-300">
       {/* Actions Pane */}
@@ -122,21 +124,25 @@ export const PositionDetail = ({
           tokenYSym={tokenYSym}
         />
 
-        <OrchestrationControls
-          strategies={strategies}
-          selectedStrategyId={selectedStrategyId}
-          selectedMode={selectedMode}
-          onStrategyChange={setSelectedStrategyId}
-          onModeChange={setSelectedMode}
-          onAssign={handleAssign}
-          onEvaluate={handleEvaluate}
-        />
+        {!isClosed && (
+          <>
+            <OrchestrationControls
+              strategies={strategies}
+              selectedStrategyId={selectedStrategyId}
+              selectedMode={selectedMode}
+              onStrategyChange={setSelectedStrategyId}
+              onModeChange={setSelectedMode}
+              onAssign={handleAssign}
+              onEvaluate={handleEvaluate}
+            />
 
-        <PositionActionButtons
-          positionId={position.id}
-          state={position.state}
-          onRemoveLiquidity={onRemoveLiquidity}
-        />
+            <PositionActionButtons
+              positionId={position.id}
+              state={position.state}
+              onRemoveLiquidity={onRemoveLiquidity}
+            />
+          </>
+        )}
       </div>
 
       <EventLog logs={evalLogs} />
