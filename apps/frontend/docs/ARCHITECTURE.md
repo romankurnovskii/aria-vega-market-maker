@@ -21,6 +21,7 @@ The frontend connects to the `market-maker` engine REST API using a configurable
 1. **Mount**: Upon mounting, the component initiates parallel fetches to the following Express endpoints:
    - `GET /health` — Check engine liveness and fetch the server-side timestamp epoch.
    - `GET /positions` — Fetch active on-chain CLMM positions.
+   - `GET /positions/closed` — Fetch historical closed positions from persistent store.
    - `GET /assignments` — Fetch registered strategy assignments.
    - `GET /strategies` — Fetch introspected trading strategy definitions.
    - `GET /steps` — Fetch atomic stateless pipeline steps.
@@ -28,6 +29,7 @@ The frontend connects to the `market-maker` engine REST API using a configurable
 3. **Data Enrichment**:
    - Strategy IDs are enriched with human-friendly names and risk indicators (Low, Medium, High).
    - Stateless step IDs are paired with descriptions describing their individual validations/computations.
+   - Positions are grouped by status: "Open / Active" (top) and "Closed" (bottom with dimmed styling).
 
 ---
 
