@@ -64,18 +64,24 @@ export class VolatilityAwareStrategy implements IStrategy {
       `[VolatilityAwareStrategy] Finished evaluation. Signal: ${finalContext.signal || 'skip'}. Reason: ${finalContext.reason || 'None'}`
     );
 
+    const resultBase = {
+      signal: finalContext.signal as string,
+      reason: finalContext.reason,
+      metrics: finalContext.calculations,
+    };
+
     if (finalContext.signal === 'close+open' && finalContext.openParams) {
-      return { action: 'close+open', openParams: finalContext.openParams };
+      return { action: 'close+open', openParams: finalContext.openParams, ...resultBase };
     }
 
     if (finalContext.signal === 'close') {
-      return { action: 'close' };
+      return { action: 'close', ...resultBase };
     }
 
     if (finalContext.signal === 'open' && finalContext.openParams) {
-      return { action: 'open', openParams: finalContext.openParams };
+      return { action: 'open', openParams: finalContext.openParams, ...resultBase };
     }
 
-    return { action: 'skip' };
+    return { action: 'skip', ...resultBase };
   }
 }

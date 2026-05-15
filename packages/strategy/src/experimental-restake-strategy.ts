@@ -72,11 +72,18 @@ export class ExperimentalRestakeStrategy implements IStrategy {
       `[ExperimentalRestakeStrategy] Workflow evaluation complete. Signal: ${finalContext.signal || 'none'}, Reason: ${finalContext.reason || 'none'}`
     );
 
+    const resultBase = {
+      signal: finalContext.signal as string,
+      reason: finalContext.reason,
+      metrics: finalContext.calculations,
+    };
+
     if (finalContext.signal === 'close+open' && finalContext.openParams) {
       logger.info(`[ExperimentalRestakeStrategy] Decision: close+open with params`);
       return {
         action: 'close+open',
         openParams: finalContext.openParams,
+        ...resultBase,
       };
     }
 
@@ -84,6 +91,7 @@ export class ExperimentalRestakeStrategy implements IStrategy {
       logger.info(`[ExperimentalRestakeStrategy] Decision: close`);
       return {
         action: 'close',
+        ...resultBase,
       };
     }
 
@@ -92,12 +100,14 @@ export class ExperimentalRestakeStrategy implements IStrategy {
       return {
         action: 'open',
         openParams: finalContext.openParams,
+        ...resultBase,
       };
     }
 
     logger.info(`[ExperimentalRestakeStrategy] Decision: skip`);
     return {
       action: 'skip',
+      ...resultBase,
     };
   }
 }
