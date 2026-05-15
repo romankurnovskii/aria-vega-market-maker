@@ -186,7 +186,7 @@ test('Issue #14: should sanitize decision.positionId before calling executor.app
 
   m.tasks.push(task);
 
-  await processTasks(m.store, m.executor, m.positionProvider, m.registry);
+  await processTasks(m.store, m.executor, m.positionProvider, m.registry, m.positionStore);
 
   const appliedDecision = m.getAppliedDecision();
   assert.ok(appliedDecision, 'executor.apply should have been called');
@@ -230,7 +230,7 @@ test('Issue #14: regression guard - happy path open task completes successfully'
 
   m.tasks.push(task);
 
-  await processTasks(m.store, m.executor, m.positionProvider, m.registry);
+  await processTasks(m.store, m.executor, m.positionProvider, m.registry, m.positionStore);
 
   assert.strictEqual(m.tasks.length, 0, 'Task should be successfully completed and removed');
 });

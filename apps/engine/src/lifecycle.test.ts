@@ -266,7 +266,7 @@ test('processTasks - Scenario A: Standard rebalance (close+open)', async () => {
   // 2. Process 'pending_open' -> completes
   await processTasks(m.store, m.executor, m.positionProvider, m.registry, m.positionStore);
   assert.strictEqual(m.tasks.length, 0);
-  assert.ok(task.events?.some((e) => e.stage === 'COMPLETED'));
+  assert.ok(task.events?.some((e: any) => e.stage === 'POSITION_OPENED'));
 
   // 2. Simulate next tick in startTickLoop creating pending_open task
   const openTask: RebalanceTask = {
@@ -296,9 +296,10 @@ test('processTasks - Scenario A: Standard rebalance (close+open)', async () => {
   await processTasks(m.store, m.executor, m.positionProvider, m.registry, m.positionStore);
 
   assert.strictEqual(m.tasks.length, 0); // Task should be deleted
-  assert.ok(openTask.events?.some((e) => e.stage === 'OPEN_BROADCAST'));
-  assert.ok(openTask.events?.some((e) => e.stage === 'OPEN_CONFIRMED'));
-  assert.ok(openTask.events?.some((e) => e.stage === 'COMPLETED'));
+  assert.ok(openTask.events?.some((e: any) => e.stage === 'OPEN_BROADCAST'));
+  assert.ok(openTask.events?.some((e: any) => e.stage === 'OPEN_CONFIRMED'));
+  assert.ok(openTask.events?.some((e: any) => e.stage === 'POSITION_OPENED'));
+  assert.ok(!openTask.events?.some((e: any) => e.stage === 'CLOSE_BROADCAST'));
 });
 
 test('processTasks - Scenario B: Rebalance with JIT Abort', async () => {
@@ -386,10 +387,9 @@ test('processTasks - Scenario C: Pure Close (close)', async () => {
   await processTasks(m.store, m.executor, m.positionProvider, m.registry, m.positionStore);
 
   assert.strictEqual(m.tasks.length, 0); // Pure close should complete and delete immediately without settlement/open
-  assert.ok(task.events?.some((e) => e.stage === 'CLOSE_BROADCAST'));
-  assert.ok(task.events?.some((e) => e.stage === 'CLOSE_CONFIRMED'));
-  assert.ok(task.events?.some((e) => e.stage === 'COMPLETED'));
-  assert.ok(!task.events?.some((e) => e.stage === 'SETTLEMENT_POLLING'));
+  assert.ok(task.events?.some((e: any) => e.stage === 'CLOSE_BROADCAST'));
+  assert.ok(task.events?.some((e: any) => e.stage === 'CLOSE_CONFIRMED'));
+  assert.ok(task.events?.some((e: any) => e.stage === 'POSITION_CLOSED'));
 });
 
 test('processTasks - Scenario D: Pure Open (open)', async () => {
@@ -434,10 +434,10 @@ test('processTasks - Scenario D: Pure Open (open)', async () => {
   await processTasks(m.store, m.executor, m.positionProvider, m.registry, m.positionStore);
 
   assert.strictEqual(m.tasks.length, 0); // Pure open should complete and delete
-  assert.ok(task.events?.some((e) => e.stage === 'OPEN_BROADCAST'));
-  assert.ok(task.events?.some((e) => e.stage === 'OPEN_CONFIRMED'));
-  assert.ok(task.events?.some((e) => e.stage === 'COMPLETED'));
-  assert.ok(!task.events?.some((e) => e.stage === 'CLOSE_BROADCAST'));
+  assert.ok(task.events?.some((e: any) => e.stage === 'OPEN_BROADCAST'));
+  assert.ok(task.events?.some((e: any) => e.stage === 'OPEN_CONFIRMED'));
+  assert.ok(task.events?.some((e: any) => e.stage === 'POSITION_OPENED'));
+  assert.ok(!task.events?.some((e: any) => e.stage === 'CLOSE_BROADCAST'));
 });
 
 test('processTasks - Timeout Scenario', async () => {

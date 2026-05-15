@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "bin": {
-    "lp": "./bin/lp.js"
+    "avmm": "./bin/avmm.js"
   },
   "dependencies": {
     "@lp-system/core": "workspace:*",

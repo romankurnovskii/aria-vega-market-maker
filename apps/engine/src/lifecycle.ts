@@ -243,11 +243,10 @@ export async function processTasks(
     deleteTask: (id: string) => Promise<void>;
     getAssignments: () => Promise<Assignment[]>;
   };
-  if (typeof tasksStore.getTasks !== 'function') return;
-
-  const storeId = (store as Record<string, unknown>).id || 'unknown';
-  const tasks: RebalanceTask[] = await tasksStore.getTasks();
+  const tasks = await tasksStore.getTasks();
   if (tasks.length === 0) return;
+
+  const storeId = (store as unknown as { id?: string }).id || 'unknown';
 
   logger.info(`[Execution Monitor][${storeId}] Found ${tasks.length} active task(s) in task store.`);
 
@@ -365,12 +364,17 @@ export async function processTasks(
 
         const openPoolAddress = task.intent.openParams?.poolAddress || task.intent.positionId;
         const market = await positionProvider.getMarketSnapshot(openPoolAddress);
-        const openIntent: Decision = { ...task.intent, action: 'open' };
+        const openIntent: Decision = {
+          ...task.intent,
+          action: 'open',
+          positionId: openPoolAddress,
+        };
 
         task.events.push({ stage: 'OPEN_BROADCAST', timestamp: Date.now() });
         await tasksStore.saveTask(task);
 
         const record = await executor.apply(openIntent, market);
+
         if (record.status === 'failed') {
           task.status = 'pending_open'; // Revert
           task.events.push({ stage: 'ERROR', timestamp: Date.now(), error: record.error });
@@ -402,6 +406,13 @@ export async function processTasks(
       }
     } catch (err) {
       logger.error(`[Execution Monitor] Error processing task ${task.id}: ${err}`);
+      if (task.status === 'executing_close') {
+        task.status = 'pending_close';
+        await tasksStore.saveTask(task);
+      } else if (task.status === 'executing_open') {
+        task.status = 'pending_open';
+        await tasksStore.saveTask(task);
+      }
     }
   }
 }
@@ -471,7 +482,7 @@ export function startTickLoop(
       });
       isInitialRun = false;
 
-      const activeTasks = await store.getTasks();
+      const activeTasks = (await store.getTasks()) as RebalanceTask[];
 
       const knownPositions = await positionStore.getKnown();
       const updatedKnownPositions: Position[] = [...knownPositions];
