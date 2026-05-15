@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
   "dependencies": {
     "@lp-system/core": "workspace:*",
     "@lp-system/logger": "workspace:*"
@@ -15,7 +15,7 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "test": "tsc && node --test dist/**/*.test.js",
-    "test:coverage": "tsc && node --experimental-test-coverage --test dist/**/*.test.js"
+    "test": "tsx --test src/**/*.test.ts",
+    "test:coverage": "tsx --test --experimental-test-coverage src/**/*.test.ts"
   }
 }
