@@ -70,13 +70,66 @@ export const EventLog = ({ logs }: EventLogProps) => {
                         ? ` | METRICS: ${JSON.stringify((res as Record<string, unknown>).metrics)}`
                         : '';
 
+                      const openParams = (res as Record<string, unknown>).openParams as Record<string, unknown> | undefined;
+                      const hasPriceData = openParams && openParams.lowerBoundPrice !== undefined;
+
                       return (
                         <div className="flex flex-col gap-0.5">
-                          <div className="font-bold">
-                            &gt;&gt; ACTION: {action.toUpperCase()} {signal && `[${signal}]`}
+                          <div className="font-bold flex items-center gap-2">
+                            <span className="text-[#FF4500]">&gt;&gt;</span>
+                            ACTION: {String(action).toUpperCase()} {signal && `[${signal}]`}
                           </div>
-                          {reason && <div className="opacity-80 italic">&gt; REASON: {reason}</div>}
-                          {metrics && <div className="text-[8px] opacity-60 truncate">{metrics}</div>}
+
+                          {reason && (
+                            <div className="opacity-80 italic pl-4 border-l border-white/10 mt-0.5">
+                              &gt; {String(reason)}
+                            </div>
+                          )}
+
+                          {hasPriceData && (
+                            <div className="mt-2 mb-2 bg-white/5 p-2 border-l-2 border-[#FF4500] flex flex-col gap-2 rounded-sm shadow-inner">
+                              <div className="text-[9px] uppercase font-bold text-[#FF4500] opacity-80 tracking-widest border-b border-white/10 pb-1">
+                                Proposed Price Range
+                              </div>
+                              <div className="flex justify-between items-center px-1">
+                                <div className="flex flex-col">
+                                  <span className="opacity-50 uppercase text-[7px] tracking-tighter">Lower Price</span>
+                                  <span className="font-bold text-[11px] text-[#F4F4F0]">
+                                    {Number(openParams.lowerBoundPrice).toLocaleString(undefined, {
+                                      minimumFractionDigits: 4,
+                                      maximumFractionDigits: 6,
+                                    })}
+                                  </span>
+                                </div>
+                                <div className="h-6 w-px bg-white/10 mx-2"></div>
+                                <div className="flex flex-col">
+                                  <span className="opacity-50 uppercase text-[7px] tracking-tighter">Upper Price</span>
+                                  <span className="font-bold text-[11px] text-[#F4F4F0]">
+                                    {Number(openParams.upperBoundPrice).toLocaleString(undefined, {
+                                      minimumFractionDigits: 4,
+                                      maximumFractionDigits: 6,
+                                    })}
+                                  </span>
+                                </div>
+                                <div className="h-6 w-px bg-white/10 mx-2"></div>
+                                <div className="flex flex-col text-right">
+                                  <span className="opacity-50 uppercase text-[7px] tracking-tighter">Range Width</span>
+                                  <span className="font-bold text-[11px] text-green-400">
+                                    {(Number(openParams.rangePercent) || 0).toFixed(2)}%
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="text-[8px] opacity-40 uppercase tracking-tighter flex justify-between border-t border-white/5 pt-1">
+                                <span>Bins: {String(openParams.binCount || 'unknown')}</span>
+                                <span>
+                                  Slippage:{' '}
+                                  {String((openParams.metadata as Record<string, unknown>)?.slippageTolerance || '50')} bps
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          {metrics && <div className="text-[8px] opacity-20 truncate mt-1">{metrics}</div>}
                         </div>
                       );
                     })()}
