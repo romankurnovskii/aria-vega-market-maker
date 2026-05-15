@@ -124,6 +124,64 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /positions/closed:
+    get:
+      summary: List Closed Positions
+      description: Fetches all historical, closed Meteora DLMM positions associated with the configured wallet from the local persistent store.
+      responses:
+        '200':
+          description: Successfully retrieved closed positions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - wallet
+                  - count
+                  - positions
+                properties:
+                  wallet:
+                    type: string
+                    example: 'HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTYUQh'
+                  count:
+                    type: integer
+                    example: 5
+                  positions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Position'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /positions/history:
+    get:
+      summary: List Position History
+      description: Alias for /positions/closed. Returns all archived positions.
+      responses:
+        '200':
+          description: Successfully retrieved position history.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - wallet
+                  - count
+                  - positions
+                properties:
+                  wallet:
+                    type: string
+                    example: 'HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTYUQh'
+                  count:
+                    type: integer
+                    example: 5
+                  positions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Position'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /positions/{positionId}/actions:
     post:
       summary: Perform Position Action
