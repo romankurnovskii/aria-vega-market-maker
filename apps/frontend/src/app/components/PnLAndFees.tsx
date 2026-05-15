@@ -51,7 +51,7 @@ export const PnLAndFees = ({
 
   return (
     <div className="bg-[#F4F4F0] p-2.5 border border-[#0D0D0D] text-xs flex flex-col gap-1.5">
-      <div className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">PnL & All-Time Fees</div>
+      <div className="text-[11px] text-gray-500 uppercase tracking-widest font-bold">PnL & All-Time Fees</div>
       <div className="flex justify-between font-mono-jb items-center">
         <span className="text-gray-500">Realized PnL:</span>
         <span className={`font-bold ${getPnLClasses(pnlUsd)}`}>

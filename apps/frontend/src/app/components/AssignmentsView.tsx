@@ -45,11 +45,11 @@ export const AssignmentsView = ({ assignments, onDelete }: AssignmentsViewProps)
                 {asg.positionId}
               </td>
               <td className="py-2 px-3 border-r border-gray-200">
-                <span className="bg-[#0D0D0D] text-[#F4F4F0] px-1.5 py-0.5 text-[10px] font-mono">{asg.strategyId}</span>
+                <span className="bg-[#0D0D0D] text-[#F4F4F0] px-1.5 py-0.5 text-[11px] font-mono">{asg.strategyId}</span>
               </td>
               <td className="py-2 px-3 border-r border-gray-200">
                 <span
-                  className={`px-1.5 py-0.5 text-[10px] border font-bold ${asg.mode === 'active' ? 'border-green-500 text-green-600' : 'border-yellow-500 text-yellow-600'}`}
+                  className={`px-1.5 py-0.5 text-[11px] border font-bold ${asg.mode === 'active' ? 'border-green-500 text-green-600' : 'border-yellow-500 text-yellow-600'}`}
                 >
                   {asg.mode.toUpperCase()}
                 </span>

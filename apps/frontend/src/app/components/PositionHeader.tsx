@@ -32,19 +32,19 @@ export const PositionHeader = ({ positionId, pool, state, onClose }: PositionHea
   return (
     <div className="flex justify-between items-start border-b border-[#0D0D0D] pb-3">
       <div className="min-w-0">
-        <div className="text-[10px] text-gray-500 uppercase tracking-widest mb-1">Target Position</div>
+        <div className="text-[11px] text-gray-500 uppercase tracking-widest mb-1">Target Position</div>
         <div className="font-syne font-bold text-lg truncate" title={positionId}>
           {positionId}
         </div>
         <div className="text-xs text-gray-600 truncate mt-1">
           Pool:{' '}
-          <span className="font-mono text-[10px]" title={pool}>
+          <span className="font-mono text-[11px]" title={pool}>
             {pool}
           </span>
         </div>
         <div className="mt-2 flex items-center">
           <span
-            className={`px-2 py-0.5 text-[9px] font-bold border uppercase tracking-widest font-mono-jb ${getStateClasses(state)}`}
+            className={`px-2 py-0.5 text-[11px] font-bold border uppercase tracking-widest font-mono-jb ${getStateClasses(state)}`}
           >
             {state}
           </span>

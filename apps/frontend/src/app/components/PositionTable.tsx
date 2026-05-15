@@ -70,7 +70,7 @@ export const PositionTable = ({ positions, positionOrchestration, selectedPosId,
                       </span>
                       {pos.state && pos.state !== 'OPEN' && (
                         <span
-                          className={`text-[8px] px-1 py-0.5 border scale-90 tracking-wide font-mono ${
+                          className={`text-[11px] px-1 py-0.5 border scale-90 tracking-wide font-mono ${
                             pos.state === 'REBALANCING'
                               ? 'border-yellow-500 text-yellow-600 animate-pulse bg-yellow-50'
                               : pos.state === 'CLOSING'

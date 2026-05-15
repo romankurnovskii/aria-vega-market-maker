@@ -30,7 +30,7 @@ export const PositionActionButtons = ({ positionId, state, onRemoveLiquidity }: 
 
   return (
     <div className="flex flex-col gap-3 pt-2 border-t border-[#0D0D0D]/10">
-      <div className="text-[10px] font-bold uppercase tracking-widest text-red-600 flex items-center gap-1">
+      <div className="text-[11px] font-bold uppercase tracking-widest text-red-600 flex items-center gap-1">
         <AlertTriangle size={10} /> Danger Zone
       </div>
 
