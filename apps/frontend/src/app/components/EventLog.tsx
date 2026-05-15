@@ -21,13 +21,18 @@ interface LogEntry {
   error?: string;
   result?: unknown;
   transactionSignatures?: string[];
+  pendingSuggestion?: {
+    action: string;
+    openParams?: Record<string, unknown>;
+  };
 }
 
 interface EventLogProps {
   logs: LogEntry[];
+  onApplySuggestion?: (positionId: string, strategyId: string, suggestion: { action: string; openParams?: Record<string, unknown> }) => void;
 }
 
-export const EventLog = ({ logs }: EventLogProps) => {
+export const EventLog = ({ logs, onApplySuggestion }: EventLogProps) => {
   return (
     <div className="flex-1 border border-[#0D0D0D] bg-[#0D0D0D] text-[#F4F4F0] p-4 font-mono text-[11px] overflow-hidden flex flex-col min-h-0 relative">
       <div className="absolute top-0 right-0 p-2 opacity-20 pointer-events-none uppercase tracking-tighter text-xs">
@@ -88,8 +93,19 @@ export const EventLog = ({ logs }: EventLogProps) => {
 
                           {hasPriceData && (
                             <div className="mt-2 mb-2 bg-white/5 p-2 border-l-2 border-[#FF4500] flex flex-col gap-2 rounded-sm shadow-inner">
-                              <div className="text-[11px] uppercase font-bold text-[#FF4500] opacity-80 tracking-widest border-b border-white/10 pb-1">
-                                Proposed Price Range
+                              <div className="text-[11px] uppercase font-bold text-[#FF4500] opacity-80 tracking-widest border-b border-white/10 pb-1 flex justify-between items-center">
+                                <span>Proposed Price Range</span>
+                                {onApplySuggestion && log.positionId && log.strategyId && action !== 'skip' && (
+                                  <button
+                                    onClick={() => onApplySuggestion(log.positionId!, log.strategyId!, {
+                                      action: String(action),
+                                      openParams
+                                    })}
+                                    className="bg-[#FF4500] text-[#F4F4F0] px-2 py-0.5 text-[10px] hover:bg-[#FF4500]/80 transition-colors uppercase font-bold rounded-sm"
+                                  >
+                                    Apply Suggestion
+                                  </button>
+                                )}
                               </div>
                               <div className="flex justify-between items-center px-1">
                                 <div className="flex flex-col">

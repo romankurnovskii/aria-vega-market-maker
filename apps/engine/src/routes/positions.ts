@@ -187,6 +187,51 @@ export function handlePositionsRouter(
         return;
       }
 
+      if (action === 'applySuggestion') {
+        if (!strategyId) {
+          res.status(400).json({ error: 'Missing strategyId in request body for applySuggestion action' });
+          return;
+        }
+
+        const { suggestion } = req.body;
+
+        if (!suggestion || !suggestion.action) {
+          res.status(400).json({ error: 'Missing suggestion data in request body for applySuggestion action' });
+          return;
+        }
+
+        const position = await positionProvider.getPosition(positionId);
+
+        // Determine the actual action to perform based on the suggestion
+        const actualAction = suggestion.action === 'close+open' ? 'close+open' : suggestion.action;
+
+        const execRecord = await executor.apply(
+          {
+            positionId,
+            action: actualAction,
+            sourceAssignmentId: 'manual',
+            evaluatedAt: Date.now(),
+            openParams: suggestion.openParams,
+          },
+          await positionProvider.getMarketSnapshot(position.poolAddress),
+          async () => ({ action: suggestion.action })
+        );
+
+        if (execRecord.status === 'failed') {
+          res.status(500).json({ error: execRecord.error || 'Execution failed' });
+          return;
+        }
+
+        res.json({
+          status: 'success',
+          action: 'applySuggestion',
+          appliedAction: suggestion.action,
+          transactionSignatures: execRecord.txSignatures || [],
+          suggestionApplied: true,
+        });
+        return;
+      }
+
       res.status(400).json({ error: `Unsupported action: ${action}` });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
