@@ -23,7 +23,6 @@ import { PriceAnalytics } from './PriceAnalytics';
 import { PnLAndFees } from './PnLAndFees';
 import { OrchestrationControls } from './OrchestrationControls';
 import { PositionActionButtons } from './PositionActionButtons';
-import { EventLog } from './EventLog';
 
 interface PositionDetailProps {
   position: any;
@@ -146,8 +145,6 @@ export const PositionDetail = ({
           </>
         )}
       </div>
-
-      <EventLog logs={evalLogs} onApplySuggestion={onApplySuggestion} />
     </div>
   );
 };
