@@ -4,11 +4,6 @@
   "private": true,
   "main": "src/index.ts",
   "types": "src/index.ts",
-  "dependencies": {
-    "@lp-system/core": "workspace:*",
-    "@lp-system/logger": "workspace:*",
-    "@lp-system/providers": "workspace:*"
-  },
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist"

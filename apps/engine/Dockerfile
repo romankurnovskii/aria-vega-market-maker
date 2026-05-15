@@ -28,9 +28,8 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY packages/ ./packages/
 COPY apps/engine/ ./apps/engine/
 
-# Compile the entire TypeScript monorepo workspace
-RUN npx tsc -b
-
+# Expose port
 EXPOSE 3000
 
-CMD ["node", "apps/engine/dist/main.js"]
+# Use tsx watch in development
+CMD ["npx", "tsx", "watch", "apps/engine/src/main.ts"]

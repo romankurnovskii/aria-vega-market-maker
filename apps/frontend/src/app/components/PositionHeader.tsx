@@ -32,8 +32,8 @@ export const PositionHeader = ({ positionId, pool, state, onClose }: PositionHea
   return (
     <div className="flex justify-between items-start border-b border-[#0D0D0D] pb-3">
       <div className="min-w-0">
-        <div className="text-[11px] text-gray-500 uppercase tracking-widest mb-1">Target Position</div>
-        <div className="font-syne font-bold text-lg truncate" title={positionId}>
+        <div className="text-[12px] text-gray-500 uppercase tracking-widest mb-1">Target Position</div>
+        <div className="font-syne font-bold text-sm truncate" title={positionId}>
           {positionId}
         </div>
         <div className="text-xs text-gray-600 truncate mt-1">

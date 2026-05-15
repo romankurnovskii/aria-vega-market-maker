@@ -31,52 +31,61 @@ export const OrchestrationControls = ({
   onModeChange,
   onAssign,
   onEvaluate,
-}: OrchestrationControlsProps) => {
+}: Props) => {
   return (
-    <div className="flex flex-col gap-3">
-      <div className="text-[11px] font-bold uppercase tracking-widest text-[#FF4500]">Orchestration & Strategy</div>
+    <div className="flex flex-col gap-3 border-t border-[#0D0D0D] pt-4 min-w-0">
       <div className="flex flex-col gap-2">
-        <select
-          value={selectedStrategyId}
-          onChange={(e) => onStrategyChange(e.target.value)}
-          className="w-full bg-[#F4F4F0] border border-[#0D0D0D] p-2 text-xs uppercase outline-none focus:border-[#FF4500]"
-        >
-          <option value="NONE">-- No Strategy (Unassign) --</option>
-          {strategies.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name} ({s.id})
-            </option>
-          ))}
-        </select>
-
+        <label className="text-[10px] uppercase font-bold tracking-widest opacity-50">Select Strategy</label>
         <div className="flex gap-2">
           <select
-            value={selectedMode}
-            onChange={(e) => onModeChange(e.target.value)}
-            className="flex-1 bg-[#F4F4F0] border border-[#0D0D0D] p-2 text-xs uppercase outline-none focus:border-[#FF4500]"
-            disabled={selectedStrategyId === 'NONE'}
+            value={selectedStrategyId}
+            onChange={(e) => onStrategyChange(e.target.value)}
+            className="flex-1 bg-[#F4F4F0] border border-[#0D0D0D] px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[#FF4500] min-w-0"
           >
-            <option value="active">Active</option>
-            <option value="monitor">Monitor</option>
+            <option value="NONE">-- NONE --</option>
+            {strategies.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
           </select>
-
           <button
-            onClick={onAssign}
-            className="flex-1 bg-[#0D0D0D] text-[#F4F4F0] p-2 text-xs font-bold uppercase hover:bg-[#FF4500] transition-colors border border-[#0D0D0D]"
+            onClick={onEvaluate}
+            className="bg-[#0D0D0D] text-[#F4F4F0] px-3 py-1 text-[10px] uppercase font-bold tracking-widest hover:bg-[#FF4500] transition-colors shrink-0"
           >
-            Set Assignment
+            Evaluate
           </button>
         </div>
       </div>
 
-      <div className="pt-1">
-        <button
-          onClick={onEvaluate}
-          disabled={selectedStrategyId === 'NONE'}
-          className="w-full flex items-center justify-center gap-2 border border-[#0D0D0D] p-2 text-xs font-bold uppercase hover:bg-[#F4F4F0] hover:text-[#FF4500] hover:border-[#FF4500] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Zap size={14} /> Evaluate Strategy
-        </button>
+      <div className="flex flex-col gap-2">
+        <label className="text-[10px] uppercase font-bold tracking-widest opacity-50">Operation Mode</label>
+        <div className="flex gap-2">
+          <div className="flex-1 flex border border-[#0D0D0D] overflow-hidden">
+            <button
+              onClick={() => onModeChange('active')}
+              className={`flex-1 py-1 text-[10px] uppercase font-bold transition-colors ${
+                selectedMode === 'active' ? 'bg-[#0D0D0D] text-[#F4F4F0]' : 'bg-transparent text-[#0D0D0D] hover:bg-gray-100'
+              }`}
+            >
+              Active
+            </button>
+            <button
+              onClick={() => onModeChange('monitor')}
+              className={`flex-1 py-1 text-[10px] uppercase font-bold transition-colors ${
+                selectedMode === 'monitor' ? 'bg-[#0D0D0D] text-[#F4F4F0]' : 'bg-transparent text-[#0D0D0D] hover:bg-gray-100'
+              }`}
+            >
+              Monitor
+            </button>
+          </div>
+          <button
+            onClick={onAssign}
+            className="bg-[#FF4500] text-[#F4F4F0] px-3 py-1 text-[10px] uppercase font-bold tracking-widest hover:bg-[#0D0D0D] transition-colors shadow-[2px_2px_0_#0D0D0D] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none shrink-0"
+          >
+            Assign
+          </button>
+        </div>
       </div>
     </div>
   );

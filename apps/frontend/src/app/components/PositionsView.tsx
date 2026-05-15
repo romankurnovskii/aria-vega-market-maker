@@ -53,26 +53,30 @@ export const PositionsView = ({
   const selectedOrch = selectedPos ? positionOrchestration[selectedPos.id] : null;
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 h-full min-h-0">
-      <PositionTable
-        positions={positions}
-        positionOrchestration={positionOrchestration}
-        selectedPosId={selectedPosId}
-        onSelect={setSelectedPosId}
-      />
+    <div className="flex h-full gap-4 overflow-hidden">
+      <div className={`flex flex-col transition-all duration-300 ${selectedPosId ? 'w-1/3' : 'w-full'}`}>
+        <PositionTable
+          positions={positions}
+          positionOrchestration={positionOrchestration}
+          selectedPosId={selectedPosId}
+          onSelect={setSelectedPosId}
+        />
+      </div>
 
       {selectedPos && (
-        <PositionDetail
-          position={selectedPos}
-          orchestration={selectedOrch}
-          strategies={strategies}
-          onAssign={onAssign}
-          onEvaluate={onEvaluate}
-          onRemoveLiquidity={onRemoveLiquidity}
-          onApplySuggestion={onApplySuggestion}
-          evalLogs={evalLogs}
-          onClose={() => setSelectedPosId(null)}
-        />
+        <div className="flex flex-1 gap-4 min-w-0 animate-in slide-in-from-right-4 duration-300">
+          <PositionDetail
+            position={selectedPos}
+            orchestration={selectedOrch}
+            strategies={strategies}
+            onAssign={onAssign}
+            onEvaluate={onEvaluate}
+            onRemoveLiquidity={onRemoveLiquidity}
+            onApplySuggestion={onApplySuggestion}
+            evalLogs={evalLogs}
+            onClose={() => setSelectedPosId(null)}
+          />
+        </div>
       )}
     </div>
   );

@@ -93,9 +93,7 @@ export const PositionTable = ({ positions, positionOrchestration, selectedPosId,
   };
 
   return (
-    <div
-      className={`flex flex-col border border-[#0D0D0D] bg-white transition-all duration-300 ${selectedPosId ? 'hidden lg:flex lg:w-7/12' : 'w-full h-full'}`}
-    >
+    <div className="flex flex-col h-full border border-[#0D0D0D] bg-white overflow-hidden">
       <div className="flex-1 overflow-auto">
         {positions.length === 0 ? (
           <div className="p-4 text-xs italic text-gray-500">

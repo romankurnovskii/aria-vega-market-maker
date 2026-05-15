@@ -23,6 +23,7 @@ import { PriceAnalytics } from './PriceAnalytics';
 import { PnLAndFees } from './PnLAndFees';
 import { OrchestrationControls } from './OrchestrationControls';
 import { PositionActionButtons } from './PositionActionButtons';
+import { EventLog } from './EventLog';
 
 interface PositionDetailProps {
   position: any;
@@ -31,7 +32,11 @@ interface PositionDetailProps {
   onAssign: (positionId: string, strategyId: string, mode: string) => Promise<void>;
   onEvaluate: (positionId: string, strategyId: string) => Promise<void>;
   onRemoveLiquidity: (positionId: string) => Promise<void>;
-  onApplySuggestion: (positionId: string, strategyId: string, suggestion: { action: string; openParams?: Record<string, unknown> }) => void;
+  onApplySuggestion: (
+    positionId: string,
+    strategyId: string,
+    suggestion: { action: string; openParams?: Record<string, unknown> }
+  ) => void;
   evalLogs: any[];
   onClose: () => void;
 }
@@ -91,9 +96,9 @@ export const PositionDetail = ({
   const isClosed = position.state === 'CLOSED';
 
   return (
-    <div className="flex flex-col gap-4 w-full lg:w-5/12 h-full min-h-0 animate-in slide-in-from-right-4 duration-300">
+    <div className="flex flex-1 flex-col gap-4 min-h-0">
       {/* Actions Pane */}
-      <div className="border border-[#0D0D0D] bg-white p-4 shrink-0 flex flex-col gap-4 overflow-y-auto">
+      <div className="border border-[#0D0D0D] bg-white p-4 flex flex-col gap-4 overflow-y-auto min-h-[300px]">
         <PositionHeader positionId={position.id} pool={position.pool} state={position.state} onClose={onClose} />
 
         <PositionBalances
@@ -101,8 +106,12 @@ export const PositionDetail = ({
           tokenYSym={tokenYSym}
           tokenX={position.tokenX}
           tokenY={position.tokenY}
-          unrealizedPnlTokenXUsd={pnl.unrealizedPnl?.balanceTokenX?.usd ? Number(pnl.unrealizedPnl.balanceTokenX.usd) : undefined}
-          unrealizedPnlTokenYUsd={pnl.unrealizedPnl?.balanceTokenY?.usd ? Number(pnl.unrealizedPnl.balanceTokenY.usd) : undefined}
+          unrealizedPnlTokenXUsd={
+            pnl.unrealizedPnl?.balanceTokenX?.usd ? Number(pnl.unrealizedPnl.balanceTokenX.usd) : undefined
+          }
+          unrealizedPnlTokenYUsd={
+            pnl.unrealizedPnl?.balanceTokenY?.usd ? Number(pnl.unrealizedPnl.balanceTokenY.usd) : undefined
+          }
           formatAmount={formatAmount}
         />
 
@@ -144,6 +153,14 @@ export const PositionDetail = ({
             />
           </>
         )}
+      </div>
+
+      {/* Event Log Pane */}
+      <div className="flex flex-1 flex-col min-h-[300px]">
+        <EventLog
+          logs={evalLogs}
+          onApplySuggestion={onApplySuggestion}
+        />
       </div>
     </div>
   );

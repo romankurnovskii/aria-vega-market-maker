@@ -101,6 +101,7 @@ interface AriaVegaData {
 
 export const AriaVegaContainer = () => {
   const [activeTab, setActiveTab] = useState<string>('positions');
+  const [isSidebarVisible, setIsSidebarVisible] = useState<boolean>(true);
   const [data, setData] = useState<AriaVegaData>({
     assignments: [],
     positions: [],
@@ -415,7 +416,16 @@ export const AriaVegaContainer = () => {
       <Header health={data.health} assignments={data.assignments} />
 
       <div className="flex-1 flex flex-col lg:flex-row gap-4 relative z-10 min-h-0">
-        <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        <div className="flex flex-col gap-2 shrink-0">
+          <button
+            onClick={() => setIsSidebarVisible(!isSidebarVisible)}
+            className="flex items-center justify-center p-2 border border-[#0D0D0D] hover:bg-[#0D0D0D] hover:text-[#F4F4F0] transition-colors"
+            title={isSidebarVisible ? 'Hide Sidebar' : 'Show Sidebar'}
+          >
+            <TerminalSquare size={16} />
+          </button>
+          {isSidebarVisible && <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />}
+        </div>
 
         <main className="flex-1 border-t border-l border-[#0D0D0D] bg-[#F4F4F0] p-4 relative flex flex-col min-h-0 overflow-hidden">
           <div className="absolute top-0 left-0 w-2 h-2 bg-[#0D0D0D]"></div>

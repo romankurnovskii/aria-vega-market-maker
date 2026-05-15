@@ -102,12 +102,14 @@ export async function startDiscovery(
 
   const tasksStore = store as unknown as {
     getTasks?: () => Promise<RebalanceTask[]>;
-    deleteTask?: (id: string) => Promise<void>;
+    saveTask?: (t: RebalanceTask) => Promise<void>;
   };
   let tasks = tasksStore.getTasks ? await tasksStore.getTasks() : [];
 
   // Recover tasks that finished opening but failed to clean up (newPositionId is set)
   for (const task of tasks) {
+    if (task.status === 'completed' || task.status === 'failed') continue;
+
     if (task.newPositionId) {
       logger.info(
         `[Discovery] Recovered task ${task.id} with already-set newPositionId: ${task.newPositionId}. Registering new orchestrator and completing task.`
@@ -126,9 +128,10 @@ export async function startDiscovery(
         registry.register(orchestrator);
       }
 
-      if (tasksStore.deleteTask) {
-        await tasksStore.deleteTask(task.id);
-        logger.info(`[Discovery] Cleaned up recovered task ${task.id}`);
+      task.status = 'completed';
+      if (tasksStore.saveTask) {
+        await tasksStore.saveTask(task);
+        logger.info(`[Discovery] Marked recovered task ${task.id} as completed`);
       }
     }
   }
@@ -139,7 +142,11 @@ export async function startDiscovery(
 
   const liveIds = new Set(livePositions.map((p) => p.id));
   const knownIds = new Set(knownPositions.map((p) => p.id));
-  const inFlightPositionIds = new Set<string>(tasks.map((t: RebalanceTask) => t.originalPositionId));
+  const inFlightPositionIds = new Set<string>(
+    tasks
+      .filter((t) => t.status !== 'completed' && t.status !== 'failed')
+      .map((t: RebalanceTask) => t.originalPositionId)
+  );
 
   // 2. Identify live positions and ensure their orchestrators are registered
   for (const livePos of livePositions) {
@@ -240,7 +247,6 @@ export async function processTasks(
   const tasksStore = store as unknown as {
     getTasks: () => Promise<RebalanceTask[]>;
     saveTask: (t: RebalanceTask) => Promise<void>;
-    deleteTask: (id: string) => Promise<void>;
     getAssignments: () => Promise<Assignment[]>;
   };
   const tasks = await tasksStore.getTasks();
@@ -264,6 +270,8 @@ export async function processTasks(
   }
 
   for (const task of tasks) {
+    if (task.status === 'completed' || task.status === 'failed') continue;
+
     const currentKnown = await positionStore.getKnown();
     logger.info(
       `[Execution Monitor][${storeId}] Processing task ${task.id} (status: ${task.status}). Known positions in cache: [${currentKnown.map((p) => p.id).join(', ')}]`
@@ -272,7 +280,7 @@ export async function processTasks(
       // 1. Timeout check (fail-safe)
       const MAX_TASK_AGE_MS = 10 * 60 * 1000; // 10 minutes
       if (Date.now() - task.evaluatedAt > MAX_TASK_AGE_MS) {
-        logger.error(`[Execution Monitor] Task ${task.id} timed out. Archiving.`);
+        logger.error(`[Execution Monitor] Task ${task.id} timed out. Marking as failed.`);
 
         task.events.push({ stage: 'TIMEOUT', timestamp: Date.now() });
 
@@ -286,7 +294,27 @@ export async function processTasks(
           await positionStore.saveKnown(remaining);
         }
 
-        await tasksStore.deleteTask(task.id);
+        task.status = 'failed';
+        await tasksStore.saveTask(task);
+        continue;
+      }
+
+      // 2. Recovery for confirmed states that didn't finish their post-processing
+      if (task.status === 'confirmed_close') {
+        logger.info(`[Execution Monitor] Recovering task ${task.id} from confirmed_close status.`);
+        if (task.intent.action === 'close+open') {
+          task.status = 'pending_open';
+        } else {
+          task.status = 'completed';
+        }
+        await tasksStore.saveTask(task);
+        continue;
+      }
+
+      if (task.status === 'confirmed_open') {
+        logger.info(`[Execution Monitor] Recovering task ${task.id} from confirmed_open status.`);
+        task.status = 'completed';
+        await tasksStore.saveTask(task);
         continue;
       }
 
@@ -317,7 +345,10 @@ export async function processTasks(
           continue;
         }
 
+        // Atomic transition to prevent redundant closes
+        task.status = 'confirmed_close';
         task.events.push({ stage: 'CLOSE_CONFIRMED', timestamp: Date.now(), txSignature: record.txSignatures[0] });
+        await tasksStore.saveTask(task);
 
         // Transition Position State in local cache
         const knownPositions = await positionStore.getKnown();
@@ -345,7 +376,8 @@ export async function processTasks(
           task.status = 'pending_open';
           await tasksStore.saveTask(task);
         } else {
-          await tasksStore.deleteTask(task.id);
+          task.status = 'completed';
+          await tasksStore.saveTask(task);
         }
         continue;
       }
@@ -382,7 +414,11 @@ export async function processTasks(
           continue;
         }
 
+        // Atomic transition to prevent redundant opens on indexing lag or crashes
+        task.status = 'confirmed_open';
+        task.newPositionId = record.newPositionId;
         task.events.push({ stage: 'OPEN_CONFIRMED', timestamp: Date.now(), txSignature: record.txSignatures[0] });
+        await tasksStore.saveTask(task);
 
         // Update assignments
         const assignments = await tasksStore.getAssignments();
@@ -395,23 +431,64 @@ export async function processTasks(
 
         // Transition Position State in local cache: Add new position, remove old one
         const knownPositions = await positionStore.getKnown();
-        const freshPosition = await positionProvider.getPosition(record.newPositionId!, task.intent.openParams!.poolAddress);
         const remaining = knownPositions.filter((p) => p.id !== task.intent.positionId);
+
+        let freshPosition: Position;
+        try {
+          freshPosition = await positionProvider.getPosition(
+            record.newPositionId!,
+            task.intent.openParams!.poolAddress
+          );
+        } catch (err) {
+          logger.warn(
+            `[Execution Monitor] Indexing lag detected for new position ${record.newPositionId}. Synthesizing temporary position from intent.`
+          );
+          // Synthesize a temporary position to avoid cache miss and subsequent redundant opens
+          freshPosition = {
+            id: record.newPositionId!,
+            poolAddress: task.intent.openParams!.poolAddress,
+            chain: 'solana',
+            protocol: 'meteora_dlmm',
+            lowerBound: task.intent.openParams!.lowerBound,
+            upperBound: task.intent.openParams!.upperBound,
+            tokenX: {
+              tokenAddress: '', // To be updated by discovery
+              mint: '',
+              decimals: 0,
+              amount: '0',
+            },
+            tokenY: {
+              tokenAddress: '',
+              mint: '',
+              decimals: 0,
+              amount: '0',
+            },
+            isInRange: true,
+            openedAt: Date.now(),
+            state: 'REBALANCING', // Indicates it's newly opened and needs full sync
+          };
+        }
+
         await positionStore.saveKnown([...remaining, freshPosition]);
         task.events.push({ stage: 'POSITION_OPENED', timestamp: Date.now() });
 
-        await tasksStore.deleteTask(task.id);
-        logger.info(`[Execution Monitor] Task ${task.id} completed.`);
+        // IMPORTANT: Mark task as completed immediately after successful on-chain confirmation and cache update
+        // to prevent indexing lag from triggering a retry/duplicate open.
+        task.status = 'completed';
+        await tasksStore.saveTask(task);
+        logger.info(`[Execution Monitor] Task ${task.id} marked as completed.`);
         continue;
       }
     } catch (err) {
       logger.error(`[Execution Monitor] Error processing task ${task.id}: ${err}`);
-      if (task.status === 'executing_close') {
-        task.status = 'pending_close';
-        await tasksStore.saveTask(task);
-      } else if (task.status === 'executing_open') {
-        task.status = 'pending_open';
-        await tasksStore.saveTask(task);
+      // Prevent status revert if we already confirmed on-chain success
+      if (task.status !== 'confirmed_open' && task.status !== 'confirmed_close') {
+        if (task.status === 'executing_close') {
+          task.status = 'pending_close';
+        } else if (task.status === 'executing_open') {
+          task.status = 'pending_open';
+        }
+        await tasksStore.saveTask(task).catch(() => {});
       }
     }
   }
@@ -501,7 +578,9 @@ export function startTickLoop(
           }
 
           // Fetch active tasks from store to check lock before querying RPC to avoid useless RPC workload
-          const isLocked = activeTasks.some((t) => t.originalPositionId === position.id);
+          const isLocked = activeTasks.some(
+            (t) => t.originalPositionId === position.id && t.status !== 'completed' && t.status !== 'failed'
+          );
           if (isLocked) {
             logger.info(
               `[Tick Loop] Position ${position.id} is currently locked (active rebalance task in-flight). Skipping evaluation.`

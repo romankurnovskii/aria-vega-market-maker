@@ -235,113 +235,71 @@ export class SolanaExecutor implements IExecutor {
     }
   ): Promise<string> {
     return await this.rpcPool.execute(async (connection: Connection) => {
-      // 1. Fetch blockhash first
-      const { blockhash } = await connection.getLatestBlockhash('confirmed');
+      // 1. Fetch blockhash and height for confirmation strategy
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
       tx.recentBlockhash = blockhash;
       tx.feePayer = this.keypair.publicKey;
 
-      // NOTE: We are skipping custom CU simulation and relying entirely
-      // on the Meteora SDK's default Compute Budget instructions for now.
-
-      // 2. Sign and serialize the transaction
+      // 2. Sign and serialize
       tx.sign(this.keypair, ...additionalSigners);
+      const rawTx = tx.serialize();
 
-      // Preflight Simulation: verify transaction validity before broadcasting
+      // Preflight Simulation
       logger.info(`[SolanaExecutor] Simulating transaction preflight check...`);
       const simulation = await connection.simulateTransaction(tx);
       if (simulation.value.err) {
-        logger.error(`[SolanaExecutor] Preflight simulation failed: ${JSON.stringify(simulation.value.err)}`);
         throw new Error(`Transaction simulation failed: ${JSON.stringify(simulation.value.err)}`);
       }
-      logger.info(`[SolanaExecutor] Preflight simulation succeeded. Units consumed: ${simulation.value.unitsConsumed || 0}`);
+      logger.info(`[SolanaExecutor] Preflight simulation succeeded. Units: ${simulation.value.unitsConsumed || 0}`);
 
-      const rawTx = tx.serialize();
+      // 3. Send initial transaction
+      const signature = await connection.sendRawTransaction(rawTx, {
+        skipPreflight: true,
+        maxRetries: 0,
+      });
 
-      // 3. The Active Rebroadcast "Spam Loop" (UDP Delivery Assurance)
-      logger.info(`[SolanaExecutor] Broadcasting transaction using Meteora SDK defaults...`);
+      logger.info(`[SolanaExecutor] Broadcasted initial transaction. Signature: ${signature}. Awaiting confirmation via WebSocket...`);
 
-      let signature = '';
+      // 4. Confirmation Strategy: WebSocket Listener + Background Spam Loop
       let confirmed = false;
-      const startTime = Date.now();
-      const timeoutMs = 60000; // 60-second execution timeout
-      let attempt = 0;
 
-      while (!confirmed && Date.now() - startTime < timeoutMs && attempt < context.maxAttempts) {
-        attempt++;
-        const elapsed = Date.now() - startTime;
-        logger.info(
-          `[SolanaExecutor] executeTx attempt #${attempt}/${context.maxAttempts} for position ${context.positionId} (Action: ${context.action}). Elapsed: ${elapsed}ms.`
-        );
+      const confirmationPromise = connection.confirmTransaction(
+        {
+          signature,
+          blockhash,
+          lastValidBlockHeight,
+        },
+        'confirmed'
+      );
 
-        try {
-          // Send with skipPreflight: true to bypass local node simulation bottlenecks
-          signature = await connection.sendRawTransaction(rawTx, {
-            skipPreflight: true,
-            maxRetries: 0,
-          });
-
-          logger.info(
-            `[SolanaExecutor] Broadcasted transaction raw payload. Signature: ${signature || 'pending'}. Awaiting signature status...`
-          );
-
-          // Check if transaction has hit the block status index
-          const status = await connection.getSignatureStatus(signature, {
-            searchTransactionHistory: true,
-          });
-
-          if (status && status.value && status.value.confirmationStatus) {
-            if (status.value.err) {
-              throw new Error(`Transaction failed on-chain: ${JSON.stringify(status.value.err)}`);
-            }
-
-            const confStatus = status.value.confirmationStatus;
-            logger.info(`[SolanaExecutor] Signature ${signature} status: ${confStatus || 'unknown'}`);
-            if (confStatus === 'confirmed' || confStatus === 'finalized') {
-              confirmed = true;
-              break;
-            }
-          } else {
-            logger.info(`[SolanaExecutor] Signature status not found yet for signature ${signature}`);
-          }
-        } catch (err: unknown) {
-          const errMsg = (err as Error).message || String(err);
-          const isRateLimit =
-            errMsg.includes('429') ||
-            errMsg.toLowerCase().includes('too many requests') ||
-            errMsg.toLowerCase().includes('rate limit');
-          const isSendError =
-            (err as { name?: string }).name === 'SendTransactionError' || errMsg.includes('Transaction simulation failed');
-
-          if (
-            isSendError ||
-            isRateLimit ||
-            errMsg.includes('fetch') ||
-            errMsg.includes('socket') ||
-            errMsg.includes('timeout')
-          ) {
-            logger.warn(
-              `[SolanaExecutor] RPC Send/Rate-limit warning on attempt #${attempt}/${context.maxAttempts} for position ${context.positionId}. Error: ${errMsg}. Elapsed: ${elapsed}ms. Retrying...`
-            );
-          } else {
-            logger.error(
-              `[SolanaExecutor] Hard error encountered during sendRawTransaction on attempt #${attempt}/${context.maxAttempts} for position ${context.positionId}. Reason: ${errMsg}`
-            );
-            throw err; // Propagate hard failures
+      // Background "Spam Loop" - ensures validators keep seeing the tx while we wait for WSS notification
+      const spamLoop = (async () => {
+        let attempt = 1;
+        while (!confirmed && attempt < context.maxAttempts) {
+          await new Promise((r) => setTimeout(r, 2000));
+          if (confirmed) break;
+          
+          attempt++;
+          try {
+            await connection.sendRawTransaction(rawTx, { skipPreflight: true, maxRetries: 0 });
+            logger.debug(`[SolanaExecutor] Re-broadcast attempt #${attempt} for ${signature}`);
+          } catch (e) {
+            logger.debug(`[SolanaExecutor] Re-broadcast attempt #${attempt} failed: ${e}`);
           }
         }
+      })();
 
-        // Wait 2 seconds before rebroadcasting
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+      try {
+        const result = await confirmationPromise;
+        confirmed = true;
+        if (result.value.err) {
+          throw new Error(`Transaction failed on-chain: ${JSON.stringify(result.value.err)}`);
+        }
+        logger.info(`[SolanaExecutor] Transaction confirmed on-chain: ${signature}`);
+        return signature;
+      } catch (err) {
+        throw new Error(`Transaction ${signature} confirmation failed: ${err instanceof Error ? err.message : String(err)}`);
       }
-
-      if (!confirmed) {
-        throw new Error(
-          `Transaction ${signature || '(not sent)'} failed/timed out after ${attempt} attempts for position ${context.positionId} (Action: ${context.action}).`
-        );
-      }
-
-      logger.info(`[SolanaExecutor] Transaction successfully confirmed on-chain: ${signature}`);
-      return signature;
     });
   }
 

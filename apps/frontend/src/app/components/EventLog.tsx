@@ -34,7 +34,7 @@ interface EventLogProps {
 
 export const EventLog = ({ logs, onApplySuggestion }: EventLogProps) => {
   return (
-    <div className="flex-1 border border-[#0D0D0D] bg-[#0D0D0D] text-[#F4F4F0] p-4 font-mono text-[11px] overflow-hidden flex flex-col min-h-0 relative">
+    <div className="flex-1 border border-[#0D0D0D] bg-[#0D0D0D] text-[#F4F4F0] p-4 font-mono text-[11px] overflow-hidden flex flex-col min-h-0 relative min-w-0">
       <div className="absolute top-0 right-0 p-2 opacity-20 pointer-events-none uppercase tracking-tighter text-xs">
         Live CRT Terminal
       </div>
@@ -43,7 +43,7 @@ export const EventLog = ({ logs, onApplySuggestion }: EventLogProps) => {
         <span className="uppercase font-bold tracking-widest text-[#FF4500]">Strategy Event Log</span>
       </div>
 
-      <div className="flex-1 overflow-y-auto flex flex-col gap-1 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto flex flex-col gap-1 custom-scrollbar min-w-0">
         {logs.length === 0 ? (
           <div className="text-gray-500 italic opacity-50">No events recorded. Click "Evaluate Ad-Hoc" to trigger.</div>
         ) : (
@@ -92,8 +92,8 @@ export const EventLog = ({ logs, onApplySuggestion }: EventLogProps) => {
                           )}
 
                           {hasPriceData && (
-                            <div className="mt-2 mb-2 bg-white/5 p-2 border-l-2 border-[#FF4500] flex flex-col gap-2 rounded-sm shadow-inner">
-                              <div className="text-[11px] uppercase font-bold text-[#FF4500] opacity-80 tracking-widest border-b border-white/10 pb-1 flex justify-between items-center">
+                            <div className="mt-2 mb-2 bg-white/5 p-2 border-l-2 border-[#FF4500] flex flex-col gap-2 rounded-sm shadow-inner min-w-0 overflow-hidden">
+                              <div className="text-[11px] uppercase font-bold text-[#FF4500] opacity-80 tracking-widest border-b border-white/10 pb-1 flex flex-wrap justify-between items-center gap-2">
                                 <span>Proposed Price Range</span>
                                 {onApplySuggestion && log.positionId && log.strategyId && action !== 'skip' && (
                                   <button
@@ -101,41 +101,41 @@ export const EventLog = ({ logs, onApplySuggestion }: EventLogProps) => {
                                       action: String(action),
                                       openParams
                                     })}
-                                    className="bg-[#FF4500] text-[#F4F4F0] px-2 py-0.5 text-[10px] hover:bg-[#FF4500]/80 transition-colors uppercase font-bold rounded-sm"
+                                    className="bg-[#FF4500] text-[#F4F4F0] px-2 py-0.5 text-[10px] hover:bg-[#FF4500]/80 transition-colors uppercase font-bold rounded-sm whitespace-nowrap"
                                   >
                                     Apply Suggestion
                                   </button>
                                 )}
                               </div>
-                              <div className="flex justify-between items-center px-1">
-                                <div className="flex flex-col">
-                                  <span className="opacity-50 uppercase text-[11px] tracking-tighter">Lower Price</span>
-                                  <span className="font-bold text-[11px] text-[#F4F4F0]">
+                              <div className="flex flex-wrap justify-between items-center px-1 gap-y-2">
+                                <div className="flex flex-col min-w-0">
+                                  <span className="opacity-50 uppercase text-[10px] tracking-tighter truncate">Lower</span>
+                                  <span className="font-bold text-[11px] text-[#F4F4F0] whitespace-nowrap">
                                     {Number(openParams.lowerBoundPrice).toLocaleString(undefined, {
                                       minimumFractionDigits: 4,
                                       maximumFractionDigits: 6,
                                     })}
                                   </span>
                                 </div>
-                                <div className="h-6 w-px bg-white/10 mx-2"></div>
-                                <div className="flex flex-col">
-                                  <span className="opacity-50 uppercase text-[11px] tracking-tighter">Upper Price</span>
-                                  <span className="font-bold text-[11px] text-[#F4F4F0]">
+                                <div className="hidden sm:block h-6 w-px bg-white/10 mx-2"></div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="opacity-50 uppercase text-[10px] tracking-tighter truncate">Upper</span>
+                                  <span className="font-bold text-[11px] text-[#F4F4F0] whitespace-nowrap">
                                     {Number(openParams.upperBoundPrice).toLocaleString(undefined, {
                                       minimumFractionDigits: 4,
                                       maximumFractionDigits: 6,
                                     })}
                                   </span>
                                 </div>
-                                <div className="h-6 w-px bg-white/10 mx-2"></div>
-                                <div className="flex flex-col text-right">
-                                  <span className="opacity-50 uppercase text-[11px] tracking-tighter">Range Width</span>
-                                  <span className="font-bold text-[11px] text-green-400">
+                                <div className="hidden sm:block h-6 w-px bg-white/10 mx-2"></div>
+                                <div className="flex flex-col text-right min-w-0">
+                                  <span className="opacity-50 uppercase text-[10px] tracking-tighter truncate">Width</span>
+                                  <span className="font-bold text-[11px] text-green-400 whitespace-nowrap">
                                     {(Number(openParams.rangePercent) || 0).toFixed(2)}%
                                   </span>
                                 </div>
                               </div>
-                              <div className="text-[11px] opacity-40 uppercase tracking-tighter flex justify-between border-t border-white/5 pt-1">
+                              <div className="text-[10px] opacity-40 uppercase tracking-tighter flex flex-wrap justify-between border-t border-white/5 pt-1 gap-2">
                                 <span>Bins: {String(openParams.binCount || 'unknown')}</span>
                                 <span>
                                   Slippage:{' '}
