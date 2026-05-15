@@ -99,13 +99,13 @@ export class TrailingUsdcStrategy implements IStrategy {
       };
     }
 
-if (finalContext.signal === 'open' && finalContext.openParams) {
-       logger.info(`[TrailingUsdcStrategy] Decision: open with params`);
-       return {
-         action: 'open',
-         openParams: finalContext.openParams,
-       };
-     }
+    if (finalContext.signal === 'open' && finalContext.openParams) {
+      logger.info(`[TrailingUsdcStrategy] Decision: open with params`);
+      return {
+        action: 'open',
+        openParams: finalContext.openParams,
+      };
+    }
 
     logger.info(`[TrailingUsdcStrategy] Decision: skip`);
     return {
