@@ -10,7 +10,7 @@
 
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 
 interface LogEntry {
   id: string | number;
@@ -33,16 +33,24 @@ interface EventLogProps {
 }
 
 export const EventLog = ({ logs, onApplySuggestion }: EventLogProps) => {
+  const [collapsed, setCollapsed] = useState(true);
   return (
     <div className="flex-1 border border-[#0D0D0D] bg-[#0D0D0D] text-[#F4F4F0] p-4 font-mono text-[11px] overflow-hidden flex flex-col min-h-0 relative min-w-0">
       <div className="absolute top-0 right-0 p-2 opacity-20 pointer-events-none uppercase tracking-tighter text-xs">
         Live CRT Terminal
       </div>
-      <div className="flex items-center gap-2 border-b border-[#F4F4F0]/20 pb-2 mb-2 shrink-0">
-        <div className="w-2 h-2 bg-[#FF4500] animate-pulse"></div>
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        className="flex items-center gap-2 border-b border-[#F4F4F0]/20 pb-2 mb-2 shrink-0 w-full text-left cursor-pointer bg-transparent border-t-0 border-r-0 border-l-0"
+      >
+        <div className="w-2 h-2 bg-[#FF4500] animate-pulse shrink-0"></div>
         <span className="uppercase font-bold tracking-widest text-[#FF4500]">Strategy Event Log</span>
-      </div>
+        <span className="ml-auto text-[#F4F4F0]/40 text-xs transition-transform duration-200">
+          {collapsed ? '\u25B6' : '\u25BC'}
+        </span>
+      </button>
 
+      {!collapsed && (
       <div className="flex-1 overflow-y-auto flex flex-col gap-1 custom-scrollbar min-w-0">
         {logs.length === 0 ? (
           <div className="text-gray-500 italic opacity-50">No events recorded. Click "Evaluate Ad-Hoc" to trigger.</div>
@@ -166,6 +174,7 @@ export const EventLog = ({ logs, onApplySuggestion }: EventLogProps) => {
           ))
         )}
       </div>
+      )}
     </div>
   );
 };
