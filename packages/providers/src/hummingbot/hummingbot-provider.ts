@@ -332,7 +332,8 @@ export class HummingbotProvider implements IPositionProvider {
       // fall through to getPositions
     }
 
-    const positions = await this.getPositions('', poolAddress);
+    const wallet = await this.getWalletAddress();
+    const positions = await this.getPositions(wallet, poolAddress);
     const pos = positions.find((p) => p.id === positionId);
     if (pos) return pos;
     throw new Error(`Position ${positionId} not found`);

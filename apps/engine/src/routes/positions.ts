@@ -1,43 +1,19 @@
 import { Router } from 'express';
-import {
-  IPositionProvider,
-  IExecutor,
-  IOrchestratorRegistry,
-  IPositionStore,
-  OpenParams,
-  IStore,
-  RebalanceTask,
-  IRpcProvider,
-} from '@lp-system/core';
+import { IPositionProvider, IExecutor, IStore, RebalanceTask } from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
 
 const logger = getLogger('router-positions');
 
-import { OrchestratorFactory } from '@lp-system/orchestration';
-import { getPriceFromBinId } from '@lp-system/providers';
-import { processTasks } from '../lifecycle.js';
-
 /**
  * Creates the positions router handling unified position actions.
  */
-export function handlePositionsRouter(
-  positionProvider: IPositionProvider,
-  executor: IExecutor,
-  registry: IOrchestratorRegistry,
-  factory: OrchestratorFactory,
-  walletAddress: string,
-  positionStore?: IPositionStore,
-  store?: IStore,
-  rpcPool?: IRpcProvider
-): Router {
-  void walletAddress;
-  void positionStore;
-  void rpcPool;
+export function handlePositionsRouter(positionProvider: IPositionProvider, executor: IExecutor, store?: IStore): Router {
   const router = Router();
 
   /**
    * POST /positions/:positionId/actions
-   * Perform a unified action on a position (evaluate, removeLiquidity, addLiquidity).
+   * Perform a position action (removeLiquidity, addLiquidity, applySuggestion).
+   * Strategy evaluation is handled by POST /strategies/:id/evaluate.
    */
   router.post('/:positionId/actions', async (req, res) => {
     const { positionId } = req.params;
@@ -50,78 +26,6 @@ export function handlePositionsRouter(
 
     try {
       logger.info(`[HTTP Server] Received position action '${action}' for position ${positionId}`);
-
-      if (action === 'evaluate') {
-        if (!strategyId) {
-          res.status(400).json({ error: 'Missing strategyId in request body for evaluate action' });
-          return;
-        }
-
-        const position = await positionProvider.getPosition(positionId);
-        const market = await positionProvider.getMarketSnapshot(position.poolAddress);
-
-        const orchestrators = registry.getForPosition(positionId);
-        let targetOrch = orchestrators.find((o) => o.strategyId === strategyId);
-
-        if (!targetOrch) {
-          logger.info(
-            `[HTTP Server] No active orchestrator found for strategy ${strategyId} on position ${positionId}, creating ad-hoc orchestrator for evaluation.`
-          );
-          try {
-            targetOrch = factory.create({
-              id: `adhoc_${Date.now()}`,
-              positionId,
-              strategyId,
-              mode: 'monitoring',
-              createdAt: Date.now(),
-            });
-          } catch (factoryErr: unknown) {
-            const msg = factoryErr instanceof Error ? factoryErr.message : String(factoryErr);
-            res.status(404).json({
-              error: `Strategy ${strategyId} is not registered or cannot be instantiated: ${msg}`,
-            });
-            return;
-          }
-        }
-
-        const result = await targetOrch.tick(position, market);
-
-        const openParams = (result &&
-          ('openParams' in result ? result.openParams : 'params' in result ? result.params : undefined)) as
-          | OpenParams
-          | undefined;
-        if (openParams) {
-          try {
-            const poolInfo = await positionProvider.getPoolInfo(position.poolAddress);
-            const lower = openParams.lowerBinId ?? openParams.lowerBound;
-            const upper = openParams.upperBinId ?? openParams.upperBound;
-            if (lower !== undefined && upper !== undefined) {
-              const lowerBoundPrice = getPriceFromBinId(
-                lower,
-                poolInfo.binStep,
-                position.tokenX.decimals,
-                position.tokenY.decimals
-              );
-              const upperBoundPrice = getPriceFromBinId(
-                upper,
-                poolInfo.binStep,
-                position.tokenX.decimals,
-                position.tokenY.decimals
-              );
-              openParams.lowerBoundPrice = lowerBoundPrice;
-              openParams.upperBoundPrice = upperBoundPrice;
-              openParams.binCount = upper - lower + 1;
-              openParams.rangePercent =
-                lowerBoundPrice > 0 ? ((upperBoundPrice - lowerBoundPrice) / lowerBoundPrice) * 100 : 0;
-            }
-          } catch (enrichErr) {
-            logger.warn(`Failed to enrich evaluation result with price data: ${enrichErr}`);
-          }
-        }
-
-        res.json({ status: 'success', action: 'evaluate', result });
-        return;
-      }
 
       if (action === 'removeLiquidity') {
         const position = await positionProvider.getPosition(positionId);
@@ -216,7 +120,12 @@ export function handlePositionsRouter(
         const actualAction = suggestion.action === 'close+open' ? 'close+open' : suggestion.action;
 
         // If it's a compound action (close+open), we MUST use the stateful RebalanceTask system
-        if (actualAction === 'close+open' && store) {
+        // The lifecycle loop will pick up the task on the next tick.
+        if (actualAction === 'close+open') {
+          if (!store) {
+            res.status(500).json({ error: 'No persistence store available for compound action' });
+            return;
+          }
           logger.info(`[HTTP Server] Creating stateful RebalanceTask for manual suggestion: ${actualAction}`);
           const tasksStore = store as unknown as { saveTask: (t: RebalanceTask) => Promise<void> };
           const task: RebalanceTask = {
@@ -243,15 +152,6 @@ export function handlePositionsRouter(
 
           await tasksStore.saveTask(task);
 
-          // Trigger Execution Monitor immediately for responsiveness
-          if (positionStore) {
-            processTasks(store, executor, positionProvider, registry, positionStore, { factory }).catch((err) =>
-              logger.error(`[HTTP Server] Error triggering processTasks: ${err.message}`)
-            );
-          } else {
-            logger.warn(`[HTTP Server] Cannot trigger processTasks: positionStore is undefined`);
-          }
-
           res.json({
             status: 'success',
             action: 'applySuggestion',
@@ -259,7 +159,7 @@ export function handlePositionsRouter(
             message:
               'Rebalance task successfully queued. The engine will now execute the close and open legs asynchronously. Monitor the Event Log for real-time progress.',
             taskId: task.id,
-            suggestionApplied: false, // Changed to false to reflect it is queued, not finished
+            suggestionApplied: false,
           });
           return;
         }
