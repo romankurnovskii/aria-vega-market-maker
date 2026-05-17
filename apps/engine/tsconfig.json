@@ -2,7 +2,14 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "./src",
-    "outDir": "dist"
+    "outDir": "dist",
+    "paths": {
+      "@lp-system/providers": ["../../packages/providers/src/index.ts"],
+      "@lp-system/core": ["../../packages/core/src/index.ts"],
+      "@lp-system/logger": ["../../packages/logger/src/index.ts"],
+      "@lp-system/steps": ["../../packages/steps/src/index.ts"],
+      "@lp-system/executor": ["../../packages/executor/src/index.ts"]
+    }
   },
   "include": ["src/**/*"]
 }

@@ -244,19 +244,20 @@ export function handlePositionsRouter(
           await tasksStore.saveTask(task);
 
           // Trigger Execution Monitor immediately for responsiveness
-          processTasks(
-            store,
-            executor,
-            positionProvider,
-            registry,
-            factory
-          ).catch((err) => logger.error(`[HTTP Server] Error triggering processTasks: ${err.message}`));
+          if (positionStore) {
+            processTasks(store, executor, positionProvider, registry, positionStore, { factory }).catch((err) =>
+              logger.error(`[HTTP Server] Error triggering processTasks: ${err.message}`)
+            );
+          } else {
+            logger.warn(`[HTTP Server] Cannot trigger processTasks: positionStore is undefined`);
+          }
 
           res.json({
             status: 'success',
             action: 'applySuggestion',
             appliedAction: actualAction,
-            message: 'Rebalance task successfully queued. The engine will now execute the close and open legs asynchronously. Monitor the Event Log for real-time progress.',
+            message:
+              'Rebalance task successfully queued. The engine will now execute the close and open legs asynchronously. Monitor the Event Log for real-time progress.',
             taskId: task.id,
             suggestionApplied: false, // Changed to false to reflect it is queued, not finished
           });

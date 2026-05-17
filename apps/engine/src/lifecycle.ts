@@ -10,8 +10,6 @@
  * @sideEffects startDiscovery modifies JsonPositionStore; startTickLoop spawns interval that mutates persistent store and calls executor
  */
 
-import { TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from '@solana/spl-token';
-
 import {
   IPositionProvider,
   IPositionStore,
@@ -19,7 +17,6 @@ import {
   IOrchestratorRegistry,
   IExecutionGate,
   IExecutor,
-  IRpcProvider,
   Recommendation,
   Decision,
   Position,
@@ -34,45 +31,6 @@ import { isDeepStrictEqual } from 'node:util';
 const logger = getLogger('lifecycle');
 
 let tickLoopRunning = false;
-
-import { PublicKey, Connection } from '@solana/web3.js';
-
-/**
- * Robust helper to fetch raw SPL token account balances for token X and token Y of a pool.
- */
-async function getWalletBalances(
-  connection: Connection,
-  walletAddress: string,
-  mintX: string,
-  mintY: string
-): Promise<{ amountX: string; amountY: string }> {
-  let amountX = '0';
-  let amountY = '0';
-
-  const tokenProgramId = TOKEN_PROGRAM_ID;
-  const token2022ProgramId = TOKEN_2022_PROGRAM_ID;
-
-  const fetchForProgram = async (programId: PublicKey) => {
-    const response = await connection.getParsedTokenAccountsByOwner(new PublicKey(walletAddress), { programId });
-
-    for (const account of response.value) {
-      const info = account.account.data.parsed.info;
-      const mint = info.mint;
-      const amount = info.tokenAmount.amount;
-
-      if (mint === mintX) {
-        amountX = amount;
-      } else if (mint === mintY) {
-        amountY = amount;
-      }
-    }
-  };
-
-  await fetchForProgram(tokenProgramId);
-  await fetchForProgram(token2022ProgramId);
-
-  return { amountX, amountY };
-}
 
 /**
  * Starts the one-time position discovery cycle.
@@ -143,9 +101,7 @@ export async function startDiscovery(
   const liveIds = new Set(livePositions.map((p) => p.id));
   const knownIds = new Set(knownPositions.map((p) => p.id));
   const inFlightPositionIds = new Set<string>(
-    tasks
-      .filter((t) => t.status !== 'completed' && t.status !== 'failed')
-      .map((t: RebalanceTask) => t.originalPositionId)
+    tasks.filter((t) => t.status !== 'completed' && t.status !== 'failed').map((t: RebalanceTask) => t.originalPositionId)
   );
 
   // 2. Identify live positions and ensure their orchestrators are registered
@@ -435,11 +391,8 @@ export async function processTasks(
 
         let freshPosition: Position;
         try {
-          freshPosition = await positionProvider.getPosition(
-            record.newPositionId!,
-            task.intent.openParams!.poolAddress
-          );
-        } catch (err) {
+          freshPosition = await positionProvider.getPosition(record.newPositionId!, task.intent.openParams!.poolAddress);
+        } catch {
           logger.warn(
             `[Execution Monitor] Indexing lag detected for new position ${record.newPositionId}. Synthesizing temporary position from intent.`
           );
@@ -465,12 +418,13 @@ export async function processTasks(
             },
             isInRange: true,
             openedAt: Date.now(),
+            metadata: {},
             state: 'REBALANCING', // Indicates it's newly opened and needs full sync
           };
         }
 
         await positionStore.saveKnown([...remaining, freshPosition]);
-        task.events.push({ stage: 'POSITION_OPENED', timestamp: Date.now() });
+        task.events.push({ stage: 'OPEN_CONFIRMED', timestamp: Date.now() });
 
         // IMPORTANT: Mark task as completed immediately after successful on-chain confirmation and cache update
         // to prevent indexing lag from triggering a retry/duplicate open.
@@ -516,7 +470,6 @@ export function startTickLoop(
   executionGate: IExecutionGate,
   executor: IExecutor,
   store: IStore,
-  rpcPool: IRpcProvider,
   factory?: OrchestratorFactory
 ): NodeJS.Timeout {
   logger.info(
@@ -597,9 +550,11 @@ export function startTickLoop(
               `[Tick Loop] Position ${position.id} is in REBALANCING state. Synthesizing position from wallet balances...`
             );
             const poolInfo = await positionProvider.getPoolInfo(position.poolAddress);
-            const walletBalances = await rpcPool.execute(async (connection: Connection) => {
-              return await getWalletBalances(connection, walletAddress, poolInfo.tokenXAddress, poolInfo.tokenYAddress);
-            });
+            const walletBalances = await positionProvider.getWalletBalances(
+              walletAddress,
+              poolInfo.tokenXAddress,
+              poolInfo.tokenYAddress
+            );
             freshPosition = {
               id: position.id,
               poolAddress: poolInfo.poolAddress,

@@ -38,6 +38,7 @@ import {
   createStrategiesRouter,
   createIntrospectionRouter,
   handlePositionsRouter,
+  createWalletsRouter,
 } from './routes/index.js';
 
 const logger = getLogger('server');
@@ -76,18 +77,25 @@ export function startHttpServer(
   app.use('/assignments', createAssignmentsRouter(store, registry, factory));
   app.use('/strategies', createStrategiesRouter(registry, factory, positionProvider));
   app.use('/', createIntrospectionRouter(factory));
-
-  app.get('/positions', async (_req, res) => {
+  app.use('/wallets', createWalletsRouter(positionProvider));
+  app.get('/positions', async (req, res) => {
     try {
-      let positions: Position[];
-      if (positionStore) {
-        positions = await positionStore.getKnown();
-      } else {
-        positions = await positionProvider.getPositions(walletAddress);
-      }
+      const targetWallet = (req.query.wallet as string) || walletAddress;
 
-      // Reuse positions if we just fetched them from provider, otherwise fetch live for PnL
-      const livePositions = positionStore ? await positionProvider.getPositions(walletAddress).catch(() => []) : positions;
+      const isDefaultWallet = targetWallet === walletAddress;
+
+      let positions: Position[];
+      let livePositions: Position[];
+
+      if (isDefaultWallet && positionStore) {
+        // Use cache for default wallet, fetch live only for PnL enrichment
+        positions = await positionStore.getKnown();
+        livePositions = await positionProvider.getPositions(targetWallet).catch(() => []);
+      } else {
+        // Fetch live for non-default wallets (positionStore cache only covers default)
+        positions = await positionProvider.getPositions(targetWallet);
+        livePositions = positions;
+      }
 
       // Batch fetch pool metadata and market snapshots to avoid N+1 redundancy
       const uniquePools = [...new Set(positions.map((p) => p.poolAddress))];
@@ -142,6 +150,9 @@ export function startHttpServer(
             activeBin: market.activeBound,
             binCount,
             rangePercent,
+            poolActivePrice: market.price,
+            binStep: poolInfo.binStep,
+            feeRate: poolInfo.feeRate,
             pnlData: livePnl,
           };
         } catch (e) {
@@ -151,7 +162,7 @@ export function startHttpServer(
       });
 
       res.json({
-        wallet: walletAddress,
+        wallet: targetWallet,
         count: positionsWithPriceData.length,
         positions: positionsWithPriceData,
       });
@@ -178,7 +189,10 @@ export function startHttpServer(
     }
   });
 
-  app.use('/positions', handlePositionsRouter(positionProvider, executor, registry, factory, walletAddress, positionStore, store, rpcPool));
+  app.use(
+    '/positions',
+    handlePositionsRouter(positionProvider, executor, registry, factory, walletAddress, positionStore, store, rpcPool)
+  );
 
   const swaggerDocument = YAML.load(path.join(__dirname, '../src/openapi.yaml'));
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
