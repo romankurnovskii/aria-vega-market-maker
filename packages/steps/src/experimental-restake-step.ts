@@ -106,7 +106,7 @@ export class ExperimentalRestakeStep implements IStep {
       );
 
       // Determine the average spot buy price (prefer effective break-even with accrued fees, otherwise geometric average)
-      const avgSpotBuy = calculations.effectiveBreakEven || calculations.geometricAverage;
+      const avgSpotBuy = calculations!.effectiveBreakEven || calculations!.geometricAverage;
       const lowerBoundPrice = context.market.price;
 
       // Calculate wider range upper bound so that the geometric average spot sell price matches average spot buy price

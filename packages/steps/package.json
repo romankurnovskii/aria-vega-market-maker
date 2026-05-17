@@ -7,5 +7,10 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@lp-system/core": "workspace:*",
+    "@lp-system/logger": "workspace:*",
+    "@lp-system/providers": "workspace:*"
   }
 }
