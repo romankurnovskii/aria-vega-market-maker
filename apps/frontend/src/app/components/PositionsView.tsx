@@ -17,16 +17,35 @@
 import React, { useState, useMemo } from 'react';
 import { PositionTable } from './PositionTable';
 import { PositionDetail } from './PositionDetail';
+import { Position, EvalLogEntry } from '../stores/app-store';
+
+interface Assignment {
+  id: string;
+  positionId: string;
+  strategyId: string;
+  mode: string;
+}
+
+interface Strategy {
+  id: string;
+  name: string;
+  description: string;
+  risk: string;
+}
 
 interface Props {
-  positions: any[];
-  assignments: any[];
-  strategies: any[];
+  positions: Position[];
+  assignments: Assignment[];
+  strategies: Strategy[];
   onAssign: (positionId: string, strategyId: string, mode: string) => Promise<void>;
   onEvaluate: (positionId: string, strategyId: string) => Promise<void>;
   onRemoveLiquidity: (positionId: string) => Promise<void>;
-  onApplySuggestion: (positionId: string, strategyId: string, suggestion: { action: string; openParams?: Record<string, unknown> }) => void;
-  evalLogs: any[];
+  onApplySuggestion: (
+    positionId: string,
+    strategyId: string,
+    suggestion: { action: string; openParams?: Record<string, unknown> }
+  ) => void;
+  evalLogs: EvalLogEntry[];
 }
 
 export const PositionsView = ({
@@ -43,18 +62,20 @@ export const PositionsView = ({
 
   const positionOrchestration = useMemo(() => {
     const map: Record<string, { strategyId: string; mode: string }> = {};
-    assignments.forEach((a: any) => {
+    assignments.forEach((a: Assignment) => {
       map[a.positionId] = { strategyId: a.strategyId, mode: a.mode };
     });
     return map;
   }, [assignments]);
 
-  const selectedPos = positions.find((p: any) => p.id === selectedPosId);
+  const selectedPos = positions.find((p: Position) => p.id === selectedPosId);
   const selectedOrch = selectedPos ? positionOrchestration[selectedPos.id] : null;
 
   return (
-    <div className="flex h-full gap-4 overflow-hidden">
-      <div className={`flex flex-col transition-all duration-300 ${selectedPosId ? 'w-1/3' : 'w-full'}`}>
+    <div className="flex flex-col lg:flex-row h-full gap-4 overflow-hidden">
+      <div
+        className={`flex flex-col transition-all duration-300 ${selectedPosId ? 'lg:w-1/3 w-full' : 'w-full'} ${selectedPosId ? 'hidden lg:flex' : 'flex'}`}
+      >
         <PositionTable
           positions={positions}
           positionOrchestration={positionOrchestration}
@@ -64,8 +85,9 @@ export const PositionsView = ({
       </div>
 
       {selectedPos && (
-        <div className="flex flex-1 gap-4 min-w-0 animate-in slide-in-from-right-4 duration-300">
+        <div className="flex flex-1 gap-4 min-w-0 animate-in slide-in-from-bottom-4 lg:slide-in-from-right-4 duration-300">
           <PositionDetail
+            key={selectedPos.id}
             position={selectedPos}
             orchestration={selectedOrch}
             strategies={strategies}

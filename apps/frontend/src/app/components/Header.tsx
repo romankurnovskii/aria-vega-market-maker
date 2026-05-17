@@ -1,33 +1,47 @@
-/**
- * @file Header.tsx
- * @description Compact header displaying epoch, active task count, and engine health status.
- *
- * @features
- * - Shows current epoch timestamp
- * - Shows number of active assignments
- * - Shows engine status with color indicator
- *
- * @dependencies HealthData, Assignment (AriaVegaContainer)
- */
-
 import { HealthData, Assignment } from '../containers/AriaVegaContainer';
+
+interface Wallet {
+  chain: string;
+  address: string;
+  is_default: boolean;
+}
 
 interface HeaderProps {
   health: HealthData;
   assignments: Assignment[];
+  wallets: Wallet[];
 }
 
-export const Header = ({ health, assignments }: HeaderProps) => {
-  return (
-    <header className="border-b border-[#0D0D0D] pb-2 mb-4 flex flex-row justify-between items-end gap-4 relative z-10 shrink-0">
-      <h1 className="font-syne text-2xl md:text-3xl font-extrabold uppercase leading-none tracking-tighter">
-        Aria Vega{' '}
-        <span className="text-transparent" style={{ WebkitTextStroke: '1px #0D0D0D' }}>
-          Control
-        </span>
-      </h1>
+const addrShort = (addr: string) => `${addr.slice(0, 4)}...${addr.slice(-4)}`;
 
-      <div className="flex gap-6 text-xs border-l border-[#0D0D0D] pl-4">
+export const Header = ({ health, assignments, wallets }: HeaderProps) => {
+  return (
+    <header className="border-b border-[#0D0D0D] pb-2 mb-4 flex flex-col md:flex-row justify-between items-start md:items-end gap-4 relative z-10 shrink-0">
+      <div className="flex flex-col">
+        <h1 className="font-syne text-2xl md:text-3xl font-extrabold uppercase leading-none tracking-tighter">
+          Aria Vega{' '}
+          <span className="text-transparent" style={{ WebkitTextStroke: '1px #0D0D0D' }}>
+            Control
+          </span>
+        </h1>
+      </div>
+
+      <div className="flex flex-wrap gap-4 md:gap-6 text-xs border-t md:border-t-0 md:border-l border-[#0D0D0D] pt-2 md:pt-0 md:pl-4 w-full md:w-auto">
+        {wallets.length > 0 && (
+          <div>
+            <div className="text-gray-500 mb-0.5 uppercase tracking-wider text-[11px]">Wallets</div>
+            <div className="flex flex-col gap-0.5">
+              {wallets.map((w) => (
+                <div key={w.address} className="flex items-center gap-1.5">
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${w.is_default ? 'bg-[#FF4500]' : 'bg-gray-300'}`} />
+                  <span className="font-mono font-bold">{addrShort(w.address)}</span>
+                  <span className="text-gray-400 uppercase text-[10px]">{w.chain}</span>
+                  {w.is_default && <span className="text-[10px] text-[#FF4500] font-bold ml-auto">DEFAULT</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div>
           <div className="text-gray-500 mb-0.5 uppercase tracking-wider text-[11px]">Epoch</div>
           <div className="font-bold">{health.epoch}</div>

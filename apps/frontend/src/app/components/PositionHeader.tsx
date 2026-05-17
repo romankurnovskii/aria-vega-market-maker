@@ -16,10 +16,25 @@ interface PositionHeaderProps {
   positionId: string;
   pool: string;
   state: string;
+  openedAt?: number;
   onClose: () => void;
 }
 
-export const PositionHeader = ({ positionId, pool, state, onClose }: PositionHeaderProps) => {
+const timeAgo = (ts?: number): string => {
+  if (!ts) return '';
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  return `${months}mo ago`;
+};
+
+export const PositionHeader = ({ positionId, pool, state, openedAt, onClose }: PositionHeaderProps) => {
   const getStateClasses = (state: string): string => {
     if (state === 'OPEN') return 'border-green-500 text-green-600 bg-green-50';
     if (state === 'CREATING') return 'border-blue-500 text-blue-600 bg-blue-50 animate-pulse';
@@ -42,12 +57,13 @@ export const PositionHeader = ({ positionId, pool, state, onClose }: PositionHea
             {pool}
           </span>
         </div>
-        <div className="mt-2 flex items-center">
+        <div className="mt-2 flex items-center gap-3">
           <span
             className={`px-2 py-0.5 text-[11px] font-bold border uppercase tracking-widest font-mono-jb ${getStateClasses(state)}`}
           >
             {state}
           </span>
+          {openedAt && <span className="text-[11px] text-gray-400 font-mono">Opened {timeAgo(openedAt)}</span>}
         </div>
       </div>
       <button

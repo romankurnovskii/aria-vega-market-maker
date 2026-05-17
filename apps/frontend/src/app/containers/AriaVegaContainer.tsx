@@ -14,17 +14,19 @@
 
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Zap, Trash2, ChevronRight, TerminalSquare, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { TerminalSquare } from 'lucide-react';
 
 import { Header } from '../components/Header';
 import { Sidebar } from '../components/Sidebar';
 import { PositionsView } from '../components/PositionsView';
+import { WalletsView } from '../components/WalletsView';
 import { AssignmentsView } from '../components/AssignmentsView';
 import { StrategiesView } from '../components/StrategiesView';
 import { StepsView } from '../components/StepsView';
 
 import { Footer } from '../components/Footer';
+import { useAppStore, EvalLogEntry } from '../stores/app-store';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8441';
 
@@ -56,6 +58,13 @@ export interface HealthData {
   status: string;
 }
 
+interface Wallet {
+  chain: string;
+  address: string;
+  is_default: boolean;
+  portfolio?: Record<string, unknown>;
+}
+
 interface Position {
   id: string;
   pool: string;
@@ -63,12 +72,18 @@ interface Position {
   maxBin: number;
   binCount: number;
   rangePercent: number;
+  lowerBoundPrice?: number;
+  upperBoundPrice?: number;
+  activeBin?: number;
   status: string;
   state: string;
-  tokenX: { amount: string; decimals: number } | null | undefined;
-  tokenY: { amount: string; decimals: string } | null | undefined;
-  raw: any;
-  pnlData?: any;
+  tokenX: { amount: string; decimals: number; mint?: string } | null | undefined;
+  tokenY: { amount: string; decimals: number; mint?: string } | null | undefined;
+  openedAt?: number;
+  poolActivePrice?: number;
+  raw: Record<string, unknown>;
+  pnlData?: Record<string, unknown>;
+  _wallet?: string;
 }
 
 export interface Assignment {
@@ -97,6 +112,33 @@ interface AriaVegaData {
   assignments: Assignment[];
   strategies: Strategy[];
   steps: Step[];
+  wallets: Wallet[];
+}
+
+interface RawApiPosition {
+  id: string;
+  poolAddress: string;
+  lowerBinId?: number;
+  upperBinId?: number;
+  lowerBound?: number;
+  upperBound?: number;
+  binCount?: number;
+  rangePercent?: number;
+  lowerBoundPrice?: number;
+  upperBoundPrice?: number;
+  activeBin?: number;
+  openedAt?: number;
+  poolActivePrice?: number;
+  isInRange?: boolean;
+  state?: string;
+  tokenX?: { amount: string; decimals: number; mint?: string; tokenAddress?: string };
+  tokenY?: { amount: string; decimals: number; mint?: string; tokenAddress?: string };
+  pnlData?: Record<string, unknown>;
+  metadata?: { pnl?: Record<string, unknown> };
+  binStep?: number;
+  baseFee?: number;
+  feeRate?: number;
+  [key: string]: unknown;
 }
 
 export const AriaVegaContainer = () => {
@@ -107,25 +149,23 @@ export const AriaVegaContainer = () => {
     positions: [],
     strategies: [],
     steps: [],
+    wallets: [],
     health: { epoch: 0, status: '' },
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [evalLogs, setEvalLogs] = useState<any[]>([]);
+  const [evalLogs, setEvalLogs] = useState<EvalLogEntry[]>([]);
 
   // Fetch all state from API
   const syncState = async (): Promise<void> => {
     try {
-      const [healthRes, positionsRes, closedPositionsRes, assignmentsRes, strategiesRes, stepsRes] = await Promise.all([
+      const [healthRes, walletsRes, assignmentsRes, strategiesRes, stepsRes] = await Promise.all([
         fetch(`${API_URL}/health`)
           .then((r) => r.json())
           .catch(() => ({ status: 'offline', timestamp: Date.now() })),
-        fetch(`${API_URL}/positions`)
+        fetch(`${API_URL}/wallets`)
           .then((r) => r.json())
-          .catch(() => ({ count: 0, positions: [] })),
-        fetch(`${API_URL}/positions/closed`)
-          .then((r) => r.json())
-          .catch(() => ({ count: 0, positions: [] })),
+          .catch(() => ({ count: 0, wallets: [] })),
         fetch(`${API_URL}/assignments`)
           .then((r) => r.json())
           .catch(() => []),
@@ -137,13 +177,45 @@ export const AriaVegaContainer = () => {
           .catch(() => ({ availableSteps: [], documentation: '' })),
       ]);
 
+      const wallets = (walletsRes.wallets || []) as Wallet[];
+
+      // Fetch portfolio data for each wallet concurrently
+      const portfoliosResults = await Promise.all(
+        wallets.map((w) =>
+          fetch(`${API_URL}/wallets/${w.address}/portfolio`)
+            .then((r) => r.json())
+            .then((d) => ({ wallet: w.address, portfolio: d }))
+            .catch(() => ({ wallet: w.address, portfolio: undefined }))
+        )
+      );
+
+      // Merge portfolio data into wallets
+      const portfoliosMap = new Map<string, Record<string, unknown>>();
+      for (const r of portfoliosResults) {
+        portfoliosMap.set(r.wallet, r.portfolio);
+      }
+
+      const walletsWithPortfolio = wallets.map((w) => ({
+        ...w,
+        portfolio: portfoliosMap.get(w.address) || undefined,
+      })) as Wallet[];
+
+      const positionsResults = await Promise.all(
+        wallets.map((w) =>
+          fetch(`${API_URL}/positions?wallet=${w.address}`)
+            .then((r) => r.json())
+            .then((d: { positions?: RawApiPosition[] }) => ({ wallet: w.address, positions: d.positions || [] }))
+            .catch(() => ({ wallet: w.address, positions: [] as RawApiPosition[] }))
+        )
+      );
+
       // Enrich strategies with standard names and risk levels
       const metadataMap: Record<string, { name: string; risk: string }> = {
         'trailing-usdc': { name: 'Trailing USDC', risk: 'Low' },
         'experimental-restake': { name: 'Experimental Restake', risk: 'High' },
         'spot-balanced': { name: 'Spot Balanced', risk: 'Medium' },
       };
-      const enrichedStrategies = (strategiesRes.strategies || []).map((s: any) => {
+      const enrichedStrategies = (strategiesRes.strategies || []).map((s: { id: string; description?: string }) => {
         const meta = metadataMap[s.id] || {
           name: s.id
             .split('-')
@@ -175,28 +247,61 @@ export const AriaVegaContainer = () => {
         };
       });
 
-      // Map positions
-      const mappedPositions = (positionsRes.positions || []).map((pos: any) => {
-        const minBin = pos.lowerBinId !== undefined ? pos.lowerBinId : pos.lowerBound !== undefined ? pos.lowerBound : 0;
-        const maxBin = pos.upperBinId !== undefined ? pos.upperBinId : pos.upperBound !== undefined ? pos.upperBound : 0;
-        const binCount = pos.binCount !== undefined ? pos.binCount : maxBin >= minBin ? maxBin - minBin + 1 : 0;
-        const rangePercent = pos.rangePercent !== undefined ? pos.rangePercent : 0;
+      // Map positions, tagged with wallet address
+      const mappedPositions: Position[] = [];
+      for (const r of positionsResults) {
+        for (const pos of r.positions) {
+          const minBin = pos.lowerBinId !== undefined ? pos.lowerBinId : pos.lowerBound !== undefined ? pos.lowerBound : 0;
+          const maxBin = pos.upperBinId !== undefined ? pos.upperBinId : pos.upperBound !== undefined ? pos.upperBound : 0;
+          const binCount = pos.binCount !== undefined ? pos.binCount : maxBin >= minBin ? maxBin - minBin + 1 : 0;
+          const rangePercent = pos.rangePercent !== undefined ? pos.rangePercent : 0;
 
-        return {
-          id: pos.id,
-          pool: pos.poolAddress,
-          minBin,
-          maxBin,
-          binCount,
-          rangePercent,
-          status: pos.isInRange ? 'In Range' : 'Out of Range',
-          state: pos.state || 'OPEN',
-          tokenX: pos.tokenX,
-          tokenY: pos.tokenY,
-          raw: pos,
-          pnlData: pos.pnlData || pos.metadata?.pnl || pos.metadata || pos,
-        };
-      });
+          mappedPositions.push({
+            id: pos.id,
+            pool: pos.poolAddress,
+            minBin,
+            maxBin,
+            binCount,
+            rangePercent,
+            lowerBoundPrice: pos.lowerBoundPrice,
+            upperBoundPrice: pos.upperBoundPrice,
+            activeBin: pos.activeBin,
+            openedAt: pos.openedAt,
+            poolActivePrice: pos.poolActivePrice,
+            status: pos.isInRange ? 'In Range' : 'Out of Range',
+            state: pos.state || 'OPEN',
+            tokenX: pos.tokenX,
+            tokenY: pos.tokenY,
+            raw: pos,
+            pnlData: pos.pnlData || pos.metadata?.pnl || pos.metadata || pos,
+            _wallet: r.wallet,
+          });
+        }
+      }
+
+      // Populate Zustand store with pool metadata and positions
+      const setPoolMeta = useAppStore.getState().setPoolMeta;
+      const setPositionsByPool = useAppStore.getState().setPositionsByPool;
+      const poolAddresses = [...new Set(mappedPositions.map((p) => p.pool))];
+      for (const poolAddr of poolAddresses) {
+        const example = mappedPositions.find((p) => p.pool === poolAddr);
+        if (!example) continue;
+        const rawPos = example.raw as RawApiPosition;
+        const xMint = rawPos.tokenX?.mint || rawPos.tokenX?.tokenAddress;
+        const yMint = rawPos.tokenY?.mint || rawPos.tokenY?.tokenAddress;
+        setPoolMeta(poolAddr, {
+          address: poolAddr,
+          name: `${getTokenSymbol({ mint: xMint })}-${getTokenSymbol({ mint: yMint })}`,
+          tokenXMint: xMint || '',
+          tokenYMint: yMint || '',
+          tokenXSym: getTokenSymbol({ mint: xMint }),
+          tokenYSym: getTokenSymbol({ mint: yMint }),
+          binStep: rawPos.binStep || 0,
+          baseFee: rawPos.baseFee || 0,
+          feeRate: rawPos.feeRate || 0,
+        });
+      }
+      setPositionsByPool(mappedPositions);
 
       setData({
         health: { epoch: healthRes.timestamp || Date.now(), status: healthRes.status || 'healthy' },
@@ -204,9 +309,10 @@ export const AriaVegaContainer = () => {
         assignments: assignmentsRes || [],
         strategies: enrichedStrategies,
         steps: enrichedSteps,
+        wallets: walletsWithPortfolio,
       });
       setConnectionError(null);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Sync failed', error);
       setConnectionError('Unable to connect to the Aria Vega control server. Ensure it is running.');
     } finally {
@@ -284,7 +390,7 @@ export const AriaVegaContainer = () => {
   const handlePositionAction = async (
     positionId: string,
     action: string,
-    body: Record<string, any> = {}
+    body: Record<string, unknown> = {}
   ): Promise<void> => {
     console.log(`[AriaVega] Triggering position action '${action}' for position: ${positionId}`);
     try {
@@ -308,12 +414,14 @@ export const AriaVegaContainer = () => {
             id: Date.now(),
             timestamp: new Date().toLocaleTimeString(),
             action,
-            strategyId: body.strategyId,
+            strategyId: body.strategyId as string | undefined,
             positionId,
             result: result.result || result,
             transactionSignatures: result.transactionSignatures,
-            pendingSuggestion: body.pendingSuggestion,
-          },
+            pendingSuggestion: body.pendingSuggestion as
+              | { action: string; openParams?: Record<string, unknown> }
+              | undefined,
+          } satisfies EvalLogEntry,
           ...prev.slice(0, 49),
         ]);
 
@@ -327,22 +435,22 @@ export const AriaVegaContainer = () => {
             timestamp: new Date().toLocaleTimeString(),
             action,
             error: result.error || result.message || 'Action failed',
-            strategyId: body.strategyId,
+            strategyId: body.strategyId as string | undefined,
             positionId,
-          },
+          } satisfies EvalLogEntry,
           ...prev.slice(0, 49),
         ]);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       setEvalLogs((prev) => [
         {
           id: Date.now(),
           timestamp: new Date().toLocaleTimeString(),
           action,
-          error: err.message || 'Network error',
-          strategyId: body.strategyId,
+          error: err instanceof Error ? err.message : 'Network error',
+          strategyId: body.strategyId as string | undefined,
           positionId,
-        },
+        } satisfies EvalLogEntry,
         ...prev.slice(0, 49),
       ]);
     }
@@ -397,7 +505,7 @@ export const AriaVegaContainer = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F4F4F0] text-[#0D0D0D] font-mono-jb flex items-center justify-center wireframe-grid">
+      <div className="min-h-[100dvh] bg-[#F4F4F0] text-[#0D0D0D] font-mono-jb flex items-center justify-center wireframe-grid">
         <div className="flex flex-col items-center">
           <div className="w-12 h-12 border border-[#0D0D0D] animate-spin mb-6 flex items-center justify-center">
             <div className="w-6 h-6 bg-[#FF4500]"></div>
@@ -410,10 +518,10 @@ export const AriaVegaContainer = () => {
   }
 
   return (
-    <div className="min-h-screen max-h-screen bg-[#F4F4F0] text-[#0D0D0D] font-mono-jb selection:bg-[#FF4500] selection:text-[#F4F4F0] p-4 flex flex-col wireframe-grid relative overflow-hidden">
+    <div className="min-h-[100dvh] lg:h-screen lg:max-h-screen bg-[#F4F4F0] text-[#0D0D0D] font-mono-jb selection:bg-[#FF4500] selection:text-[#F4F4F0] p-4 flex flex-col wireframe-grid relative overflow-auto lg:overflow-hidden">
       <div className="scanline"></div>
 
-      <Header health={data.health} assignments={data.assignments} />
+      <Header health={data.health} assignments={data.assignments} wallets={data.wallets} />
 
       <div className="flex-1 flex flex-col lg:flex-row gap-4 relative z-10 min-h-0">
         <div className="flex flex-col gap-2 shrink-0">
@@ -447,6 +555,7 @@ export const AriaVegaContainer = () => {
                 evalLogs={evalLogs}
               />
             )}
+            {activeTab === 'wallets' && <WalletsView wallets={data.wallets} />}
             {activeTab === 'assignments' && (
               <AssignmentsView
                 assignments={data.assignments}

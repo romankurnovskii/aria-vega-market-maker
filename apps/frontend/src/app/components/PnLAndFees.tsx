@@ -56,7 +56,7 @@ export const PnLAndFees = ({
         <span className="text-gray-500">Realized PnL:</span>
         <span className={`font-bold ${getPnLClasses(pnlUsd)}`}>
           {pnlUsd !== undefined ? `$${pnlUsd.toFixed(4)}` : '$0.0000'}
-          {pnlPctChange !== undefined && ` (${pnlPctChange >= 0 ? '+' : ''}${(pnlPctChange * 100).toFixed(2)}%)`}
+          {pnlPctChange !== undefined && ` (${pnlPctChange >= 0 ? '+' : ''}${pnlPctChange.toFixed(2)}%)`}
         </span>
       </div>
       <div className="flex justify-between font-mono-jb">

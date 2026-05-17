@@ -15,27 +15,45 @@
 
 import React from 'react';
 import { ChevronRight } from 'lucide-react';
+import { Position } from '../stores/app-store';
 
 interface PositionTableProps {
-  positions: any[];
+  positions: Position[];
   positionOrchestration: Record<string, { strategyId: string; mode: string }>;
   selectedPosId: string | null;
   onSelect: (id: string | null) => void;
 }
 
 export const PositionTable = ({ positions, positionOrchestration, selectedPosId, onSelect }: PositionTableProps) => {
-  const openPositions = positions.filter((pos: any) => pos.state !== 'CLOSED');
-  const closedPositions = positions.filter((pos: any) => pos.state === 'CLOSED');
+  const openPositions = positions.filter((pos: Position) => pos.state !== 'CLOSED');
+  const closedPositions = positions.filter((pos: Position) => pos.state === 'CLOSED');
 
   const renderSectionHeader = (label: string, count: number) => (
-    <tr className="bg-[#0D0D0D] text-[#F4F4F0]">
-      <td colSpan={4} className="py-1.5 px-3 font-bold uppercase tracking-widest text-xs">
+    <tr className="bg-[#0D0D0D] text-[#F4F4F0] block md:table-row">
+      <td colSpan={5} className="py-1.5 px-3 font-bold uppercase tracking-widest text-xs block md:table-cell">
         {label} ({count})
       </td>
     </tr>
   );
 
-  const renderRow = (pos: any, dimmed = false) => {
+  const addrShort = (addr: string, len = 4) => `${addr.slice(0, len)}...${addr.slice(-len)}`;
+
+  const tokenSymbol = (mint?: string): string => {
+    if (!mint) return '?';
+    if (mint === 'So11111111111111111111111111111111111111112') return 'SOL';
+    if (mint === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v') return 'USDC';
+    if (mint === 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB') return 'USDT';
+    return mint.slice(0, 4).toUpperCase();
+  };
+
+  const poolName = (pos: Position): string => {
+    const x = pos.tokenX?.mint || pos.tokenX?.tokenAddress;
+    const y = pos.tokenY?.mint || pos.tokenY?.tokenAddress;
+    if (!x || !y) return '?';
+    return `${tokenSymbol(x)}-${tokenSymbol(y)}`;
+  };
+
+  const renderRow = (pos: Position, dimmed = false) => {
     const orch = positionOrchestration[pos.id];
     const orchLabel = orch ? orch.mode.toUpperCase() : 'UNASSIGNED';
     const orchClass =
@@ -50,13 +68,15 @@ export const PositionTable = ({ positions, positionOrchestration, selectedPosId,
       <tr
         key={pos.id}
         onClick={() => onSelect(pos.id)}
-        className={`border-b border-gray-200 hover:bg-[#F4F4F0] transition-colors cursor-pointer ${isSelected ? 'bg-[#E5E5DF]' : ''} ${dimmed ? 'opacity-60' : ''}`}
+        className={`border-b border-gray-200 hover:bg-[#F4F4F0] transition-colors cursor-pointer flex flex-col md:table-row ${isSelected ? 'bg-[#E5E5DF]' : ''} ${dimmed ? 'opacity-60' : ''}`}
       >
-        <td className="py-2 px-3 border-r border-gray-200 font-bold flex items-center gap-2">
-          {isSelected && <ChevronRight size={12} className="text-[#FF4500]" />}
-          <span className="font-mono" title={pos.id}>
-            {pos.id}
-          </span>
+        <td className="py-2 px-3 border-r-0 md:border-r border-gray-200 font-bold flex items-center gap-2 justify-between md:justify-start block md:table-cell">
+          <div className="flex items-center gap-2">
+            {isSelected && <ChevronRight size={12} className="text-[#FF4500]" />}
+            <span className="font-mono" title={pos.id}>
+              {addrShort(pos.id, 6)}
+            </span>
+          </div>
           {pos.state && pos.state !== 'OPEN' && (
             <span
               className={`text-[11px] px-1 py-0.5 border scale-90 tracking-wide font-mono ${
@@ -73,21 +93,35 @@ export const PositionTable = ({ positions, positionOrchestration, selectedPosId,
             </span>
           )}
         </td>
-        <td
-          className="py-2 px-3 border-r border-gray-200 truncate max-w-[120px] text-gray-600"
-          title={pos.pool}
-        >
-          {pos.pool}
+        <td className="py-2 px-3 text-[11px] font-mono text-gray-500 block md:table-cell" title={pos._wallet}>
+          <span className="md:hidden text-gray-500 mr-2">Wallet:</span>
+          {pos._wallet ? addrShort(pos._wallet) : '-'}
         </td>
-        <td className="py-2 px-3 border-r border-gray-200">
+        <td className="py-2 px-3 border-r-0 md:border-r border-gray-200 text-gray-600 block md:table-cell" title={pos.pool}>
+          <span className="md:hidden text-gray-500 mr-2">Pool:</span>
+          <span className="font-semibold">{poolName(pos)}</span>{' '}
+          <span className="text-[11px] text-gray-400 font-mono">{addrShort(pos.pool, 4)}</span>
+        </td>
+        <td className="py-2 px-3 border-r-0 md:border-r border-gray-200 block md:table-cell">
+          <span className="md:hidden text-gray-500 mr-2">Range:</span>
           <span
             className={pos.status === 'In Range' ? 'text-green-600 cursor-help' : 'text-[#FF4500] cursor-help'}
             title={`Bins: ${pos.minBin} to ${pos.maxBin}`}
           >
-            {pos.binCount} bins ({Number(pos.rangePercent).toFixed(1)}%)
+            {pos.binCount} bins
+            {(pos.lowerBoundPrice || pos.upperBoundPrice) && (
+              <>
+                {' '}
+                | ${Number(pos.lowerBoundPrice).toFixed(2)}–${Number(pos.upperBoundPrice).toFixed(2)}
+              </>
+            )}{' '}
+            <span className="text-[11px] opacity-70">({Number(pos.rangePercent).toFixed(2)}%)</span>
           </span>
         </td>
-        <td className={`py-2 px-3 text-right ${orchClass}`}>{orchLabel}</td>
+        <td className={`py-2 px-3 text-left md:text-right ${orchClass} block md:table-cell`}>
+          <span className="md:hidden text-gray-500 mr-2">State:</span>
+          {orchLabel}
+        </td>
       </tr>
     );
   };
@@ -100,10 +134,11 @@ export const PositionTable = ({ positions, positionOrchestration, selectedPosId,
             No active positions fetched. Confirm liquidity provider assignments are running on-chain.
           </div>
         ) : (
-          <table className="w-full text-left border-collapse text-xs whitespace-nowrap">
-            <thead className="sticky top-0 bg-[#0D0D0D] text-[#F4F4F0] z-10 shadow-[0_1px_0_#0D0D0D]">
+          <table className="w-full text-left border-collapse text-xs md:whitespace-nowrap block md:table">
+            <thead className="sticky top-0 bg-[#0D0D0D] text-[#F4F4F0] z-10 shadow-[0_1px_0_#0D0D0D] hidden md:table-header-group">
               <tr>
                 <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D]">Pos ID</th>
+                <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D]">Wallet</th>
                 <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D]">Target Pool</th>
                 <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D]">Range</th>
                 <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D] text-right">
@@ -111,11 +146,11 @@ export const PositionTable = ({ positions, positionOrchestration, selectedPosId,
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="block md:table-row-group">
               {openPositions.length > 0 && renderSectionHeader('Open / Active', openPositions.length)}
-              {openPositions.map((pos: any) => renderRow(pos))}
+              {openPositions.map((pos: Position) => renderRow(pos))}
               {closedPositions.length > 0 && renderSectionHeader('Closed', closedPositions.length)}
-              {closedPositions.map((pos: any) => renderRow(pos, true))}
+              {closedPositions.map((pos: Position) => renderRow(pos, true))}
             </tbody>
           </table>
         )}

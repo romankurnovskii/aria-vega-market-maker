@@ -14,21 +14,50 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
 import { formatAmount, getTokenSymbol } from '../containers/AriaVegaContainer';
 import { PositionHeader } from './PositionHeader';
+import { PoolMetaPanel } from './PoolMetaPanel';
 import { PositionBalances } from './PositionBalances';
 import { PriceAnalytics } from './PriceAnalytics';
 import { PnLAndFees } from './PnLAndFees';
 import { OrchestrationControls } from './OrchestrationControls';
 import { PositionActionButtons } from './PositionActionButtons';
 import { EventLog } from './EventLog';
+import { Position, EvalLogEntry } from '../stores/app-store';
+
+interface Strategy {
+  id: string;
+  name: string;
+  description: string;
+  risk: string;
+}
+
+interface PnLData {
+  pnlUsd?: string | number;
+  pnlPctChange?: string | number;
+  minPrice?: string | number;
+  maxPrice?: string | number;
+  poolActivePrice?: string | number;
+  feePerTvl24h?: string | number;
+  unclaimedFees?: string | number;
+  unclaimedFeesSol?: string | number;
+  allTimeFees?: {
+    total?: { usd?: string | number };
+    tokenX?: { usd?: string | number; amount?: string | number };
+    tokenY?: { usd?: string | number; amount?: string | number };
+  };
+  unrealizedPnl?: {
+    balanceTokenX?: { usd?: string | number };
+    balanceTokenY?: { usd?: string | number };
+  };
+}
 
 interface PositionDetailProps {
-  position: any;
+  position: Position;
   orchestration: { strategyId: string; mode: string } | null;
-  strategies: any[];
+  strategies: Strategy[];
   onAssign: (positionId: string, strategyId: string, mode: string) => Promise<void>;
   onEvaluate: (positionId: string, strategyId: string) => Promise<void>;
   onRemoveLiquidity: (positionId: string) => Promise<void>;
@@ -37,7 +66,7 @@ interface PositionDetailProps {
     strategyId: string,
     suggestion: { action: string; openParams?: Record<string, unknown> }
   ) => void;
-  evalLogs: any[];
+  evalLogs: EvalLogEntry[];
   onClose: () => void;
 }
 
@@ -52,21 +81,12 @@ export const PositionDetail = ({
   evalLogs,
   onClose,
 }: PositionDetailProps) => {
-  const [selectedStrategyId, setSelectedStrategyId] = useState<string>('');
-  const [selectedMode, setSelectedMode] = useState<string>('active');
+  const [selectedStrategyId, setSelectedStrategyId] = useState<string>(
+    orchestration?.strategyId || strategies[0]?.id || 'NONE'
+  );
+  const [selectedMode, setSelectedMode] = useState<string>(orchestration?.mode || 'active');
 
-  // Update local forms when selection changes
-  useEffect(() => {
-    if (orchestration) {
-      setSelectedStrategyId(orchestration.strategyId);
-      setSelectedMode(orchestration.mode);
-    } else {
-      setSelectedStrategyId(strategies[0]?.id || 'NONE');
-      setSelectedMode('active');
-    }
-  }, [position.id, orchestration, strategies]);
-
-  const pnl = position.pnlData || position.metadata?.pnl || position.raw || {};
+  const pnl = (position.pnlData || position.raw || {}) as PnLData;
 
   const pnlUsd = pnl.pnlUsd !== undefined ? Number(pnl.pnlUsd) : undefined;
   const pnlPctChange = pnl.pnlPctChange !== undefined ? Number(pnl.pnlPctChange) : undefined;
@@ -99,7 +119,21 @@ export const PositionDetail = ({
     <div className="flex flex-1 flex-col gap-4 min-h-0">
       {/* Actions Pane */}
       <div className="border border-[#0D0D0D] bg-white p-4 flex flex-col gap-4 overflow-y-auto min-h-[300px]">
-        <PositionHeader positionId={position.id} pool={position.pool} state={position.state} onClose={onClose} />
+        <PositionHeader
+          positionId={position.id}
+          pool={position.pool}
+          state={position.state}
+          openedAt={position.openedAt}
+          onClose={onClose}
+        />
+
+        <PoolMetaPanel
+          poolAddress={position.pool}
+          status={position.status}
+          state={position.state}
+          activeBin={position.activeBin}
+          pnlData={pnl as Record<string, unknown>}
+        />
 
         <PositionBalances
           tokenXSym={tokenXSym}
@@ -127,9 +161,9 @@ export const PositionDetail = ({
           pnlPctChange={pnlPctChange}
           allTimeFeesTotalUsd={allTimeFeesTotalUsd}
           allTimeFeesXUsd={allTimeFeesXUsd}
-          allTimeFeesXAmt={allTimeFeesXAmt}
+          allTimeFeesXAmt={allTimeFeesXAmt as string | undefined}
           allTimeFeesYUsd={allTimeFeesYUsd}
-          allTimeFeesYAmt={allTimeFeesYAmt}
+          allTimeFeesYAmt={allTimeFeesYAmt as string | undefined}
           tokenXSym={tokenXSym}
           tokenYSym={tokenYSym}
         />
@@ -146,21 +180,14 @@ export const PositionDetail = ({
               onEvaluate={handleEvaluate}
             />
 
-            <PositionActionButtons
-              positionId={position.id}
-              state={position.state}
-              onRemoveLiquidity={onRemoveLiquidity}
-            />
+            <PositionActionButtons positionId={position.id} state={position.state} onRemoveLiquidity={onRemoveLiquidity} />
           </>
         )}
       </div>
 
       {/* Event Log Pane */}
       <div className="flex flex-1 flex-col min-h-[300px]">
-        <EventLog
-          logs={evalLogs}
-          onApplySuggestion={onApplySuggestion}
-        />
+        <EventLog logs={evalLogs} onApplySuggestion={onApplySuggestion} />
       </div>
     </div>
   );

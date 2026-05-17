@@ -9,7 +9,7 @@
  */
 
 import React from 'react';
-import { Database, Layers, Zap, Box } from 'lucide-react';
+import { Database, Layers, Zap, Box, Wallet } from 'lucide-react';
 
 interface SidebarProps {
   activeTab: string;
@@ -24,6 +24,7 @@ interface TabItem {
 
 const tabs: TabItem[] = [
   { id: 'positions', icon: Database, label: 'Positions' },
+  { id: 'wallets', icon: Wallet, label: 'Wallets' },
   { id: 'assignments', icon: Layers, label: 'Assignments' },
   { id: 'strategies', icon: Zap, label: 'Strategies' },
   { id: 'steps', icon: Box, label: 'Pipeline' },
@@ -37,15 +38,10 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
           key={tab.id}
           onClick={() => onTabChange(tab.id)}
           className={`flex items-center gap-3 px-3 py-2 border border-[#0D0D0D] transition-all duration-200 group relative overflow-hidden ${
-            activeTab === tab.id
-              ? 'bg-[#0D0D0D] text-[#F4F4F0]'
-              : 'bg-transparent hover:bg-[#0D0D0D] hover:text-[#F4F4F0]'
+            activeTab === tab.id ? 'bg-[#0D0D0D] text-[#F4F4F0]' : 'bg-transparent hover:bg-[#0D0D0D] hover:text-[#F4F4F0]'
           }`}
         >
-          <tab.icon
-            size={14}
-            className={activeTab === tab.id ? 'text-[#FF4500]' : 'group-hover:text-[#FF4500]'}
-          />
+          <tab.icon size={14} className={activeTab === tab.id ? 'text-[#FF4500]' : 'group-hover:text-[#FF4500]'} />
           <span className="uppercase text-xs tracking-widest font-semibold">{tab.label}</span>
           {activeTab === tab.id && <div className="absolute right-0 top-0 bottom-0 w-1 bg-[#FF4500]"></div>}
         </button>
