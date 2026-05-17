@@ -67,6 +67,9 @@ export interface IPositionProvider {
   getPosition(positionId: string, poolAddress?: string): Promise<Position>;
   getPoolInfo(poolAddress: string): Promise<PoolInfo>;
   getMarketSnapshot(poolAddress: string): Promise<MarketSnapshot>;
+  getWalletBalances(walletAddress: string, tokenX: string, tokenY: string): Promise<{ amountX: string; amountY: string }>;
+  getWalletAddress(chain?: string): Promise<string>;
+  listWallets(): Promise<{ chain: string; address: string; is_default: boolean }[]>;
 }
 
 export interface IRpcProvider {

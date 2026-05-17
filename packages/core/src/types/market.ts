@@ -40,6 +40,7 @@ export interface PoolInfo {
   protocol: ProtocolType;
   feeRate: number;
   activeBound: number;
+  price?: number;
   tokenXAddress: string;
   tokenYAddress: string;
   binStep: number;
