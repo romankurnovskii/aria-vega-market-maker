@@ -11,9 +11,9 @@
  * @sideEffects None — all methods are pure data fetchers with no local state mutation
  */
 import { IPositionProvider, Position, PoolInfo, MarketSnapshot } from '@lp-system/core';
+import { getLogger } from '@lp-system/logger';
 import { PoolResponse, OhlcvResponse, PositionsPnlResponse } from './types';
 import { getBinIdFromPrice, parseDecimalToRaw } from './meteora.utils';
-import { getLogger } from '@lp-system/logger';
 
 const logger = getLogger('meteora-api-provider');
 
@@ -30,6 +30,7 @@ export class MeteoraApiProvider implements IPositionProvider {
   private getPositionsCache = new Map<string, { data: Position[]; timestamp: number }>();
   private poolInfoCache = new Map<string, { data: PoolInfo; timestamp: number }>();
   private marketSnapshotCache = new Map<string, { data: MarketSnapshot; timestamp: number }>();
+  private poolDataCache = new Map<string, { data: PoolResponse; timestamp: number }>();
 
   /**
    * Constructs the provider with the Meteora API base URL.
@@ -39,7 +40,8 @@ export class MeteoraApiProvider implements IPositionProvider {
    */
   constructor(
     private apiUrl: string,
-    private walletAddress?: string
+    private walletAddress?: string,
+    private options?: { leverage?: number }
   ) {
     this.apiUrl = apiUrl || 'https://dlmm.datapi.meteora.ag';
   }
@@ -80,6 +82,35 @@ export class MeteoraApiProvider implements IPositionProvider {
 
     this.poolTokenMetadataCache.set(poolAddress, metadataPromise);
     return metadataPromise;
+  }
+
+  /**
+   * Fetches full pool data from /pools/{address} with shared cache.
+   * Used by getPoolInfo, getMarketSnapshot, and internally.
+   */
+  private async fetchPoolData(poolAddress: string): Promise<PoolResponse> {
+    const cached = this.poolDataCache.get(poolAddress);
+    const now = Date.now();
+    if (cached && now - cached.timestamp < 10000) {
+      return cached.data;
+    }
+
+    const response = await fetch(`${this.apiUrl}/pools/${poolAddress}`, {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'MeteoraLPBot/1.0',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `[MeteoraApiProvider] Failed to fetch pool data for ${poolAddress}: HTTP ${response.status} ${response.statusText}`
+      );
+    }
+
+    const data = (await response.json()) as PoolResponse;
+    this.poolDataCache.set(poolAddress, { data, timestamp: now });
+    return data;
   }
 
   /**
@@ -135,107 +166,134 @@ export class MeteoraApiProvider implements IPositionProvider {
           poolsToQuery.push(addr);
         }
       }
+
+      if (poolsToQuery.length === 0) {
+        logger.warn(`[MeteoraApiProvider] No pools found in portfolio response for wallet ${walletAddress}`);
+      }
     }
 
-    const allPositions: Position[] = [];
+    const leverage = this.options?.leverage ?? 10;
 
-    for (const pool of poolsToQuery) {
-      const url = `${this.apiUrl}/positions/${pool}/pnl?user=${walletAddress}&status=open&pageSize=200&page=1`;
-      logger.info(`[MeteoraApiProvider] Fetching positions PnL from Datapi for pool ${pool}`);
+    // Fetch all pools concurrently
+    const poolResults = await Promise.all(
+      poolsToQuery.map(async (pool) => {
+        const results: Position[] = [];
+        let page = 1;
+        let hasNext = true;
 
-      const response = await fetch(url, {
-        headers: {
-          Accept: 'application/json',
-          'User-Agent': 'MeteoraLPBot/1.0',
-        },
-      });
+        while (hasNext) {
+          const url = `${this.apiUrl}/positions/${pool}/pnl?user=${walletAddress}&status=open&pageSize=200&page=${page}`;
+          logger.info(`[MeteoraApiProvider] Fetching positions PnL from Datapi for pool ${pool} (page ${page})`);
 
-      if (!response.ok) {
-        throw new Error(
-          `[MeteoraApiProvider] Failed to fetch positions PnL from Datapi for pool ${pool}: HTTP ${response.status} ${response.statusText}`
-        );
-      }
-
-      const result = (await response.json()) as PositionsPnlResponse;
-      const { decimalsX, decimalsY, tokenXMint, tokenYMint } = await this.getPoolTokenMetadata(pool);
-
-      if (result && Array.isArray(result.positions)) {
-        for (const pos of result.positions) {
-          const lowerBinId = pos.lower_bin_id !== undefined ? pos.lower_bin_id : (pos.lowerBinId ?? 0);
-          const upperBinId = pos.upper_bin_id !== undefined ? pos.upper_bin_id : (pos.upperBinId ?? 0);
-          const isInRange =
-            pos.is_in_range !== undefined
-              ? pos.is_in_range
-              : pos.isInRange !== undefined
-                ? pos.isInRange
-                : pos.isOutOfRange !== undefined
-                  ? !pos.isOutOfRange
-                  : true;
-          const openedAt = pos.opened_at || (pos.createdAt ? pos.createdAt * 1000 : undefined) || Date.now() - 3600000;
-
-          const positionId = pos.address || pos.positionAddress || pos.position_address || '';
-
-          let amtX = '0';
-          let amtY = '0';
-
-          if (pos.unrealizedPnl?.balanceTokenX?.amount !== undefined) {
-            amtX = parseDecimalToRaw(pos.unrealizedPnl.balanceTokenX.amount, decimalsX);
-          } else if (pos.amount_x !== undefined) {
-            amtX = pos.amount_x;
-          } else if (pos.amountX !== undefined) {
-            amtX = pos.amountX;
-          }
-
-          if (pos.unrealizedPnl?.balanceTokenY?.amount !== undefined) {
-            amtY = parseDecimalToRaw(pos.unrealizedPnl.balanceTokenY.amount, decimalsY);
-          } else if (pos.amount_y !== undefined) {
-            amtY = pos.amount_y;
-          } else if (pos.amountY !== undefined) {
-            amtY = pos.amountY;
-          }
-
-          allPositions.push({
-            id: positionId,
-            poolAddress: pos.pool_address || pool,
-            chain: 'solana',
-            protocol: 'meteora_dlmm',
-            lowerBound: lowerBinId,
-            upperBound: upperBinId,
-            lowerBinId,
-            upperBinId,
-            tokenX: {
-              amount: amtX,
-              decimals: decimalsX,
-              mint: tokenXMint,
-              tokenAddress: tokenXMint,
-            },
-            tokenY: {
-              amount: amtY,
-              decimals: decimalsY,
-              mint: tokenYMint,
-              tokenAddress: tokenYMint,
-            },
-            isInRange,
-            openedAt,
-            pnlData: pos,
-            state: pos.isClosed ? 'CLOSED' : 'OPEN',
-            closedAt: pos.closedAt || undefined,
-            metadata: {
-              leverage: 10,
-              feeX: pos.fee_x || '0',
-              feeY: pos.fee_y || '0',
+          const response = await fetch(url, {
+            headers: {
+              Accept: 'application/json',
+              'User-Agent': 'MeteoraLPBot/1.0',
             },
           });
+
+          if (!response.ok) {
+            throw new Error(
+              `[MeteoraApiProvider] Failed to fetch positions PnL from Datapi for pool ${pool}: HTTP ${response.status} ${response.statusText}`
+            );
+          }
+
+          const result = (await response.json()) as PositionsPnlResponse;
+          const { decimalsX, decimalsY, tokenXMint, tokenYMint } = await this.getPoolTokenMetadata(pool);
+
+          if (result && Array.isArray(result.positions)) {
+            for (const pos of result.positions) {
+              const lowerBinId = pos.lower_bin_id !== undefined ? pos.lower_bin_id : (pos.lowerBinId ?? 0);
+              const upperBinId = pos.upper_bin_id !== undefined ? pos.upper_bin_id : (pos.upperBinId ?? 0);
+              const isInRange =
+                pos.is_in_range !== undefined
+                  ? pos.is_in_range
+                  : pos.isInRange !== undefined
+                    ? pos.isInRange
+                    : pos.isOutOfRange !== undefined
+                      ? !pos.isOutOfRange
+                      : true;
+              const openedAt = pos.opened_at || (pos.createdAt ? pos.createdAt * 1000 : undefined) || Date.now() - 3600000;
+
+              const positionId = pos.address || pos.positionAddress || pos.position_address || '';
+
+              let amtX = '0';
+              let amtY = '0';
+
+              if (pos.unrealizedPnl?.balanceTokenX?.amount !== undefined) {
+                amtX = parseDecimalToRaw(pos.unrealizedPnl.balanceTokenX.amount, decimalsX);
+              } else if (pos.amount_x !== undefined) {
+                amtX = pos.amount_x;
+              } else if (pos.amountX !== undefined) {
+                amtX = pos.amountX;
+              }
+
+              if (pos.unrealizedPnl?.balanceTokenY?.amount !== undefined) {
+                amtY = parseDecimalToRaw(pos.unrealizedPnl.balanceTokenY.amount, decimalsY);
+              } else if (pos.amount_y !== undefined) {
+                amtY = pos.amount_y;
+              } else if (pos.amountY !== undefined) {
+                amtY = pos.amountY;
+              }
+
+              results.push({
+                id: positionId,
+                poolAddress: pos.pool_address || pool,
+                chain: 'solana',
+                protocol: 'meteora_dlmm',
+                lowerBound: lowerBinId,
+                upperBound: upperBinId,
+                lowerBinId,
+                upperBinId,
+                tokenX: {
+                  amount: amtX,
+                  decimals: decimalsX,
+                  mint: tokenXMint,
+                  tokenAddress: tokenXMint,
+                },
+                tokenY: {
+                  amount: amtY,
+                  decimals: decimalsY,
+                  mint: tokenYMint,
+                  tokenAddress: tokenYMint,
+                },
+                isInRange,
+                openedAt,
+                pnlData: pos,
+                state: pos.isClosed ? 'CLOSED' : 'OPEN',
+                closedAt: pos.closedAt || undefined,
+                metadata: {
+                  leverage,
+                  feeX: pos.fee_x || '0',
+                  feeY: pos.fee_y || '0',
+                },
+              });
+            }
+          }
+
+          hasNext = result.hasNext && result.totalCount > page * result.pageSize;
+          page++;
         }
-      }
-    }
+
+        return results;
+      })
+    );
+
+    const allPositions = poolResults.flat();
 
     this.getPositionsCache.set(cacheKey, { data: allPositions, timestamp: Date.now() });
 
-    // LRU: Cleanup old cache entries if it grows too large
+    // LRU: Cleanup old cache entries if cache grows too large
     if (this.getPositionsCache.size > 50) {
-      const oldestKey = this.getPositionsCache.keys().next().value;
-      if (oldestKey) this.getPositionsCache.delete(oldestKey);
+      const keysToDelete: string[] = [];
+      for (const key of this.getPositionsCache.keys()) {
+        if (keysToDelete.length < 10 && key !== cacheKey) {
+          keysToDelete.push(key);
+        }
+      }
+      for (const key of keysToDelete) {
+        this.getPositionsCache.delete(key);
+      }
     }
 
     return allPositions;
@@ -282,21 +340,8 @@ export class MeteoraApiProvider implements IPositionProvider {
     }
 
     logger.info(`[MeteoraApiProvider] Fetching pool metadata for ${poolAddress}`);
-    const url = `${this.apiUrl}/pools/${poolAddress}`;
 
-    const response = await fetch(url, {
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': 'MeteoraLPBot/1.0',
-      },
-    });
-
-    if (!response.ok) {
-      const errorMsg = `Failed to fetch pool info from Datapi: ${response.status} ${response.statusText}`;
-      throw new Error(errorMsg);
-    }
-
-    const data = (await response.json()) as PoolResponse;
+    const data = await this.fetchPoolData(poolAddress);
 
     const activeBinId = getBinIdFromPrice(
       data.current_price,
@@ -341,19 +386,7 @@ export class MeteoraApiProvider implements IPositionProvider {
 
     logger.info(`[MeteoraApiProvider] Assembling Market Snapshot for pool ${poolAddress}`);
 
-    const poolInfoUrl = `${this.apiUrl}/pools/${poolAddress}`;
-    const poolResponse = await fetch(poolInfoUrl, {
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': 'MeteoraLPBot/1.0',
-      },
-    });
-
-    if (!poolResponse.ok) {
-      throw new Error(`Failed to fetch pool info for market snapshot: ${poolResponse.status} ${poolResponse.statusText}`);
-    }
-
-    const poolData = (await poolResponse.json()) as PoolResponse;
+    const poolData = await this.fetchPoolData(poolAddress);
 
     const activeBinId = getBinIdFromPrice(
       poolData.current_price,
@@ -414,5 +447,49 @@ export class MeteoraApiProvider implements IPositionProvider {
 
     this.marketSnapshotCache.set(poolAddress, { data: snapshot, timestamp: now });
     return snapshot;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Wallet methods (Meteora API does not manage wallets; stub implementations)
+  // ---------------------------------------------------------------------------
+
+  public async getWalletBalances(
+    _walletAddress: string,
+    _tokenX: string,
+    _tokenY: string
+  ): Promise<{ amountX: string; amountY: string }> {
+    void _walletAddress;
+    void _tokenX;
+    void _tokenY;
+    return { amountX: '0', amountY: '0' };
+  }
+
+  public async getWalletAddress(chain?: string): Promise<string> {
+    void chain;
+    return this.walletAddress || process.env.WALLET_PUBKEY || '';
+  }
+
+  public async listWallets(): Promise<{ chain: string; address: string; is_default: boolean }[]> {
+    const addr = await this.getWalletAddress();
+    return addr ? [{ chain: 'solana', address: addr, is_default: true }] : [];
+  }
+
+  /**
+   * Fetches the open portfolio for a wallet address from Meteora Datapi.
+   */
+  public async getPortfolio(walletAddress: string): Promise<Record<string, unknown>> {
+    const portfolioUrl = `${this.apiUrl}/portfolio/open?user=${walletAddress}`;
+    const response = await fetch(portfolioUrl, {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'MeteoraLPBot/1.0',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`[MeteoraApiProvider] Failed to fetch portfolio: HTTP ${response.status} ${response.statusText}`);
+    }
+
+    return response.json();
   }
 }

@@ -4,7 +4,7 @@ Start here. Every doc in this directory is listed below.
 
 ## Architecture
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — load balanced connections and market data extraction
+- [ARCHITECTURE.md](ARCHITECTURE.md) — Hummingbot API provider for pool and market data
 
 ## Decisions
 

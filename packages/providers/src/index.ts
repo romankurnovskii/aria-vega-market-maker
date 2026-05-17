@@ -3,19 +3,18 @@
  * @description Public API surface for the @lp-system/providers package.
  *
  * @features
- * - Re-exports all provider classes: MeteoraApiProvider, SolanaRpcProvider, HeliusRpcProvider, RpcPool
+ * - Re-exports HummingbotProvider
+ * - Re-exports HummingbotWalletManager
+ * - Re-exports Meteora utils
  *
  * @dependencies None — pure barrel export
  * @sideEffects None
  */
-export { MeteoraApiProvider } from './meteora/meteora-api-provider.js';
-export { MeteoraOnChainProvider } from './meteora/meteora-onchain-provider.js';
-export { SolanaRpcProvider } from './rpc/provider.base.js';
-export { HeliusRpcProvider } from './rpc/provider.helius.js';
-export { RpcPool } from './rpc/rpc-pool.js';
+export { HummingbotProvider } from './hummingbot/hummingbot-provider.js';
+export { HummingbotWalletManager } from './hummingbot/wallet-manager.js';
 export {
   getBinIdFromPrice,
   getPriceFromBinId,
   calculateConcentratedLiquidityPrices,
   parseDecimalToRaw,
-} from './meteora/meteora.utils.js';
+} from './meteora-utils.js';
