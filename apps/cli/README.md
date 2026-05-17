@@ -14,8 +14,8 @@ The `avmm` tool allows operators to manually execute liquidity provision steps. 
 
 The tool requires the following environment variables:
 
+- `HUMMINGBOT_API_URL`: Hummingbot Gateway URL (default: http://localhost:8000).
 - `RPC_URL`: Solana RPC endpoint (e.g., Helius or Quicknode).
-- `PRIVATE_KEY_BASE64`: Solana wallet private key as a Base64 encoded string.
 
 ## Usage
 

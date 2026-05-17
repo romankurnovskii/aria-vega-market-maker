@@ -1,19 +1,16 @@
 import { parseArgs } from 'node:util';
-import { Keypair } from '@solana/web3.js';
-import {
-  MeteoraApiProvider,
-  MeteoraOnChainProvider,
-  RpcPool,
-  HeliusRpcProvider,
-  parseDecimalToRaw,
-} from '@lp-system/providers';
-import { SolanaExecutor } from '@lp-system/executor';
+import { HummingbotProvider } from '@lp-system/providers';
+import { HummingbotExecutor } from '@lp-system/executor';
+
+function parseDecimalToRaw(decimal: string, decimals: number): string {
+  const parts = decimal.split('.');
+  let raw = parts[0];
+  const fraction = parts[1] || '';
+  raw += fraction.padEnd(decimals, '0').slice(0, decimals);
+  return raw.replace(/^0+/, '') || '0';
+}
 import { RangeCalculatorStep, AmountCalculatorStep } from '@lp-system/steps';
-import { 
-  Decision, 
-  Position, 
-  StepContext 
-} from '@lp-system/core';
+import { Decision, Position, StepContext } from '@lp-system/core';
 
 type CliAction = 'addLiquidity' | 'removeLiquidity';
 
@@ -34,7 +31,7 @@ interface CliOptions {
 
 const HELP_TEXT = `
 Liquidity Provision CLI Tool
-========================
+=======================
 
 Usage:
   avmm --action <action> [options]
@@ -62,7 +59,7 @@ Global Options:
 
 Environment Variables:
   RPC_URL             Solana RPC URL
-  PRIVATE_KEY_BASE64  Solana private key (Base64 encoded)
+  HUMMINGBOT_API_URL  Hummingbot API URL (default: http://localhost:8000)
 `;
 
 function validateAddLiquidity(options: CliOptions): void {
@@ -101,34 +98,17 @@ function createTemplatePosition(options: CliOptions, decimalsX: number, decimals
 }
 
 async function executeAction(options: CliOptions): Promise<void> {
-  const rpcUrl = options.rpcUrl || process.env.RPC_URL;
-  if (!rpcUrl) throw new Error('RPC_URL not configured.');
+  const hummingbotApiUrl = process.env.HUMMINGBOT_API_URL || 'http://localhost:8000';
 
-  const privateKeyBase64 = process.env.PRIVATE_KEY_BASE64;
-  const privateKeyJson = process.env.PRIVATE_KEY;
-  
-  let keypair: Keypair;
-  if (privateKeyBase64) {
-    keypair = Keypair.fromSecretKey(Buffer.from(privateKeyBase64, 'base64'));
-  } else if (privateKeyJson) {
-    keypair = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(privateKeyJson)));
-  } else {
-    throw new Error('Neither PRIVATE_KEY_BASE64 nor PRIVATE_KEY is configured.');
-  }
+  const positionProvider = new HummingbotProvider(hummingbotApiUrl);
+  const walletAddress = await positionProvider.getWalletAddress();
+  const executor = new HummingbotExecutor(hummingbotApiUrl, walletAddress);
 
-  const rpcPool = new RpcPool([new HeliusRpcProvider(rpcUrl)]);
-  const apiProvider = new MeteoraApiProvider('https://dlmm.datapi.meteora.ag');
-  const onChainProvider = new MeteoraOnChainProvider(rpcPool);
-  
-  const executor = new SolanaExecutor(rpcPool, keypair, onChainProvider, {
-    priorityFeeMicroLamports: options.priorityFee ? parseInt(options.priorityFee) : 0,
-  });
-
-  const snapshot = await apiProvider.getMarketSnapshot(options.pool);
+  const snapshot = await positionProvider.getMarketSnapshot(options.pool);
 
   if (options.action === 'addLiquidity') {
     validateAddLiquidity(options);
-    const poolInfo = await apiProvider.getPoolInfo(options.pool);
+    const poolInfo = await positionProvider.getPoolInfo(options.pool);
     const rawAmountX = parseDecimalToRaw(options.amountX, poolInfo.tokenX.decimals);
     const rawAmountY = parseDecimalToRaw(options.amountY, poolInfo.tokenY.decimals);
 
@@ -141,7 +121,7 @@ async function executeAction(options: CliOptions): Promise<void> {
         tokenXAmount: rawAmountX,
         tokenYAmount: rawAmountY,
       },
-      signal: 'close+open', // Triggers RangeCalculatorStep
+      signal: 'close+open',
     };
 
     const rangeStep = new RangeCalculatorStep();
@@ -170,10 +150,9 @@ async function executeAction(options: CliOptions): Promise<void> {
     } else {
       throw new Error(`Execution failed: ${result.error}`);
     }
-
   } else if (options.action === 'removeLiquidity') {
     validateRemoveLiquidity(options);
-    
+
     const decision: Decision = {
       positionId: options.positionId,
       action: 'close',
