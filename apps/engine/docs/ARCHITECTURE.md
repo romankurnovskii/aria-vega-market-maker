@@ -26,13 +26,10 @@ The HTTP server loads dynamic routers and exposes the following concrete REST en
 ### B. Unified Position Actions
 
 - **`POST /positions/:positionId/actions`**: Performs a unified action on a position.
-  - `action: "evaluate"`: Runs strategy evaluation (includes price enrichment).
+  - `action: "evaluateStrategy"`: Runs strategy evaluation (includes price enrichment). Requires `strategyId`.
   - `action: "removeLiquidity"`: Removes 100% liquidity and claims fees (closes position).
   - `action: "addLiquidity"`: Adds liquidity to an existing position (manual).
-
-### C. Strategy Ad-Hoc Control
-
-- **`POST /strategies/:id/evaluate`**: Triggers an immediate, ad-hoc strategy evaluation for a specific strategy on a target position.
+  - `action: "applySuggestion"`: Applies a strategy recommendation (close, open, or close+open). Requires `strategyId` and `suggestion`.
 
 ### D. System Introspection & Status
 

@@ -185,7 +185,7 @@ paths:
   /positions/{positionId}/actions:
     post:
       summary: Perform Position Action
-      description: Performs a unified action on a position (evaluate, removeLiquidity, addLiquidity).
+      description: Performs a position action (evaluateStrategy, removeLiquidity, addLiquidity, applySuggestion).
       parameters:
         - name: positionId
           in: path
@@ -205,12 +205,21 @@ paths:
               properties:
                 action:
                   type: string
-                  enum: [evaluate, removeLiquidity, addLiquidity]
-                  example: 'evaluate'
+                  enum: [evaluateStrategy, removeLiquidity, addLiquidity, applySuggestion]
+                  example: 'evaluateStrategy'
                 strategyId:
                   type: string
-                  description: Required for evaluate action.
+                  description: Required for evaluateStrategy and applySuggestion actions.
                   example: 'trailing-usdc'
+                suggestion:
+                  type: object
+                  description: Required for applySuggestion action. Contains the strategy recommendation to execute.
+                  properties:
+                    action:
+                      type: string
+                      enum: [close, open, close+open]
+                    openParams:
+                      $ref: '#/components/schemas/OpenParams'
                 tokenXAmount:
                   type: string
                   description: Required for addLiquidity action. Raw token amount.
@@ -236,7 +245,7 @@ paths:
                     example: 'success'
                   action:
                     type: string
-                    example: 'evaluate'
+                    example: 'evaluateStrategy'
                   result:
                     $ref: '#/components/schemas/StrategyResult'
                   transactionSignatures:
@@ -246,6 +255,12 @@ paths:
                   positionClosed:
                     type: boolean
                   positionOpened:
+                    type: boolean
+                  appliedAction:
+                    type: string
+                  taskId:
+                    type: string
+                  suggestionApplied:
                     type: boolean
         '400':
           description: Missing or invalid request parameters.
@@ -363,65 +378,7 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
-  /strategies/{id}/evaluate:
-    post:
-      summary: Evaluate Strategy Ad-hoc
-      description: Triggers a manual ad-hoc strategy evaluation tick for a given position and returns the resulting strategy recommendation.
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-          description: The ID of the strategy to evaluate.
-          example: 'trailing-usdc'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - positionId
-              properties:
-                positionId:
-                  type: string
-                  description: The on-chain identifier/pubkey of the position to evaluate.
-                  example: '9tA6m91FvP35G9A7eS982Yhd6pE35Z678WjLmoB67Pqr'
-                poolAddress:
-                  type: string
-                  description: Optional pool address if required by the provider.
-                  example: '5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6'
-      responses:
-        '200':
-          description: Ad-hoc strategy evaluation executed successfully.
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                  - status
-                  - result
-                properties:
-                  status:
-                    type: string
-                    example: 'success'
-                  result:
-                    $ref: '#/components/schemas/StrategyResult'
-        '400':
-          description: Missing or invalid request parameters.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '404':
-          description: No active orchestrator for the specified strategy and position was found in the registry.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+
 
 components:
   schemas:

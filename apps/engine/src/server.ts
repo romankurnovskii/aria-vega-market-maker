@@ -6,7 +6,6 @@
  * - GET /assignments — list all persistent assignments
  * - POST /assignments — create and register a new assignment (persists + registers orchestrator)
  * - DELETE /assignments/:id — delete assignment and deregister orchestrator
- * - POST /strategies/:id/evaluate — ad-hoc strategy evaluation for a given position
  * - GET /health — liveness probe returning timestamp
  *
  * @dependencies express, cors, IStore, IOrchestratorRegistry, IExecutor, OrchestratorFactory, IPositionProvider (from @lp-system/core)
