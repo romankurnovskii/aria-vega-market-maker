@@ -1,19 +1,26 @@
 import { Router } from 'express';
-import { IPositionProvider, IExecutor, IStore, RebalanceTask } from '@lp-system/core';
+import { IPositionProvider, IExecutor, IStore, IOrchestratorRegistry, OpenParams, RebalanceTask } from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
+import { OrchestratorFactory } from '@lp-system/orchestration';
+import { getPriceFromBinId } from '@lp-system/providers';
 
 const logger = getLogger('router-positions');
 
 /**
  * Creates the positions router handling unified position actions.
  */
-export function handlePositionsRouter(positionProvider: IPositionProvider, executor: IExecutor, store?: IStore): Router {
+export function handlePositionsRouter(
+  positionProvider: IPositionProvider,
+  executor: IExecutor,
+  registry: IOrchestratorRegistry,
+  factory: OrchestratorFactory,
+  store?: IStore
+): Router {
   const router = Router();
 
   /**
    * POST /positions/:positionId/actions
-   * Perform a position action (removeLiquidity, addLiquidity, applySuggestion).
-   * Strategy evaluation is handled by POST /strategies/:id/evaluate.
+   * Perform a position action (removeLiquidity, addLiquidity, applySuggestion, evaluateStrategy).
    */
   router.post('/:positionId/actions', async (req, res) => {
     const { positionId } = req.params;
@@ -26,6 +33,76 @@ export function handlePositionsRouter(positionProvider: IPositionProvider, execu
 
     try {
       logger.info(`[HTTP Server] Received position action '${action}' for position ${positionId}`);
+
+      if (action === 'evaluateStrategy') {
+        if (!strategyId) {
+          res.status(400).json({ error: 'Missing strategyId in request body for evaluateStrategy action' });
+          return;
+        }
+
+        const position = await positionProvider.getPosition(positionId);
+        const market = await positionProvider.getMarketSnapshot(position.poolAddress);
+
+        const orchestrators = registry.getForPosition(positionId);
+        let targetOrch = orchestrators.find((o) => o.strategyId === strategyId);
+
+        if (!targetOrch) {
+          logger.info(
+            `[HTTP Server] No active orchestrator for strategy ${strategyId} on position ${positionId}, creating ad-hoc.`
+          );
+          try {
+            targetOrch = factory.create({
+              id: `adhoc_${Date.now()}`,
+              positionId,
+              strategyId,
+              mode: 'monitoring',
+              createdAt: Date.now(),
+            });
+          } catch (factoryErr: unknown) {
+            const msg = factoryErr instanceof Error ? factoryErr.message : String(factoryErr);
+            res.status(404).json({ error: `Strategy ${strategyId} is not registered: ${msg}` });
+            return;
+          }
+        }
+
+        const result = await targetOrch.tick(position, market);
+
+        const openParams = (result &&
+          ('openParams' in result ? result.openParams : 'params' in result ? result.params : undefined)) as
+          | OpenParams
+          | undefined;
+        if (openParams) {
+          try {
+            const poolInfo = await positionProvider.getPoolInfo(position.poolAddress);
+            const lower = openParams.lowerBinId ?? openParams.lowerBound;
+            const upper = openParams.upperBinId ?? openParams.upperBound;
+            if (lower !== undefined && upper !== undefined) {
+              const lowerBoundPrice = getPriceFromBinId(
+                lower,
+                poolInfo.binStep,
+                position.tokenX.decimals,
+                position.tokenY.decimals
+              );
+              const upperBoundPrice = getPriceFromBinId(
+                upper,
+                poolInfo.binStep,
+                position.tokenX.decimals,
+                position.tokenY.decimals
+              );
+              openParams.lowerBoundPrice = lowerBoundPrice;
+              openParams.upperBoundPrice = upperBoundPrice;
+              openParams.binCount = upper - lower + 1;
+              openParams.rangePercent =
+                lowerBoundPrice > 0 ? ((upperBoundPrice - lowerBoundPrice) / lowerBoundPrice) * 100 : 0;
+            }
+          } catch (enrichErr) {
+            logger.warn(`Failed to enrich evaluation result with price data: ${enrichErr}`);
+          }
+        }
+
+        res.json({ status: 'success', action: 'evaluateStrategy', result });
+        return;
+      }
 
       if (action === 'removeLiquidity') {
         const position = await positionProvider.getPosition(positionId);

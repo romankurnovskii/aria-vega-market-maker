@@ -472,40 +472,10 @@ export const AriaVegaContainer = () => {
   };
 
   /**
-   * Evaluates a strategy on a position via POST /strategies/:id/evaluate.
+   * Shorthand for evaluating a strategy.
    */
-  const handleEvaluateStrategy = async (positionId: string, strategyId: string): Promise<void> => {
-    try {
-      const res = await fetch(`${API_URL}/strategies/${strategyId}/evaluate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ positionId }),
-      });
-      const result = await res.json();
-      setEvalLogs((prev) => [
-        {
-          id: Date.now(),
-          timestamp: new Date().toLocaleTimeString(),
-          action: 'evaluate',
-          strategyId,
-          positionId,
-          result: result.result || result,
-        } satisfies EvalLogEntry,
-        ...prev.slice(0, 49),
-      ]);
-    } catch (err: unknown) {
-      setEvalLogs((prev) => [
-        {
-          id: Date.now(),
-          timestamp: new Date().toLocaleTimeString(),
-          action: 'evaluate',
-          error: err instanceof Error ? err.message : 'Network error',
-          strategyId,
-          positionId,
-        } satisfies EvalLogEntry,
-        ...prev.slice(0, 49),
-      ]);
-    }
+  const handleEvaluateStrategy = (positionId: string, strategyId: string) => {
+    return handlePositionAction(positionId, 'evaluateStrategy', { strategyId });
   };
 
   /**

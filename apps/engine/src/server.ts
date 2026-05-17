@@ -34,7 +34,6 @@ import { getLogger } from '@lp-system/logger';
 import { getPriceFromBinId } from '@lp-system/providers';
 import {
   createAssignmentsRouter,
-  createStrategiesRouter,
   createIntrospectionRouter,
   handlePositionsRouter,
   createWalletsRouter,
@@ -73,7 +72,6 @@ export function startHttpServer(
   const PORT = process.env.PORT || 3000;
 
   app.use('/assignments', createAssignmentsRouter(store, registry, factory));
-  app.use('/strategies', createStrategiesRouter(registry, factory, positionProvider));
   app.use('/', createIntrospectionRouter(factory));
   app.use('/wallets', createWalletsRouter(positionProvider));
   app.get('/positions', async (req, res) => {
@@ -187,7 +185,7 @@ export function startHttpServer(
     }
   });
 
-  app.use('/positions', handlePositionsRouter(positionProvider, executor, store));
+  app.use('/positions', handlePositionsRouter(positionProvider, executor, registry, factory, store));
 
   const swaggerDocument = YAML.load(path.join(__dirname, '../src/openapi.yaml'));
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
