@@ -25,6 +25,9 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    networks:
+      - aria-vega-dev
+      - hummingbot-network
 
   frontend:
     build:
@@ -43,5 +46,10 @@ services:
     restart: unless-stopped
 
 networks:
-  default:
+  aria-vega-dev:
     name: aria-vega-dev
+    external: true
+  hummingbot-network:
+    name: hummingbot-repos_hummingbot-network
+    external: true
+

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "design-taste-frontend": {
+      "source": "leonxlnx/taste-skill",
+      "sourceType": "github",
+      "skillPath": "skills/taste-skill/SKILL.md",
+      "computedHash": "9d1e82c5c409d2b0247245a005bc0f7e4447c0999b78dcea60f568c1ba4a6694"
+    },
+    "hummingbot": {
+      "source": "2025emma/vibe-coding-cn",
+      "sourceType": "github",
+      "skillPath": "i18n/zh/skills/hummingbot/SKILL.md",
+      "computedHash": "e0ce402397593245b5da1c032e00adff1cbf778388abea781be3d9580ca204af"
+    }
+  }
+}

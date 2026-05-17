@@ -3,6 +3,12 @@ dist/
 build/
 *.tsbuildinfo
 
+# Compiled JS artifacts in source tree (TS project, keep src/ clean)
+packages/*/src/**/*.js
+packages/*/src/**/*.js.map
+packages/*/src/**/*.d.ts
+packages/*/src/**/*.d.ts.map
+
 # Dependencies
 node_modules/
 
