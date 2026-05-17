@@ -1,16 +1,16 @@
-# Docs — Solana CLMM LP Strategy System
+# Docs — Aria Vega Market Maker
 
 Start here. Every doc in this directory is listed below.
 
 ## Architecture
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — high-level design, components, and core data flow
+- [ARCHITECTURE.md](ARCHITECTURE.md) — high-level design, components, and core data flow (Updated for Hummingbot)
 - [INTERFACES.md](INTERFACES.md) — core domain models, business logic boundaries, and structural contracts
 
 ## Decisions
 
 - [decisions_position_lifecycle.md](decisions_position_lifecycle.md) — Design and state rules for the Position Lifecycle State Machine.
-- [SOLANA_CLMM_FINDINGS.md](SOLANA_CLMM_FINDINGS.md) — Critical technical findings, SDK quirks, and anti-patterns discovered.
+- [SOLANA_CLMM_FINDINGS.md](SOLANA_CLMM_FINDINGS.md) — [Legacy] Critical technical findings, SDK quirks, and anti-patterns discovered during direct Solana integration.
 - [references/liquidity_management_apis.md](references/liquidity_management_apis.md) — Architecture for manual add/remove liquidity REST APIs.
 
 ## Q&A
@@ -27,7 +27,7 @@ Start here. Every doc in this directory is listed below.
 - [@lp-system/config docs](../packages/config/docs/START_HERE.md) — Central configuration and dynamic workspace path resolution.
 - [@lp-system/logger docs](../packages/logger/docs/START_HERE.md) — Multi-transport Structured Winston Logging Documentation
 - [@lp-system/persistence docs](../packages/persistence/docs/START_HERE.md) — File-based JSON Persistence Documentation
-- [@lp-system/providers docs](../packages/providers/docs/START_HERE.md) — Load balanced RPC & API Providers Documentation
+- [@lp-system/providers docs](../packages/providers/docs/START_HERE.md) — Hummingbot API Providers Documentation (Updated)
 - [@lp-system/steps docs](../packages/steps/docs/START_HERE.md) — Reusable stateless step components Documentation
 - [@lp-system/strategy docs](../packages/strategy/docs/START_HERE.md) — Workflow composition and strategies Documentation
 - [@lp-system/orchestration docs](../packages/orchestration/docs/START_HERE.md) — Position orchestration & safety gates Documentation
