@@ -2,7 +2,7 @@
 
 This document defines the **Task-Intent (Write-Ahead Intent)** architecture designed to ensure atomic integrity during position rebalancing. This architecture prevents "Ghost Position" errors and manages signal decay during network congestion.
 
-Following the refactor to use the Hummingbot API, the system offloads direct blockchain execution and data fetching to the Hummingbot Gateway.
+The system uses a **split data-access pattern**: write operations (open, close, add/remove liquidity) go through the Hummingbot Gateway API, while read operations (pool info, positions, PnL, market snapshots) hit the Meteora Datapi API (`dlmm.datapi.meteora.ag`) directly. This avoids the Gateway's buggy `DLMM.getAllLbPairPositionsByUser()` and provides fresher data.
 
 ---
 
@@ -24,6 +24,7 @@ graph TD
     subgraph Orchestration_Layer [Orchestration Layer]
         OR --> |"2. Writes RebalanceTask"| TS[(Task Store)]
         TS --> |"3. Monitors Intent"| EX[Hummingbot Executor]
+        OR -.-> |"Reads pool/position data"| MD[Meteora Datapi API]
     end
 
     subgraph Persistence_Layer [Persistence Layer]
@@ -32,7 +33,13 @@ graph TD
 
     subgraph Execution_Layer [Execution Layer]
         EX --> |"4. JIT Evaluation"| ST[Strategy]
-        EX --> |"5. API Call"| RPC[Hummingbot API]
+        ST -.-> |"Reads pool info"| MD
+        EX --> |"5. Write API Call"| HB[Hummingbot API]
+    end
+
+    subgraph Data_Sources [Data Sources]
+        MD[dlmm.datapi.meteora.ag]
+        HB[Hummingbot Gateway :8000]
     end
 ```
 
@@ -106,7 +113,7 @@ sequenceDiagram
 
 ## 4. Recovery Flow (Agnostic Discovery)
 
-Upon startup, the engine synchronizes live data from the Hummingbot API with local persistent intents.
+Upon startup, the engine synchronizes live data from the Meteora Datapi API with local persistent intents. Write operations (close, open) are executed via the Hummingbot API.
 
 <details>
 <summary>Show Mermaid Source</summary>
@@ -114,7 +121,7 @@ Upon startup, the engine synchronizes live data from the Hummingbot API with loc
 ```mermaid
 flowchart LR
     Start([Engine Start]) --> LoadTasks[Load data/tasks.json]
-    LoadTasks --> LoadChain[Fetch Live Positions via Hummingbot]
+    LoadTasks --> LoadChain[Fetch Live Positions via Meteora Datapi]
 
     subgraph Discovery_Logic [Agnostic Discovery]
         LoadChain --> Match{Task Exists?}
@@ -150,7 +157,7 @@ When a position is closed, the system cannot fetch its state directly. The **Syn
 - **Execution Lock**: The `Orchestrator` uses a public `isExecuting` flag to ignore new `Tick Loop` signals while a `RebalanceTask` is in progress.
 - **Write-Ahead Intent**: The `RebalanceTask` is written to disk _before_ the first transaction is signed.
 - **Circuit Breakers**:
-  - **Hummingbot API**: Enforces a maximum snapshot age to prevent the Tick Loop from evaluating positions against stale market snapshots.
+  - **Meteora Datapi**: Enforces a maximum snapshot age to prevent the Tick Loop from evaluating positions against stale market snapshots.
   - **API Circuit Breaker**: Halts new task generation and pauses in-flight tasks if the Hummingbot API error rate exceeds configured thresholds.
 
 ---

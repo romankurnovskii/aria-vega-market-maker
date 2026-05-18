@@ -4,13 +4,14 @@ Start here. Every doc in this directory is listed below.
 
 ## Architecture
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — high-level design, components, and core data flow (Updated for Hummingbot)
+- [ARCHITECTURE.md](ARCHITECTURE.md) — high-level design, components, and core data flow (Meteora Datapi reads + Hummingbot writes)
 - [INTERFACES.md](INTERFACES.md) — core domain models, business logic boundaries, and structural contracts
 
 ## Decisions
 
 - [decisions_position_lifecycle.md](decisions_position_lifecycle.md) — Design and state rules for the Position Lifecycle State Machine.
 - [SOLANA_CLMM_FINDINGS.md](SOLANA_CLMM_FINDINGS.md) — [Legacy] Critical technical findings, SDK quirks, and anti-patterns discovered during direct Solana integration.
+- [METEORA_SDK_BUG.md](METEORA_SDK_BUG.md) — Meteora DLMM SDK feeInfos bug: root cause, all affected versions, and Gateway patch.
 - [references/liquidity_management_apis.md](references/liquidity_management_apis.md) — Architecture for manual add/remove liquidity REST APIs.
 
 ## Q&A

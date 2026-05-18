@@ -31,7 +31,7 @@ pnpm test
 ## Structure
 
 - `packages/core` — Shared domain types and interfaces.
-- `packages/providers` — Hummingbot API providers.
+- `packages/providers` — Meteora Datapi reads + Hummingbot API writes for pool/position data.
 - `packages/steps` — Reusable execution units (calculators, range/limit checks).
 - `packages/strategy` — End-to-end strategy workflows as composite steps.
 - `packages/orchestration` — State coordination, registry, and decision routing.
