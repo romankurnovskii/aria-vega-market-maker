@@ -10,8 +10,10 @@
  * @sideEffects None
  */
 
+import type { Step } from '../../types/api';
+
 interface StepsViewProps {
-  steps: any[];
+  steps: Step[];
 }
 
 export const StepsView = ({ steps }: StepsViewProps) => {
@@ -19,7 +21,7 @@ export const StepsView = ({ steps }: StepsViewProps) => {
 
   return (
     <div className="flex-1 overflow-auto pr-2 grid grid-cols-1 lg:grid-cols-2 gap-3 content-start">
-      {steps.map((step: any, idx: number) => (
+      {steps.map((step: Step, idx: number) => (
         <div
           key={step.id}
           className="flex gap-3 border border-[#0D0D0D] bg-white p-4 relative overflow-hidden h-28 hover:bg-[#F4F4F0] transition-colors"

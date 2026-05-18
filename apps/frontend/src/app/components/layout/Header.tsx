@@ -1,4 +1,4 @@
-import { HealthData, Assignment } from '../containers/AriaVegaContainer';
+import type { HealthData, Assignment } from '../../types/api';
 
 interface Wallet {
   chain: string;

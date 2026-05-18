@@ -11,7 +11,6 @@
 'use client';
 
 import React from 'react';
-import { Zap } from 'lucide-react';
 
 interface OrchestrationControlsProps {
   strategies: Array<{ id: string; name: string }>;
@@ -31,7 +30,7 @@ export const OrchestrationControls = ({
   onModeChange,
   onAssign,
   onEvaluate,
-}: Props) => {
+}: OrchestrationControlsProps) => {
   return (
     <div className="flex flex-col gap-3 border-t border-[#0D0D0D] pt-4 min-w-0">
       <div className="flex flex-col gap-2">
@@ -73,7 +72,9 @@ export const OrchestrationControls = ({
             <button
               onClick={() => onModeChange('monitor')}
               className={`flex-1 py-1 text-[10px] uppercase font-bold transition-colors ${
-                selectedMode === 'monitor' ? 'bg-[#0D0D0D] text-[#F4F4F0]' : 'bg-transparent text-[#0D0D0D] hover:bg-gray-100'
+                selectedMode === 'monitor'
+                  ? 'bg-[#0D0D0D] text-[#F4F4F0]'
+                  : 'bg-transparent text-[#0D0D0D] hover:bg-gray-100'
               }`}
             >
               Monitor

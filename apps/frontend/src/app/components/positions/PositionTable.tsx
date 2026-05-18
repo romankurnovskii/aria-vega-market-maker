@@ -15,7 +15,7 @@
 
 import React from 'react';
 import { ChevronRight } from 'lucide-react';
-import { Position } from '../stores/app-store';
+import type { Position } from '../../types/api';
 
 interface PositionTableProps {
   positions: Position[];

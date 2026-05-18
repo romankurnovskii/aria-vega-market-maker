@@ -10,8 +10,10 @@
  * @sideEffects None
  */
 
+import type { Strategy } from '../../types/api';
+
 interface StrategiesViewProps {
-  strategies: any[];
+  strategies: Strategy[];
 }
 
 export const StrategiesView = ({ strategies }: StrategiesViewProps) => {
@@ -20,7 +22,7 @@ export const StrategiesView = ({ strategies }: StrategiesViewProps) => {
 
   return (
     <div className="flex-1 overflow-auto pr-2 grid grid-cols-1 md:grid-cols-2 gap-4 content-start">
-      {strategies.map((strat: any) => (
+      {strategies.map((strat: Strategy) => (
         <div
           key={strat.id}
           className="flex flex-col justify-between border border-[#0D0D0D] bg-white p-4 shadow-[4px_4px_0_#0D0D0D]"

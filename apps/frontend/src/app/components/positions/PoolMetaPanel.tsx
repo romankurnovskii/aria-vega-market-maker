@@ -1,19 +1,17 @@
 'use client';
 
 import React from 'react';
-import { useAppStore } from '../stores/app-store';
+import type { PoolMeta } from '../../stores/app-store';
 
 interface PoolMetaPanelProps {
-  poolAddress: string;
+  poolMeta?: PoolMeta | null;
   status: string;
   state: string;
   activeBin?: number;
   pnlData?: Record<string, unknown>;
 }
 
-export const PoolMetaPanel = ({ poolAddress, status, state, activeBin, pnlData }: PoolMetaPanelProps) => {
-  const poolMeta = useAppStore((s) => s.poolMetaByAddress[poolAddress]);
-
+export const PoolMetaPanel = ({ poolMeta, status, state, activeBin, pnlData }: PoolMetaPanelProps) => {
   const outOfRange = status === 'Out of Range';
 
   const unclaimedFees = pnlData?.unclaimedFees !== undefined ? Number(pnlData.unclaimedFees) : undefined;

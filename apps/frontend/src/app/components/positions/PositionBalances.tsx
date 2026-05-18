@@ -33,7 +33,7 @@ export const PositionBalances = ({
   const renderBalance = (
     symbol: string,
     token: { amount: string; decimals: number } | null | undefined,
-    usdValue: number | undefined,
+    usdValue: number | undefined
   ) => {
     return usdValue !== undefined && usdValue > 0
       ? `$${usdValue.toFixed(4)}`

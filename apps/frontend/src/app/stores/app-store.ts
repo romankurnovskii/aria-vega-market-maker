@@ -1,6 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
+import type { Position, EvalLogEntry } from '../types/api';
 
 export interface PoolMeta {
   address: string;
@@ -14,38 +15,7 @@ export interface PoolMeta {
   feeRate: number;
 }
 
-export interface Position {
-  id: string;
-  pool: string;
-  minBin: number;
-  maxBin: number;
-  binCount: number;
-  rangePercent: number;
-  lowerBoundPrice?: number;
-  upperBoundPrice?: number;
-  activeBin?: number;
-  status: string;
-  state: string;
-  tokenX: { amount: string; decimals: number; mint?: string; tokenAddress?: string } | null | undefined;
-  tokenY: { amount: string; decimals: number; mint?: string; tokenAddress?: string } | null | undefined;
-  openedAt?: number;
-  poolActivePrice?: number;
-  raw: Record<string, unknown>;
-  pnlData?: Record<string, unknown>;
-  _wallet?: string;
-}
-
-export interface EvalLogEntry {
-  id: number;
-  timestamp: string;
-  action: string;
-  strategyId?: string;
-  positionId?: string;
-  result?: unknown;
-  error?: string;
-  transactionSignatures?: string[];
-  pendingSuggestion?: { action: string; openParams?: Record<string, unknown> };
-}
+export type { Position, EvalLogEntry };
 
 interface AppStore {
   poolMetaByAddress: Record<string, PoolMeta>;

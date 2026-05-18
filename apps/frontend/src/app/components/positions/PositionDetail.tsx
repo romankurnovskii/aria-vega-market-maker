@@ -16,7 +16,8 @@
 
 import React, { useState } from 'react';
 
-import { formatAmount, getTokenSymbol } from '../containers/AriaVegaContainer';
+import { formatAmount, getTokenSymbol } from '../../utils/format';
+import { useAppStore } from '../../stores/app-store';
 import { PositionHeader } from './PositionHeader';
 import { PoolMetaPanel } from './PoolMetaPanel';
 import { PositionBalances } from './PositionBalances';
@@ -24,15 +25,8 @@ import { PriceAnalytics } from './PriceAnalytics';
 import { PnLAndFees } from './PnLAndFees';
 import { OrchestrationControls } from './OrchestrationControls';
 import { PositionActionButtons } from './PositionActionButtons';
-import { EventLog } from './EventLog';
-import { Position, EvalLogEntry } from '../stores/app-store';
-
-interface Strategy {
-  id: string;
-  name: string;
-  description: string;
-  risk: string;
-}
+import { EventLog } from '../ui/EventLog';
+import type { Position, Strategy, EvalLogEntry } from '../../types/api';
 
 interface PnLData {
   pnlUsd?: string | number;
@@ -81,6 +75,8 @@ export const PositionDetail = ({
   evalLogs,
   onClose,
 }: PositionDetailProps) => {
+  const poolMeta = useAppStore((s) => s.poolMetaByAddress[position.pool]);
+
   const [selectedStrategyId, setSelectedStrategyId] = useState<string>(
     orchestration?.strategyId || strategies[0]?.id || 'NONE'
   );
@@ -118,7 +114,7 @@ export const PositionDetail = ({
   return (
     <div className="flex flex-1 flex-col gap-4 min-h-0">
       {/* Actions Pane */}
-      <div className="border border-[#0D0D0D] bg-white p-4 flex flex-col gap-4 overflow-y-auto min-h-[300px]">
+      <div className="flex-1 border border-[#0D0D0D] bg-white p-4 flex flex-col gap-4 overflow-y-auto min-h-[300px]">
         <PositionHeader
           positionId={position.id}
           pool={position.pool}
@@ -128,7 +124,7 @@ export const PositionDetail = ({
         />
 
         <PoolMetaPanel
-          poolAddress={position.pool}
+          poolMeta={poolMeta}
           status={position.status}
           state={position.state}
           activeBin={position.activeBin}
@@ -185,10 +181,7 @@ export const PositionDetail = ({
         )}
       </div>
 
-      {/* Event Log Pane */}
-      <div className="flex flex-1 flex-col min-h-[300px]">
-        <EventLog logs={evalLogs} onApplySuggestion={onApplySuggestion} />
-      </div>
+      <EventLog logs={evalLogs} onApplySuggestion={onApplySuggestion} />
     </div>
   );
 };

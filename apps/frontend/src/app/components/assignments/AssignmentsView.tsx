@@ -13,28 +13,18 @@
  */
 
 import { Trash2 } from 'lucide-react';
-import { EventLog } from './EventLog';
-
-interface LogEntry {
-  id: string | number;
-  timestamp: string;
-  action?: string;
-  strategyId?: string;
-  positionId?: string;
-  error?: string;
-  result?: unknown;
-  transactionSignatures?: string[];
-  pendingSuggestion?: {
-    action: string;
-    openParams?: Record<string, unknown>;
-  };
-}
+import { EventLog } from '../ui/EventLog';
+import type { Assignment, EvalLogEntry } from '../../types/api';
 
 interface AssignmentsViewProps {
-  assignments: any[];
+  assignments: Assignment[];
   onDelete: (id: string) => Promise<void>;
-  evalLogs?: LogEntry[];
-  onApplySuggestion?: (positionId: string, strategyId: string, suggestion: { action: string; openParams?: Record<string, unknown> }) => void;
+  evalLogs?: EvalLogEntry[];
+  onApplySuggestion?: (
+    positionId: string,
+    strategyId: string,
+    suggestion: { action: string; openParams?: Record<string, unknown> }
+  ) => void;
 }
 
 export const AssignmentsView = ({ assignments, onDelete, evalLogs = [], onApplySuggestion }: AssignmentsViewProps) => {
@@ -51,14 +41,18 @@ export const AssignmentsView = ({ assignments, onDelete, evalLogs = [], onApplyS
             <thead className="sticky top-0 bg-[#0D0D0D] text-[#F4F4F0] z-10">
               <tr>
                 <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D]">Assignment ID</th>
-                <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D]">Target Position</th>
+                <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D]">
+                  Target Position
+                </th>
                 <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D]">Strategy</th>
                 <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D]">Mode</th>
-                <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D] text-right">Revoke</th>
+                <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D] text-right">
+                  Revoke
+                </th>
               </tr>
             </thead>
             <tbody>
-              {assignments.map((asg: any) => (
+              {assignments.map((asg: Assignment) => (
                 <tr key={asg.id} className="border-b border-gray-200 hover:bg-[#F4F4F0] transition-colors group">
                   <td className="py-2 px-3 font-bold border-r border-gray-200 font-mono text-[11px]">{asg.id}</td>
                   <td

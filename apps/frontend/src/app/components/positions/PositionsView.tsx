@@ -17,21 +17,7 @@
 import React, { useState, useMemo } from 'react';
 import { PositionTable } from './PositionTable';
 import { PositionDetail } from './PositionDetail';
-import { Position, EvalLogEntry } from '../stores/app-store';
-
-interface Assignment {
-  id: string;
-  positionId: string;
-  strategyId: string;
-  mode: string;
-}
-
-interface Strategy {
-  id: string;
-  name: string;
-  description: string;
-  risk: string;
-}
+import type { Assignment, Strategy, Position, EvalLogEntry } from '../../types/api';
 
 interface Props {
   positions: Position[];

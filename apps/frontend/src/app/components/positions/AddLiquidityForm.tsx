@@ -8,7 +8,7 @@ interface AddLiquidityFormProps {
   onCancel?: () => void;
 }
 
-export default function AddLiquidityForm({ positionId, onSuccess, onCancel }: AddLiquidityFormProps) {
+export const AddLiquidityForm = ({ positionId, onSuccess, onCancel }: AddLiquidityFormProps) => {
   const [tokenXAmount, setTokenXAmount] = useState('');
   const [tokenYAmount, setTokenYAmount] = useState('');
   const [loading, setLoading] = useState(false);
@@ -94,4 +94,4 @@ export default function AddLiquidityForm({ positionId, onSuccess, onCancel }: Ad
       </form>
     </div>
   );
-}
+};
