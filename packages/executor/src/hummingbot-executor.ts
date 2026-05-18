@@ -1,4 +1,11 @@
-import { IExecutor, Decision, MarketSnapshot, ExecutionRecord, StrategyResult } from '@lp-system/core';
+import {
+  IExecutor,
+  Decision,
+  MarketSnapshot,
+  ExecutionRecord,
+  StrategyResult,
+  CLMMClosePositionResponse,
+} from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
 
 const logger = getLogger('hummingbot-executor');
@@ -10,6 +17,7 @@ const logger = getLogger('hummingbot-executor');
 export class HummingbotExecutor implements IExecutor {
   private apiUrl: string;
   private walletAddress: string;
+  private authHeaders: Record<string, string>;
   private reEvaluateCallback?: (positionId: string) => Promise<StrategyResult>;
 
   /**
@@ -19,6 +27,12 @@ export class HummingbotExecutor implements IExecutor {
   constructor(apiUrl: string, walletAddress: string) {
     this.apiUrl = apiUrl || 'http://localhost:8000';
     this.walletAddress = walletAddress;
+
+    const username = process.env.HUMMINGBOT_API_USERNAME || 'admin';
+    const password = process.env.HUMMINGBOT_API_PASSWORD || 'admin';
+    const encoded = Buffer.from(`${username}:${password}`).toString('base64');
+    this.authHeaders = { Authorization: `Basic ${encoded}`, 'Content-Type': 'application/json' };
+
     logger.info(`[HummingbotExecutor] Initialized with API URL: ${this.apiUrl} and wallet: ${this.walletAddress}`);
   }
 
@@ -32,7 +46,7 @@ export class HummingbotExecutor implements IExecutor {
 
   /**
    * Applies a decision to the Hummingbot API.
-   * Currently only supports 'open' action.
+   * Supports 'open' and 'close' actions via the Hummingbot Gateway API.
    *
    * @param {Decision} decision - The action to execute.
    * @param {MarketSnapshot} market - Current market data.
@@ -72,21 +86,19 @@ export class HummingbotExecutor implements IExecutor {
 
         const response = await fetch(`${this.apiUrl}/gateway/clmm/open`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: this.authHeaders,
           body: JSON.stringify(payload),
         });
 
         if (!response.ok) {
-          throw new Error(`Hummingbot API failed: ${response.status} ${response.statusText}`);
+          const errorBody = await response.text().catch(() => '(no body)');
+          throw new Error(`Hummingbot API open failed [${response.status}]: ${response.statusText} — body: ${errorBody}`);
         }
 
         const result = await response.json();
         logger.info(`[HummingbotExecutor] Hummingbot API response: ${JSON.stringify(result)}`);
 
-        // Assuming response contains a transaction signature or position ID
-        const sig = result.tx_signature || result.signature || result.id || 'unknown_sig';
+        const sig = result.transaction_hash || 'unknown_sig';
         txSignatures.push(sig);
 
         return {
@@ -95,10 +107,46 @@ export class HummingbotExecutor implements IExecutor {
           txSignatures,
           status: 'success',
           executedAt: Date.now(),
-          newPositionId: result.position_id || result.id, // Assuming it returns the new position ID
+          newPositionId: result.position_address,
         };
       } else if (decision.action === 'close') {
-        throw new Error('Close operation is not supported in this phase of Hummingbot integration.');
+        const positionAddress = decision.positionId;
+
+        logger.info(`[HummingbotExecutor] Closing position ${positionAddress} via Hummingbot API...`);
+
+        const payload = {
+          connector: 'meteora',
+          network: 'solana-mainnet-beta',
+          position_address: positionAddress,
+          wallet_address: this.walletAddress,
+        };
+
+        logger.info(`[HummingbotExecutor] Sending POST /gateway/clmm/close with payload: ${JSON.stringify(payload)}`);
+
+        const response = await fetch(`${this.apiUrl}/gateway/clmm/close`, {
+          method: 'POST',
+          headers: this.authHeaders,
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const errorBody = await response.text().catch(() => '(no body)');
+          throw new Error(`Hummingbot API close failed [${response.status}]: ${response.statusText} — body: ${errorBody}`);
+        }
+
+        const result = (await response.json()) as CLMMClosePositionResponse;
+        logger.info(`[HummingbotExecutor] Hummingbot API response: ${JSON.stringify(result)}`);
+
+        const sig = result.transaction_hash || 'unknown_sig';
+        txSignatures.push(sig);
+
+        return {
+          id: executionId,
+          decision,
+          txSignatures,
+          status: 'success',
+          executedAt: Date.now(),
+        };
       } else {
         throw new Error(`Unsupported action: ${decision.action}`);
       }

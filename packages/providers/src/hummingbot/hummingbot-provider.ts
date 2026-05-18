@@ -1,18 +1,23 @@
-import { IPositionProvider, Position, PoolInfo, MarketSnapshot, ChainId, ProtocolType } from '@lp-system/core';
+import { IPositionProvider, Position, PoolInfo, MarketSnapshot, ProtocolType } from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
 import { HummingbotWalletManager } from './wallet-manager.js';
 import { GatewayWallet } from '@lp-system/core';
+import { getBinIdFromPrice } from '../meteora/meteora.utils.js';
+import { PoolResponse } from '../meteora/types.js';
 
 const logger = getLogger('hummingbot-provider');
+const METEORA_DATAPI_URL = 'https://dlmm.datapi.meteora.ag';
 
 /**
  * Hummingbot API provider for pool and market data.
- * Implements IPositionProvider by calling Hummingbot Gateway API.
+ * Implements IPositionProvider by calling Meteora Datapi for reads
+ * and Hummingbot Gateway API for writes.
  */
 export class HummingbotProvider implements IPositionProvider {
   private apiUrl: string;
   private walletManager: HummingbotWalletManager;
   private authHeaders: Record<string, string>;
+  private poolDataCache = new Map<string, { data: PoolResponse; timestamp: number }>();
 
   /**
    * @param {string} apiUrl - Hummingbot API base URL (e.g., http://localhost:8000).
@@ -27,6 +32,29 @@ export class HummingbotProvider implements IPositionProvider {
 
     this.walletManager = new HummingbotWalletManager(this.apiUrl, this.authHeaders);
     logger.info(`[HummingbotProvider] Initialized with API URL: ${this.apiUrl}`);
+  }
+
+  /**
+   * Fetches full pool data from Meteora Datapi with shared 10s cache.
+   */
+  private async fetchPoolData(poolAddress: string): Promise<PoolResponse> {
+    const cached = this.poolDataCache.get(poolAddress);
+    const now = Date.now();
+    if (cached && now - cached.timestamp < 10000) {
+      return cached.data;
+    }
+
+    const response = await fetch(`${METEORA_DATAPI_URL}/pools/${poolAddress}`, {
+      headers: { Accept: 'application/json', 'User-Agent': 'HummingbotProvider/1.0' },
+    });
+
+    if (!response.ok) {
+      throw new Error(`[HummingbotProvider] Failed to fetch pool data for ${poolAddress}: HTTP ${response.status}`);
+    }
+
+    const data = (await response.json()) as PoolResponse;
+    this.poolDataCache.set(poolAddress, { data, timestamp: now });
+    return data;
   }
 
   /**
@@ -59,60 +87,38 @@ export class HummingbotProvider implements IPositionProvider {
   }
 
   /**
-   * Fetches static pool metadata for a given pool address.
-   * Calls GET /gateway/clmm/pool-info
+   * Fetches static pool metadata for a given pool address via Meteora Datapi.
    */
-  public async getPoolInfo(
-    poolAddress: string,
-    connector: string = 'meteora',
-    network: string = 'solana-mainnet-beta'
-  ): Promise<PoolInfo> {
+  public async getPoolInfo(poolAddress: string): Promise<PoolInfo> {
     logger.info(`[HummingbotProvider] Fetching pool info for ${poolAddress}`);
 
-    const url = `${this.apiUrl}/gateway/clmm/pool-info?connector=${connector}&network=${network}&pool_address=${poolAddress}`;
+    const data = await this.fetchPoolData(poolAddress);
 
-    try {
-      const response = await fetch(url, {
-        headers: this.authHeaders,
-      });
+    const activeBinId = getBinIdFromPrice(
+      data.current_price,
+      data.pool_config.bin_step,
+      data.token_x.decimals,
+      data.token_y.decimals
+    );
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch pool info: ${response.status} ${response.statusText}`);
-      }
+    const feeRate = data.dynamic_fee_pct > 0 ? data.dynamic_fee_pct : data.pool_config.base_fee_pct / 100;
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const raw: Record<string, any> = await response.json();
-
-      // Map snake_case response to camelCase
-      const binStep = raw.binStep ?? raw.bin_step ?? 0;
-      const feePct = raw.feePct ?? raw.fee_pct ?? '0';
-      const price = raw.price ?? '0';
-      const activeBinId = raw.activeBinId ?? raw.active_bin_id ?? null;
-      const baseTokenAddress = raw.baseTokenAddress ?? raw.base_token_address ?? '';
-      const quoteTokenAddress = raw.quoteTokenAddress ?? raw.quote_token_address ?? '';
-      const address = raw.address ?? '';
-
-      const chainPart = network.split('-')[0];
-      const chainId: ChainId = chainPart === 'solana' ? 'solana' : chainPart === 'arbitrum' ? 'arbitrum' : 'solana';
-
-      return {
-        poolAddress: address,
-        chain: chainId,
-        protocol: 'meteora_dlmm' as ProtocolType,
-        feeRate: Number(feePct) || 0,
-        activeBound: activeBinId !== null ? Number(activeBinId) : 0,
-        price: price ? Number(price) : undefined,
-        tokenXAddress: baseTokenAddress,
-        tokenYAddress: quoteTokenAddress,
-        binStep: Number(binStep) || 0,
-        activeBinId: activeBinId !== null ? Number(activeBinId) : undefined,
-        tokenXMint: baseTokenAddress,
-        tokenYMint: quoteTokenAddress,
-      };
-    } catch (error) {
-      logger.error(`[HummingbotProvider] Error fetching pool info for ${poolAddress}: ${error}`);
-      throw error;
-    }
+    return {
+      poolAddress: data.address,
+      chain: 'solana',
+      protocol: 'meteora_dlmm' as ProtocolType,
+      feeRate,
+      activeBound: activeBinId,
+      price: data.current_price,
+      tokenXAddress: data.token_x.address,
+      tokenYAddress: data.token_y.address,
+      binStep: data.pool_config.bin_step,
+      activeBinId,
+      tokenXMint: data.token_x.address,
+      tokenYMint: data.token_y.address,
+      tokenXDecimals: data.token_x.decimals,
+      tokenYDecimals: data.token_y.decimals,
+    };
   }
 
   /**
@@ -171,7 +177,7 @@ export class HummingbotProvider implements IPositionProvider {
       try {
         const abort = new AbortController();
         const timer = setTimeout(() => abort.abort(), 8000);
-        const portRes = await fetch(`https://dlmm.datapi.meteora.ag/portfolio/open?user=${walletAddress}`, {
+        const portRes = await fetch(`${METEORA_DATAPI_URL}/portfolio/open?user=${walletAddress}`, {
           signal: abort.signal,
           headers: { Accept: 'application/json' },
         });
@@ -198,7 +204,7 @@ export class HummingbotProvider implements IPositionProvider {
     const allPositions: Position[] = [];
 
     for (const pool of poolsToQuery) {
-      const url = `https://dlmm.datapi.meteora.ag/positions/${pool}/pnl?user=${walletAddress}&status=open`;
+      const url = `${METEORA_DATAPI_URL}/positions/${pool}/pnl?user=${walletAddress}&status=open`;
 
       try {
         const abort = new AbortController();
@@ -276,27 +282,19 @@ export class HummingbotProvider implements IPositionProvider {
     if (cached) return cached;
 
     try {
-      const res = await fetch(`https://dlmm.datapi.meteora.ag/pools/${poolAddress}`, {
-        headers: { Accept: 'application/json', 'User-Agent': 'HummingbotProvider/1.0' },
-      });
-      if (res.ok) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const data = (await res.json()) as any;
-        const decimals = { decimalsX: data.token_x?.decimals ?? 9, decimalsY: data.token_y?.decimals ?? 6 };
-        this.poolDecimalsCache.set(poolAddress, decimals);
-        return decimals;
-      }
+      const data = await this.fetchPoolData(poolAddress);
+      const decimals = { decimalsX: data.token_x.decimals, decimalsY: data.token_y.decimals };
+      this.poolDecimalsCache.set(poolAddress, decimals);
+      return decimals;
     } catch {
-      // fall through to defaults
+      const defaults = { decimalsX: 9, decimalsY: 6 };
+      this.poolDecimalsCache.set(poolAddress, defaults);
+      return defaults;
     }
-
-    const defaults = { decimalsX: 9, decimalsY: 6 };
-    this.poolDecimalsCache.set(poolAddress, defaults);
-    return defaults;
   }
 
   public async getPosition(positionId: string, poolAddress?: string): Promise<Position> {
-    const url = `https://dlmm.datapi.meteora.ag/position/${positionId}`;
+    const url = `${METEORA_DATAPI_URL}/position/${positionId}`;
     try {
       const res = await fetch(url, {
         headers: { Accept: 'application/json', 'User-Agent': 'HummingbotProvider/1.0' },
@@ -340,35 +338,59 @@ export class HummingbotProvider implements IPositionProvider {
   }
 
   /**
-   * Fetches a market snapshot for a pool via GET /gateway/clmm/pool-info.
+   * Fetches a market snapshot for a pool via Meteora Datapi.
+   * Includes price history from OHLCV endpoint.
    */
   public async getMarketSnapshot(poolAddress: string): Promise<MarketSnapshot> {
-    const connector = 'meteora';
-    const network = 'solana-mainnet-beta';
-    const url = `${this.apiUrl}/gateway/clmm/pool-info?connector=${connector}&network=${network}&pool_address=${poolAddress}`;
+    logger.info(`[HummingbotProvider] Fetching market snapshot for ${poolAddress}`);
 
-    const response = await fetch(url, { headers: this.authHeaders });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch market snapshot: ${response.status} ${response.statusText}`);
+    const poolData = await this.fetchPoolData(poolAddress);
+
+    const activeBinId = getBinIdFromPrice(
+      poolData.current_price,
+      poolData.pool_config.bin_step,
+      poolData.token_x.decimals,
+      poolData.token_y.decimals
+    );
+
+    const feeRate = poolData.dynamic_fee_pct > 0 ? poolData.dynamic_fee_pct : poolData.pool_config.base_fee_pct / 100;
+
+    let priceHistory: { price: number; timestamp: number }[] = [];
+
+    try {
+      const ohlcvUrl = `${METEORA_DATAPI_URL}/pools/${poolAddress}/ohlcv?timeframe=1h`;
+      const ohlcvResponse = await fetch(ohlcvUrl, {
+        headers: { Accept: 'application/json', 'User-Agent': 'HummingbotProvider/1.0' },
+      });
+
+      if (ohlcvResponse.ok) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const ohlcvData = (await ohlcvResponse.json()) as any;
+        if (ohlcvData && Array.isArray(ohlcvData.data)) {
+          priceHistory = ohlcvData.data
+            .map((candle: { close: number; timestamp: number }) => ({
+              price: candle.close,
+              timestamp: candle.timestamp * 1000,
+            }))
+            .slice(-24);
+        }
+      }
+    } catch {
+      logger.warn(`[HummingbotProvider] Failed to fetch OHLCV for ${poolAddress}, using current price only`);
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const raw: Record<string, any> = await response.json();
-    const price = Number(raw.price) || 0;
-    const dynamicFeePct = raw.dynamicFeePct ?? raw.dynamic_fee_pct ?? null;
-    const feePct = raw.feePct ?? raw.fee_pct ?? '0';
-    const feeRate = dynamicFeePct ? Number(dynamicFeePct) : Number(feePct) || 0;
-    const activeBinId = raw.activeBinId ?? raw.active_bin_id ?? 0;
-    const address = raw.address ?? '';
+    if (priceHistory.length === 0) {
+      priceHistory = [{ price: poolData.current_price, timestamp: Date.now() }];
+    }
 
     return {
-      poolAddress: address,
-      chain: (network.split('-')[0] || 'solana') as ChainId,
+      poolAddress: poolData.address,
+      chain: 'solana',
       protocol: 'meteora_dlmm' as ProtocolType,
-      activeBound: Number(activeBinId) || 0,
-      activeBinId: Number(activeBinId) || undefined,
-      price,
-      priceHistory: [{ price, timestamp: Date.now() }],
+      activeBound: activeBinId,
+      activeBinId,
+      price: poolData.current_price,
+      priceHistory,
       feeRate,
       capturedAt: Date.now(),
     };

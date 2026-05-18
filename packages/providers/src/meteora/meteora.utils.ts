@@ -1,4 +1,4 @@
-import { CalculatedPrices } from '@lp-system/core';
+import { CalculatedPrices, OpenParams } from '@lp-system/core';
 
 /**
  * Calculates the active bin ID (boundary) from the current price.
@@ -104,4 +104,45 @@ export function parseDecimalToRaw(decimalStr: string, decimals: number): string 
 
   const combined = `${integerPart}${fractionalPart}`.replace(/^0+/, '');
   return combined === '' ? '0' : combined;
+}
+
+/**
+ * Converts raw token amounts in openParams to decimal format and ensures prices are set.
+ * Should be called before storing openParams in a task, so the executor receives
+ * Hummingbot-ready values (decimal amounts, human-readable prices).
+ *
+ * @param openParams - OpenParams with raw token amounts and bin IDs
+ * @param decimals - Token decimals from position.tokenX.decimals / tokenY.decimals
+ * @param poolInfo - Pool info (needed for binStep if prices must be computed from bin IDs)
+ * @returns A new OpenParams with decimal amounts and guaranteed prices
+ */
+export function enrichOpenParamsForExecution(
+  openParams: OpenParams,
+  decimals: { tokenXDecimals: number; tokenYDecimals: number },
+  poolInfo?: { binStep: number }
+): OpenParams {
+  const { tokenXDecimals, tokenYDecimals } = decimals;
+
+  const rawX = openParams.tokenXAmount;
+  const rawY = openParams.tokenYAmount;
+  const tokenXAmount = rawX.includes('.') ? rawX : String((Number(rawX) || 0) / Math.pow(10, tokenXDecimals));
+  const tokenYAmount = rawY.includes('.') ? rawY : String((Number(rawY) || 0) / Math.pow(10, tokenYDecimals));
+
+  let lowerBoundPrice = openParams.lowerBoundPrice;
+  let upperBoundPrice = openParams.upperBoundPrice;
+
+  if ((lowerBoundPrice === undefined || upperBoundPrice === undefined) && poolInfo) {
+    const lowerBin = openParams.lowerBinId ?? openParams.lowerBound;
+    const upperBin = openParams.upperBinId ?? openParams.upperBound;
+    lowerBoundPrice = getPriceFromBinId(lowerBin, poolInfo.binStep, tokenXDecimals, tokenYDecimals);
+    upperBoundPrice = getPriceFromBinId(upperBin, poolInfo.binStep, tokenXDecimals, tokenYDecimals);
+  }
+
+  return {
+    ...openParams,
+    tokenXAmount,
+    tokenYAmount,
+    ...(lowerBoundPrice !== undefined ? { lowerBoundPrice } : {}),
+    ...(upperBoundPrice !== undefined ? { upperBoundPrice } : {}),
+  };
 }

@@ -51,36 +51,11 @@ export interface CLMMClosePositionRequest {
   wallet_address?: string | null;
 }
 
-export interface CLMMAddLiquidityRequest {
-  connector: string;
-  network: string;
-  position_address: string;
-  base_token_amount?: number | string | null;
-  quote_token_amount?: number | string | null;
-  slippage_pct?: number | string | null;
-  wallet_address?: string | null;
-}
-
-export interface CLMMRemoveLiquidityRequest {
-  connector: string;
-  network: string;
-  position_address: string;
-  percentage: number | string;
-  wallet_address?: string | null;
-}
-
-export interface CLMMCollectFeesRequest {
-  connector: string;
-  network: string;
-  position_address: string;
-  wallet_address?: string | null;
-}
-
-export interface CLMMCollectFeesResponse {
+export interface CLMMClosePositionResponse {
   transaction_hash: string;
   position_address: string;
-  base_fee_collected: string | null;
-  quote_fee_collected: string | null;
+  base_fee_collected: string;
+  quote_fee_collected: string;
   status: string;
 }
 

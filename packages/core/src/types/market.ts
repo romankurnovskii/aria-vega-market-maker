@@ -47,4 +47,6 @@ export interface PoolInfo {
   activeBinId?: number;
   tokenXMint?: string;
   tokenYMint?: string;
+  tokenXDecimals?: number;
+  tokenYDecimals?: number;
 }

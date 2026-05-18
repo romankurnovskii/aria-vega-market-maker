@@ -4,7 +4,7 @@ Start here. Every doc in this directory is listed below.
 
 ## Architecture
 
-- [ARCHITECTURE.md](ARCHITECTURE.md) — Hummingbot API provider for pool and market data
+- [ARCHITECTURE.md](ARCHITECTURE.md) — Meteora Datapi reads + Hummingbot API writes; cache strategy
 
 ## Decisions
 

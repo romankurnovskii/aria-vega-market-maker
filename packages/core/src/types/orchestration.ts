@@ -42,7 +42,15 @@ export interface ExecutionRecord {
   recordVersion?: number;
 }
 
-export type RebalanceTaskStatus = 'pending_close' | 'pending_open' | 'executing_close' | 'executing_open' | 'confirmed_close' | 'confirmed_open' | 'completed' | 'failed';
+export type RebalanceTaskStatus =
+  | 'pending_close'
+  | 'pending_open'
+  | 'executing_close'
+  | 'executing_open'
+  | 'confirmed_close'
+  | 'confirmed_open'
+  | 'completed'
+  | 'failed';
 
 export type TaskEventStage =
   // 1. Universal Start

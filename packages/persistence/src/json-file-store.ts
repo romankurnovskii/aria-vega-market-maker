@@ -242,9 +242,11 @@ export class JsonFileStore implements IStore {
         }
       }
 
-      const existingLock = tasks.find(
-        (t) => t.assignmentId === task.assignmentId || t.originalPositionId === task.originalPositionId
-      );
+      const existingLock = tasks.find((t) => {
+        if (t.originalPositionId === task.originalPositionId) return true;
+        if (task.assignmentId !== 'manual' && t.assignmentId === task.assignmentId) return true;
+        return false;
+      });
       if (existingLock && existingLock.id !== task.id) {
         throw new Error(
           `Atomicity Violation: Active task ${existingLock.id} already exists for position ${task.originalPositionId}`
@@ -258,13 +260,13 @@ export class JsonFileStore implements IStore {
         const existing = tasks[index];
         // Concurrency Guard: Prevent double-claiming
         const isExecuting = (s: string) => s === 'executing_close' || s === 'executing_open';
-        
+
         if (isExecuting(task.status) && isExecuting(existing.status)) {
           // If we are already executing on disk, we only allow saving if this is an update (more events)
           // and NOT a fresh claim attempt from another process that still thinks it's claiming.
           const taskEvents = task.events?.length || 0;
           const existingEvents = existing.events?.length || 0;
-          
+
           if (taskEvents <= existingEvents && task.status === existing.status) {
             throw new Error(
               `Concurrency Violation: Task ${task.id} is already being executed by another process (Status: ${existing.status}).`

@@ -1,14 +1,32 @@
 # Providers Architecture
 
-The `providers` package contains components that connect to external data feeds and execution gateways. Following the refactor to use Hummingbot, this package is simplified to use a single provider that communicates with the Hummingbot API.
+The `providers` package contains components that connect to external data feeds and execution gateways.
+
+## Data Flow
+
+The system uses a **split data-access pattern**:
+
+- **Read path**: `HummingbotProvider` / `MeteoraApiProvider` → Meteora Datapi API (`dlmm.datapi.meteora.ag`)
+  - Pool info, positions, PnL, market snapshots
+- **Write path**: `HummingbotProvider` → Hummingbot Gateway API (`localhost:8000`)
+  - Open/close positions, add/remove liquidity, wallet management
 
 ## Components
 
-- **`HummingbotProvider`**: Connects to the Hummingbot API server to query pool information and market data. This replaces the legacy direct integrations with specific DEX APIs and RPC nodes. Lives under the `hummingbot/` directory.
+- **`HummingbotProvider`**: Primary provider for all engine operations. Uses Meteora Datapi for read queries and Hummingbot API for write operations and wallet management. Lives under `hummingbot/`.
+- **`MeteoraApiProvider`**: Dedicated provider for Meteora DLMM Datapi queries. Used as a read-only data source with rich caching. Lives under `meteora/`.
 
-## Legacy Components (Removed/Deprecated)
+## Pure Utilities
 
-- **`MeteoraApiProvider`**: (Removed) Connected to the Meteora DLMM Datapi endpoint.
-- **`SolanaRpcProvider`**: (Removed) Direct connection to Solana RPC nodes.
-- **`HeliusRpcProvider`**: (Removed) Specialized RPC connection for Helius endpoints.
-- **`RpcPool`**: (Removed) Load balancer for multiple RPC nodes.
+- **`getBinIdFromPrice`**: Calculates the active bin ID from a price, bin step, and token decimals.
+- **`getPriceFromBinId`**: Inverse of `getBinIdFromPrice`.
+- **`calculateConcentratedLiquidityPrices`**: Computes entry pricing perspectives for CL positions.
+- **`parseDecimalToRaw`**: Safely converts decimal string to raw integer string.
+
+## Cache Strategy
+
+| Cache            | TTL     | Used By                                                   |
+| ---------------- | ------- | --------------------------------------------------------- |
+| Pool data (full) | 10s     | `getPoolInfo`, `getMarketSnapshot`, `resolvePoolDecimals` |
+| Pool decimals    | Forever | `getPositions` (lazily populated)                         |
+| Position cache   | 30s     | `getPositions`                                            |
