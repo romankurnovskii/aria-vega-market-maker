@@ -34,19 +34,33 @@ interface ParsedResult {
   openParams?: Record<string, unknown>;
 }
 
+function safeString(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
 function parseEvalResult(result: unknown): ParsedResult | null {
-  if (!result || typeof result !== 'object') return null;
+  try {
+    if (!result || typeof result !== 'object') return null;
 
-  const root = (result as Record<string, unknown>).result as Record<string, unknown> | undefined;
-  const data = root || (result as Record<string, unknown>);
+    const root = (result as Record<string, unknown>).result as Record<string, unknown> | undefined;
+    const data = root || (result as Record<string, unknown>);
 
-  return {
-    action: (data.action as string) || 'unknown',
-    signal: data.signal as string | undefined,
-    reason: data.reason as string | undefined,
-    metrics: data.metrics as string | undefined,
-    openParams: data.openParams as Record<string, unknown> | undefined,
-  };
+    return {
+      action: String(data.action || 'unknown'),
+      signal: safeString(data.signal),
+      reason: safeString(data.reason),
+      metrics: safeString(data.metrics),
+      openParams: data.openParams as Record<string, unknown> | undefined,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export const EventLogEntry = ({ log, onApplySuggestion }: EventLogEntryProps) => {
@@ -54,9 +68,9 @@ export const EventLogEntry = ({ log, onApplySuggestion }: EventLogEntryProps) =>
   const hasPriceData = parsed?.openParams && parsed.openParams.lowerBoundPrice !== undefined;
 
   return (
-    <div className="border-b border-white/5 pb-1 mb-1 animate-in fade-in slide-in-from-left-2 duration-200">
+    <div className="w-full min-w-0 border-b border-white/5 pb-1 mb-1 animate-in fade-in slide-in-from-left-2 duration-200">
       {/* Log header: timestamp + action + strategyId */}
-      <div className="flex justify-between opacity-60 text-[11px]">
+      <div className="flex justify-between opacity-60 text-[13px]">
         <span>
           [{log.timestamp}] {log.action?.toUpperCase()}
         </span>
@@ -75,11 +89,11 @@ export const EventLogEntry = ({ log, onApplySuggestion }: EventLogEntryProps) =>
                 {/* Action + signal header */}
                 <div className="font-bold flex items-center gap-2">
                   <span className="text-[#FF4500]">&gt;&gt;</span>
-                  ACTION: {parsed.action.toUpperCase()} {parsed.signal && `[${parsed.signal}]`}
+                  ACTION: {parsed.action.toUpperCase()} {typeof parsed.signal === 'string' && `[${parsed.signal}]`}
                 </div>
 
                 {/* Reason text */}
-                {parsed.reason && (
+                {typeof parsed.reason === 'string' && (
                   <div className="opacity-80 italic pl-4 border-l border-white/10 mt-0.5">&gt; {parsed.reason}</div>
                 )}
 
@@ -93,9 +107,6 @@ export const EventLogEntry = ({ log, onApplySuggestion }: EventLogEntryProps) =>
                     onApplySuggestion={onApplySuggestion}
                   />
                 )}
-
-                {/* Metrics line */}
-                {parsed.metrics && <div className="text-[11px] opacity-20 truncate mt-1">| METRICS: {parsed.metrics}</div>}
               </div>
             </div>
           ) : log.result && typeof log.result !== 'object' ? (

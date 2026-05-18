@@ -79,7 +79,7 @@ export const PositionTable = ({ positions, positionOrchestration, selectedPosId,
           </div>
           {pos.state && pos.state !== 'OPEN' && (
             <span
-              className={`text-[11px] px-1 py-0.5 border scale-90 tracking-wide font-mono ${
+              className={`text-[13px] px-1 py-0.5 border scale-90 tracking-wide font-mono ${
                 pos.state === 'REBALANCING'
                   ? 'border-yellow-500 text-yellow-600 animate-pulse bg-yellow-50'
                   : pos.state === 'CLOSING'
@@ -93,14 +93,14 @@ export const PositionTable = ({ positions, positionOrchestration, selectedPosId,
             </span>
           )}
         </td>
-        <td className="py-2 px-3 text-[11px] font-mono text-gray-500 block md:table-cell" title={pos._wallet}>
+        <td className="py-2 px-3 text-[13px] font-mono text-gray-500 block md:table-cell" title={pos._wallet}>
           <span className="md:hidden text-gray-500 mr-2">Wallet:</span>
           {pos._wallet ? addrShort(pos._wallet) : '-'}
         </td>
         <td className="py-2 px-3 border-r-0 md:border-r border-gray-200 text-gray-600 block md:table-cell" title={pos.pool}>
           <span className="md:hidden text-gray-500 mr-2">Pool:</span>
           <span className="font-semibold">{poolName(pos)}</span>{' '}
-          <span className="text-[11px] text-gray-400 font-mono">{addrShort(pos.pool, 4)}</span>
+          <span className="text-[13px] text-gray-400 font-mono">{addrShort(pos.pool, 4)}</span>
         </td>
         <td className="py-2 px-3 border-r-0 md:border-r border-gray-200 block md:table-cell">
           <span className="md:hidden text-gray-500 mr-2">Range:</span>
@@ -115,7 +115,7 @@ export const PositionTable = ({ positions, positionOrchestration, selectedPosId,
                 | ${Number(pos.lowerBoundPrice).toFixed(2)}–${Number(pos.upperBoundPrice).toFixed(2)}
               </>
             )}{' '}
-            <span className="text-[11px] opacity-70">({Number(pos.rangePercent).toFixed(2)}%)</span>
+            <span className="text-[13px] opacity-70">({Number(pos.rangePercent).toFixed(2)}%)</span>
           </span>
         </td>
         <td className={`py-2 px-3 text-left md:text-right ${orchClass} block md:table-cell`}>

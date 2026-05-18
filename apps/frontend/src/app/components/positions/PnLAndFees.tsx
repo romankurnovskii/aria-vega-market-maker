@@ -51,7 +51,7 @@ export const PnLAndFees = ({
 
   return (
     <div className="bg-[#F4F4F0] p-2.5 border border-[#0D0D0D] text-xs flex flex-col gap-1.5">
-      <div className="text-[11px] text-gray-500 uppercase tracking-widest font-bold">PnL & All-Time Fees</div>
+      <div className="text-[13px] text-gray-500 uppercase tracking-widest font-bold">PnL & All-Time Fees</div>
       <div className="flex justify-between font-mono-jb items-center">
         <span className="text-gray-500">Realized PnL:</span>
         <span className={`font-bold ${getPnLClasses(pnlUsd)}`}>
@@ -65,11 +65,11 @@ export const PnLAndFees = ({
           {allTimeFeesTotalUsd !== undefined ? `$${allTimeFeesTotalUsd.toFixed(4)}` : '$0.0000'}
         </span>
       </div>
-      <div className="flex justify-between font-mono-jb text-[11px] pl-2 border-l border-gray-300">
+      <div className="flex justify-between font-mono-jb text-[13px] pl-2 border-l border-gray-300">
         <span className="text-gray-500">{tokenXSym} Fees:</span>
         <span className="font-bold text-[#0D0D0D]">{renderTokenFees(allTimeFeesXUsd, allTimeFeesXAmt, tokenXSym)}</span>
       </div>
-      <div className="flex justify-between font-mono-jb text-[11px] pl-2 border-l border-gray-300">
+      <div className="flex justify-between font-mono-jb text-[13px] pl-2 border-l border-gray-300">
         <span className="text-gray-500">{tokenYSym} Fees:</span>
         <span className="font-bold text-[#0D0D0D]">{renderTokenFees(allTimeFeesYUsd, allTimeFeesYAmt, tokenYSym)}</span>
       </div>

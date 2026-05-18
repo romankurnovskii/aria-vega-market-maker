@@ -24,7 +24,6 @@ import { PositionBalances } from './PositionBalances';
 import { PriceAnalytics } from './PriceAnalytics';
 import { PnLAndFees } from './PnLAndFees';
 import { OrchestrationControls } from './OrchestrationControls';
-import { PositionActionButtons } from './PositionActionButtons';
 import { EventLog } from '../ui/EventLog';
 import type { Position, Strategy, EvalLogEntry } from '../../types/api';
 
@@ -54,7 +53,6 @@ interface PositionDetailProps {
   strategies: Strategy[];
   onAssign: (positionId: string, strategyId: string, mode: string) => Promise<void>;
   onEvaluate: (positionId: string, strategyId: string) => Promise<void>;
-  onRemoveLiquidity: (positionId: string) => Promise<void>;
   onApplySuggestion: (
     positionId: string,
     strategyId: string,
@@ -70,7 +68,6 @@ export const PositionDetail = ({
   strategies,
   onAssign,
   onEvaluate,
-  onRemoveLiquidity,
   onApplySuggestion,
   evalLogs,
   onClose,
@@ -123,46 +120,53 @@ export const PositionDetail = ({
           onClose={onClose}
         />
 
-        <PoolMetaPanel
-          poolMeta={poolMeta}
-          status={position.status}
-          state={position.state}
-          activeBin={position.activeBin}
-          pnlData={pnl as Record<string, unknown>}
-        />
-
-        <PositionBalances
-          tokenXSym={tokenXSym}
-          tokenYSym={tokenYSym}
-          tokenX={position.tokenX}
-          tokenY={position.tokenY}
-          unrealizedPnlTokenXUsd={
-            pnl.unrealizedPnl?.balanceTokenX?.usd ? Number(pnl.unrealizedPnl.balanceTokenX.usd) : undefined
-          }
-          unrealizedPnlTokenYUsd={
-            pnl.unrealizedPnl?.balanceTokenY?.usd ? Number(pnl.unrealizedPnl.balanceTokenY.usd) : undefined
-          }
-          formatAmount={formatAmount}
-        />
-
-        <PriceAnalytics
-          minPrice={minPrice}
-          maxPrice={maxPrice}
-          poolActivePrice={poolActivePrice}
-          feePerTvl24h={feePerTvl24h}
-        />
-
-        <PnLAndFees
-          pnlUsd={pnlUsd}
-          pnlPctChange={pnlPctChange}
-          allTimeFeesTotalUsd={allTimeFeesTotalUsd}
-          allTimeFeesXUsd={allTimeFeesXUsd}
-          allTimeFeesXAmt={allTimeFeesXAmt as string | undefined}
-          allTimeFeesYUsd={allTimeFeesYUsd}
-          allTimeFeesYAmt={allTimeFeesYAmt as string | undefined}
-          tokenXSym={tokenXSym}
-          tokenYSym={tokenYSym}
-        />
+        <div className="flex flex-wrap gap-4 w-full">
+          <div className="flex-1 min-w-[280px] max-w-[400px]">
+            <PoolMetaPanel
+              poolMeta={poolMeta}
+              status={position.status}
+              state={position.state}
+              activeBin={position.activeBin}
+              pnlData={pnl as Record<string, unknown>}
+            />
+          </div>
+          <div className="flex-1 min-w-[280px] max-w-[400px]">
+            <PositionBalances
+              tokenXSym={tokenXSym}
+              tokenYSym={tokenYSym}
+              tokenX={position.tokenX}
+              tokenY={position.tokenY}
+              unrealizedPnlTokenXUsd={
+                pnl.unrealizedPnl?.balanceTokenX?.usd ? Number(pnl.unrealizedPnl.balanceTokenX.usd) : undefined
+              }
+              unrealizedPnlTokenYUsd={
+                pnl.unrealizedPnl?.balanceTokenY?.usd ? Number(pnl.unrealizedPnl.balanceTokenY.usd) : undefined
+              }
+              formatAmount={formatAmount}
+            />
+          </div>
+          <div className="flex-1 min-w-[280px] max-w-[400px]">
+            <PriceAnalytics
+              minPrice={minPrice}
+              maxPrice={maxPrice}
+              poolActivePrice={poolActivePrice}
+              feePerTvl24h={feePerTvl24h}
+            />
+          </div>
+          <div className="flex-1 min-w-[280px] max-w-[400px]">
+            <PnLAndFees
+              pnlUsd={pnlUsd}
+              pnlPctChange={pnlPctChange}
+              allTimeFeesTotalUsd={allTimeFeesTotalUsd}
+              allTimeFeesXUsd={allTimeFeesXUsd}
+              allTimeFeesXAmt={allTimeFeesXAmt as string | undefined}
+              allTimeFeesYUsd={allTimeFeesYUsd}
+              allTimeFeesYAmt={allTimeFeesYAmt as string | undefined}
+              tokenXSym={tokenXSym}
+              tokenYSym={tokenYSym}
+            />
+          </div>
+        </div>
 
         {!isClosed && (
           <>
@@ -175,8 +179,6 @@ export const PositionDetail = ({
               onAssign={handleAssign}
               onEvaluate={handleEvaluate}
             />
-
-            <PositionActionButtons positionId={position.id} state={position.state} onRemoveLiquidity={onRemoveLiquidity} />
           </>
         )}
       </div>

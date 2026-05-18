@@ -31,14 +31,14 @@ export const StrategiesView = ({ strategies }: StrategiesViewProps) => {
             <div className="flex items-start justify-between mb-2 gap-2">
               <h3 className="font-syne text-lg font-bold">{strat.name}</h3>
               <span
-                className={`text-[11px] px-1.5 py-0.5 uppercase border shrink-0 ${strat.risk === 'High' ? 'border-[#FF4500] text-[#FF4500]' : 'border-[#0D0D0D] text-[#0D0D0D]'}`}
+                className={`text-[13px] px-1.5 py-0.5 uppercase border shrink-0 ${strat.risk === 'High' ? 'border-[#FF4500] text-[#FF4500]' : 'border-[#0D0D0D] text-[#0D0D0D]'}`}
               >
                 {strat.risk} RISK
               </span>
             </div>
             <p className="text-xs text-gray-600 leading-relaxed">{strat.description}</p>
           </div>
-          <div className="text-[11px] mt-4 pt-2 border-t border-gray-200 text-gray-400 font-mono-jb">ID: {strat.id}</div>
+          <div className="text-[13px] mt-4 pt-2 border-t border-gray-200 text-gray-400 font-mono-jb">ID: {strat.id}</div>
         </div>
       ))}
     </div>

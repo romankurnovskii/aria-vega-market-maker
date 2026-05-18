@@ -28,7 +28,7 @@ export const StepsView = ({ steps }: StepsViewProps) => {
         >
           <div className="absolute -right-2 -bottom-4 text-7xl font-syne text-gray-100 select-none z-0">{idx + 1}</div>
           <div className="relative z-10">
-            <div className="text-[11px] bg-[#0D0D0D] text-[#F4F4F0] px-1.5 py-0.5 inline-block mb-2 uppercase">
+            <div className="text-[13px] bg-[#0D0D0D] text-[#F4F4F0] px-1.5 py-0.5 inline-block mb-2 uppercase">
               {step.type}
             </div>
             <h4 className="font-bold text-sm mb-1 truncate">{step.id}</h4>

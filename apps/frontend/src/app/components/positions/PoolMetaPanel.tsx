@@ -20,7 +20,7 @@ export const PoolMetaPanel = ({ poolMeta, status, state, activeBin, pnlData }: P
 
   return (
     <div className="bg-[#F4F4F0] p-2.5 border border-[#0D0D0D] text-xs flex flex-col gap-1.5">
-      <div className="text-[11px] text-gray-500 uppercase tracking-widest font-bold">Pool Info</div>
+      <div className="text-[14px] text-gray-500 uppercase tracking-widest font-bold">Pool Info</div>
 
       {poolMeta && (
         <div className="flex justify-between font-mono-jb">
@@ -34,7 +34,7 @@ export const PoolMetaPanel = ({ poolMeta, status, state, activeBin, pnlData }: P
         <div className="flex items-center gap-2">
           {state !== 'OPEN' && (
             <span
-              className={`text-[11px] px-1 py-0.5 border tracking-wide font-mono ${
+              className={`text-[13px] px-1 py-0.5 border tracking-wide font-mono ${
                 state === 'REBALANCING'
                   ? 'border-yellow-500 text-yellow-600 bg-yellow-50'
                   : state === 'CLOSING'
@@ -48,12 +48,12 @@ export const PoolMetaPanel = ({ poolMeta, status, state, activeBin, pnlData }: P
             </span>
           )}
           {outOfRange && (
-            <span className="text-[11px] px-1 py-0.5 border border-[#FF4500] text-[#FF4500] bg-red-50 tracking-wide font-mono">
+            <span className="text-[13px] px-1 py-0.5 border border-[#FF4500] text-[#FF4500] bg-red-50 tracking-wide font-mono">
               OUT OF RANGE
             </span>
           )}
           {!outOfRange && state === 'OPEN' && (
-            <span className="text-[11px] px-1 py-0.5 border border-green-500 text-green-600 bg-green-50 tracking-wide font-mono">
+            <span className="text-[13px] px-1 py-0.5 border border-green-500 text-green-600 bg-green-50 tracking-wide font-mono">
               IN RANGE
             </span>
           )}

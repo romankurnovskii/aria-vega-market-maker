@@ -19,7 +19,7 @@ export const EventLogHeader = ({ collapsed, onToggle }: EventLogHeaderProps) => 
     return (
       <button
         onClick={onToggle}
-        className="border border-[#0D0D0D] bg-[#0D0D0D] text-[#F4F4F0] px-4 py-2 font-mono text-[11px] flex items-center gap-2 w-full text-left cursor-pointer shrink-0"
+        className="border border-[#0D0D0D] bg-[#0D0D0D] text-[#F4F4F0] px-4 py-2 font-mono text-[13px] flex items-center gap-2 w-full text-left cursor-pointer shrink-0"
       >
         <div className="w-2 h-2 bg-[#FF4500] shrink-0"></div>
         <span className="uppercase font-bold tracking-widest text-[#FF4500]">Strategy Event Log</span>

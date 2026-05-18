@@ -54,19 +54,19 @@ export const AssignmentsView = ({ assignments, onDelete, evalLogs = [], onApplyS
             <tbody>
               {assignments.map((asg: Assignment) => (
                 <tr key={asg.id} className="border-b border-gray-200 hover:bg-[#F4F4F0] transition-colors group">
-                  <td className="py-2 px-3 font-bold border-r border-gray-200 font-mono text-[11px]">{asg.id}</td>
+                  <td className="py-2 px-3 font-bold border-r border-gray-200 font-mono text-[13px]">{asg.id}</td>
                   <td
-                    className="py-2 px-3 border-r border-gray-200 text-gray-700 font-mono text-[11px] truncate max-w-[200px]"
+                    className="py-2 px-3 border-r border-gray-200 text-gray-700 font-mono text-[13px] truncate max-w-[200px]"
                     title={asg.positionId}
                   >
                     {asg.positionId}
                   </td>
                   <td className="py-2 px-3 border-r border-gray-200">
-                    <span className="bg-[#0D0D0D] text-[#F4F4F0] px-1.5 py-0.5 text-[11px] font-mono">{asg.strategyId}</span>
+                    <span className="bg-[#0D0D0D] text-[#F4F4F0] px-1.5 py-0.5 text-[13px] font-mono">{asg.strategyId}</span>
                   </td>
                   <td className="py-2 px-3 border-r border-gray-200">
                     <span
-                      className={`px-1.5 py-0.5 text-[11px] border font-bold ${asg.mode === 'active' ? 'border-green-500 text-green-600' : 'border-yellow-500 text-yellow-600'}`}
+                      className={`px-1.5 py-0.5 text-[13px] border font-bold ${asg.mode === 'active' ? 'border-green-500 text-green-600' : 'border-yellow-500 text-yellow-600'}`}
                     >
                       {asg.mode.toUpperCase()}
                     </span>

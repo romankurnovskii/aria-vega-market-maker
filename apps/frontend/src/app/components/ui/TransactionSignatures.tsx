@@ -16,7 +16,7 @@ export const TransactionSignatures = ({ signatures }: TransactionSignaturesProps
   if (!signatures || signatures.length === 0) return null;
 
   return (
-    <div className="bg-[#1A1A1A] p-1 border-l-2 border-green-500 text-[11px] flex flex-col gap-0.5">
+    <div className="bg-[#1A1A1A] p-1 border-l-2 border-green-500 text-[13px] flex flex-col gap-0.5">
       <div className="font-bold text-green-500 uppercase">TX CONFIRMED:</div>
       {signatures.map((sig, idx) => (
         <div key={idx} className="opacity-70 break-all select-all">

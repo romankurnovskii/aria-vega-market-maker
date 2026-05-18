@@ -52,7 +52,7 @@ export const AddLiquidityForm = ({ positionId, onSuccess, onCancel }: AddLiquidi
       {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 text-xs">{error}</div>}
       <form onSubmit={handleSubmit} className="space-y-3">
         <div>
-          <label className="block text-[10px] uppercase tracking-widest font-bold mb-1">Token X Amount</label>
+          <label className="block text-[12px] uppercase tracking-widest font-bold mb-1">Token X Amount</label>
           <input
             type="text"
             value={tokenXAmount}
@@ -63,7 +63,7 @@ export const AddLiquidityForm = ({ positionId, onSuccess, onCancel }: AddLiquidi
           />
         </div>
         <div>
-          <label className="block text-[10px] uppercase tracking-widest font-bold mb-1">Token Y Amount</label>
+          <label className="block text-[12px] uppercase tracking-widest font-bold mb-1">Token Y Amount</label>
           <input
             type="text"
             value={tokenYAmount}

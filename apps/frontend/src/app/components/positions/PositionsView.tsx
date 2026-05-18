@@ -25,7 +25,6 @@ interface Props {
   strategies: Strategy[];
   onAssign: (positionId: string, strategyId: string, mode: string) => Promise<void>;
   onEvaluate: (positionId: string, strategyId: string) => Promise<void>;
-  onRemoveLiquidity: (positionId: string) => Promise<void>;
   onApplySuggestion: (
     positionId: string,
     strategyId: string,
@@ -40,7 +39,6 @@ export const PositionsView = ({
   strategies,
   onAssign,
   onEvaluate,
-  onRemoveLiquidity,
   onApplySuggestion,
   evalLogs,
 }: Props) => {
@@ -79,7 +77,6 @@ export const PositionsView = ({
             strategies={strategies}
             onAssign={onAssign}
             onEvaluate={onEvaluate}
-            onRemoveLiquidity={onRemoveLiquidity}
             onApplySuggestion={onApplySuggestion}
             evalLogs={evalLogs}
             onClose={() => setSelectedPosId(null)}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { useAppStore } from '../stores/app-store';
 import { useApiPolling } from './useApiPolling';
 import { getTokenSymbol } from '../utils/format';
@@ -44,7 +44,6 @@ export interface UseAriaVegaApiReturn {
     suggestion: { action: string; openParams?: Record<string, unknown> }
   ) => Promise<void>;
   handleEvaluateStrategy: (positionId: string, strategyId: string) => Promise<void>;
-  handleRemoveLiquidity: (positionId: string) => Promise<void>;
   handleDeleteAssignment: (id: string) => Promise<void>;
 }
 
@@ -53,6 +52,96 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
   const [loading, setLoading] = useState(true);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [evalLogs, setEvalLogs] = useState<EvalLogEntry[]>([]);
+  const taskPollTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const taskEventCounts = useRef<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    return () => {
+      for (const timer of taskPollTimers.current.values()) {
+        clearInterval(timer);
+      }
+      taskPollTimers.current.clear();
+    };
+  }, []);
+
+  const pollTaskStatus = useCallback((taskId: string) => {
+    if (taskPollTimers.current.has(taskId)) return;
+
+    const timer = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_URL}/tasks/${taskId}`);
+        if (!res.ok) {
+          clearInterval(timer);
+          taskPollTimers.current.delete(taskId);
+          return;
+        }
+        const task = await res.json();
+
+        const prevCount = taskEventCounts.current.get(taskId) || 0;
+        const events: Array<{ stage: string; message?: string; txSignature?: string; error?: string; timestamp: number }> =
+          task.events || [];
+        const newEvents = events.slice(prevCount);
+
+        for (const ev of newEvents) {
+          const actionLabel =
+            ev.stage === 'CLOSE_CONFIRMED'
+              ? 'CLOSE_CONFIRMED'
+              : ev.stage === 'CLOSE_BROADCAST'
+                ? 'CLOSE_SUBMITTED'
+                : ev.stage === 'OPEN_CONFIRMED'
+                  ? 'OPEN_CONFIRMED'
+                  : ev.stage === 'OPEN_BROADCAST'
+                    ? 'OPEN_SUBMITTED'
+                    : ev.stage === 'POSITION_CLOSED'
+                      ? 'POSITION_CLOSED'
+                      : ev.stage === 'REBALANCE_COMPLETE'
+                        ? 'REBALANCE_COMPLETE'
+                        : ev.stage === 'TIMEOUT'
+                          ? 'TASK_TIMEOUT'
+                          : ev.stage === 'ERROR'
+                            ? 'TASK_ERROR'
+                            : ev.stage;
+
+          const entry: EvalLogEntry = {
+            id: Date.now() + Math.random(),
+            timestamp: new Date(ev.timestamp || Date.now()).toLocaleTimeString(),
+            action: actionLabel,
+            positionId: task.originalPositionId,
+            strategyId: task.assignmentId === 'manual' ? undefined : task.assignmentId,
+            result: ev.message || actionLabel,
+            transactionSignatures: ev.txSignature ? [ev.txSignature] : undefined,
+            error: ev.error,
+          };
+          setEvalLogs((prev) => [entry, ...prev]);
+        }
+        taskEventCounts.current.set(taskId, events.length);
+
+        if (task.status === 'completed' || task.status === 'failed') {
+          clearInterval(timer);
+          taskPollTimers.current.delete(taskId);
+          taskEventCounts.current.delete(taskId);
+
+          setEvalLogs((prev) => [
+            {
+              id: Date.now(),
+              timestamp: new Date().toLocaleTimeString(),
+              action: task.status === 'completed' ? 'REBALANCE_COMPLETE' : 'REBALANCE_FAILED',
+              positionId: task.originalPositionId,
+              result: `Rebalance ${task.status}`,
+              transactionSignatures: events.filter((e) => e.txSignature).map((e) => e.txSignature!),
+            },
+            ...prev,
+          ]);
+
+          syncState();
+        }
+      } catch {
+        // Ignore polling errors (network flakiness)
+      }
+    }, 2000);
+
+    taskPollTimers.current.set(taskId, timer);
+  }, []);
 
   const syncState = async (): Promise<void> => {
     try {
@@ -280,7 +369,12 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
           ...prev.slice(0, 49),
         ]);
 
-        if (action === 'removeLiquidity' || action === 'addLiquidity' || action === 'applySuggestion') {
+        if (action === 'applySuggestion') {
+          const taskId = result.taskId as string | undefined;
+          if (taskId) {
+            taskEventCounts.current.set(taskId, 1);
+            pollTaskStatus(taskId);
+          }
           syncState();
         }
       } else {
@@ -327,10 +421,6 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
     return handlePositionAction(positionId, 'evaluateStrategy', { strategyId });
   };
 
-  const handleRemoveLiquidity = async (positionId: string): Promise<void> => {
-    return handlePositionAction(positionId, 'removeLiquidity');
-  };
-
   const handleDeleteAssignment = async (id: string): Promise<void> => {
     try {
       const res = await fetch(`${API_URL}/assignments/${id}`, { method: 'DELETE' });
@@ -354,7 +444,6 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
     handlePositionAction,
     handleApplySuggestion,
     handleEvaluateStrategy,
-    handleRemoveLiquidity,
     handleDeleteAssignment,
   };
 };

@@ -31,7 +31,6 @@ export const AriaVegaContainer = () => {
     evalLogs,
     handleAssignStrategy,
     handleEvaluateStrategy,
-    handleRemoveLiquidity,
     handleApplySuggestion,
     handleDeleteAssignment,
   } = useAriaVegaApi();
@@ -83,7 +82,6 @@ export const AriaVegaContainer = () => {
                 strategies={data.strategies}
                 onAssign={handleAssignStrategy}
                 onEvaluate={handleEvaluateStrategy}
-                onRemoveLiquidity={handleRemoveLiquidity}
                 onApplySuggestion={handleApplySuggestion}
                 evalLogs={evalLogs}
               />

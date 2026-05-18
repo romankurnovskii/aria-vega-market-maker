@@ -36,7 +36,7 @@ export const EventLog = ({ logs, onApplySuggestion }: EventLogProps) => {
   }
 
   return (
-    <div className="flex-1 border border-[#0D0D0D] bg-[#0D0D0D] text-[#F4F4F0] p-4 font-mono text-[11px] overflow-hidden flex flex-col min-h-0 relative min-w-0">
+    <div className="flex-1 border border-[#0D0D0D] bg-[#0D0D0D] text-[#F4F4F0] p-4 font-mono text-[13px] overflow-hidden flex flex-col min-h-0 relative min-w-0">
       <EventLogHeader collapsed={false} onToggle={() => setCollapsed(true)} />
 
       <div className="flex-1 overflow-auto flex flex-col gap-1 custom-scrollbar min-w-0">

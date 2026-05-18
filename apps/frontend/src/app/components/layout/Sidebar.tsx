@@ -32,12 +32,12 @@ const tabs: TabItem[] = [
 
 export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
   return (
-    <aside className="w-full lg:w-48 flex flex-col gap-1 shrink-0">
+    <aside className="w-full lg:w-41 flex flex-col gap-1 shrink-0">
       {tabs.map((tab) => (
         <button
           key={tab.id}
           onClick={() => onTabChange(tab.id)}
-          className={`flex items-center gap-3 px-3 py-2 border border-[#0D0D0D] transition-all duration-200 group relative overflow-hidden ${
+          className={`flex items-center gap-2 px-2 py-2 border border-[#0D0D0D] transition-all duration-200 group relative overflow-hidden ${
             activeTab === tab.id ? 'bg-[#0D0D0D] text-[#F4F4F0]' : 'bg-transparent hover:bg-[#0D0D0D] hover:text-[#F4F4F0]'
           }`}
         >

@@ -20,11 +20,11 @@ export const WalletTableRow = ({ wallet, idx }: WalletTableRowProps) => {
           <div className="flex items-center gap-2">
             <WalletIcon size={12} className="text-[#0D0D0D]/50" />
             <div>
-              <code className="text-[10px] break-all">{wallet.address}</code>
+              <code className="text-[12px] break-all">{wallet.address}</code>
               {wallet.is_default && (
                 <span className="flex items-center gap-1 mt-1 text-[#FF4500]">
                   <Star size={8} />
-                  <span className="text-[10px]">Default</span>
+                  <span className="text-[12px]">Default</span>
                 </span>
               )}
             </div>
@@ -55,9 +55,9 @@ export const WalletTableRow = ({ wallet, idx }: WalletTableRowProps) => {
                       <span className="font-semibold">
                         {pool.tokenX}/{pool.tokenY}
                       </span>
-                      <span className="text-[10px] text-[#0D0D0D]/50">Bin {pool.binStep}</span>
+                      <span className="text-[12px] text-[#0D0D0D]/50">Bin {pool.binStep}</span>
                       {pool.outOfRange && (
-                        <span className="text-[10px] px-1 py-0.5 bg-red-100 text-red-700 rounded">Out of Range</span>
+                        <span className="text-[12px] px-1 py-0.5 bg-red-100 text-red-700 rounded">Out of Range</span>
                       )}
                     </div>
                     <div className="flex gap-6 text-xs">
