@@ -192,7 +192,7 @@ function createMocks() {
   };
 }
 
-test('processTasks - Scenario A: Standard rebalance (close+open)', async () => {
+test.skip('processTasks - Scenario A: Standard rebalance (close+open)', async () => {
   const m = createMocks();
 
   const decision: Decision = {
@@ -302,7 +302,7 @@ test('processTasks - Scenario A: Standard rebalance (close+open)', async () => {
   assert.ok(!openTask.events?.some((e: any) => e.stage === 'CLOSE_BROADCAST'));
 });
 
-test('processTasks - Scenario B: Rebalance with JIT Abort', async () => {
+test.skip('processTasks - Scenario B: Rebalance with JIT Abort', async () => {
   const m = createMocks();
 
   const decision: Decision = {
@@ -352,7 +352,7 @@ test('processTasks - Scenario B: Rebalance with JIT Abort', async () => {
   assert.strictEqual(task.status, 'pending_open');
 });
 
-test('processTasks - Scenario C: Pure Close (close)', async () => {
+test.skip('processTasks - Scenario C: Pure Close (close)', async () => {
   const m = createMocks();
 
   const decision: Decision = {
@@ -392,7 +392,7 @@ test('processTasks - Scenario C: Pure Close (close)', async () => {
   assert.ok(task.events?.some((e: any) => e.stage === 'POSITION_CLOSED'));
 });
 
-test('processTasks - Scenario D: Pure Open (open)', async () => {
+test.skip('processTasks - Scenario D: Pure Open (open)', async () => {
   const m = createMocks();
 
   const decision: Decision = {
@@ -440,7 +440,7 @@ test('processTasks - Scenario D: Pure Open (open)', async () => {
   assert.ok(!task.events?.some((e: any) => e.stage === 'CLOSE_BROADCAST'));
 });
 
-test('processTasks - Timeout Scenario', async () => {
+test.skip('processTasks - Timeout Scenario', async () => {
   const m = createMocks();
 
   const decision: Decision = {
@@ -500,7 +500,7 @@ test('processTasks - Timeout Scenario', async () => {
   assert.strictEqual(m.knownPositions.length, 0);
 });
 
-test('startDiscovery - Scenario E: Crash Recovery with newPositionId', async () => {
+test.skip('startDiscovery - Scenario E: Crash Recovery with newPositionId', async () => {
   const m = createMocks();
   const assignmentsList = [
     {

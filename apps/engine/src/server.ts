@@ -186,6 +186,32 @@ export function startHttpServer(
 
   app.use('/positions', handlePositionsRouter(positionProvider, executor, registry, factory, store));
 
+  app.get('/tasks/:taskId', async (req, res) => {
+    try {
+      const tasks = await store.getTasks();
+      const task = tasks.find((t) => t.id === req.params.taskId);
+      if (!task) {
+        res.status(404).json({ error: 'Task not found' });
+        return;
+      }
+      res.json(task);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: msg });
+    }
+  });
+
+  app.get('/tasks', async (_req, res) => {
+    try {
+      const tasks = await store.getTasks();
+      const active = tasks.filter((t) => t.status !== 'completed' && t.status !== 'failed');
+      res.json({ count: active.length, tasks: active });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: msg });
+    }
+  });
+
   const swaggerDocument = YAML.load(path.join(__dirname, '../src/openapi.yaml'));
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 

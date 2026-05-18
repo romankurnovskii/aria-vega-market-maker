@@ -298,6 +298,9 @@ export async function processTasks(
           task.status = 'pending_close'; // Revert to allow retry
           task.events.push({ stage: 'ERROR', timestamp: Date.now(), error: record.error });
           await tasksStore.saveTask(task);
+          logger.error(
+            `[Execution Monitor] Close leg failed for task ${task.id}: ${record.error}. Will retry on next tick.`
+          );
           continue;
         }
 
@@ -367,6 +370,7 @@ export async function processTasks(
           task.status = 'pending_open'; // Revert
           task.events.push({ stage: 'ERROR', timestamp: Date.now(), error: record.error });
           await tasksStore.saveTask(task);
+          logger.error(`[Execution Monitor] Open leg failed for task ${task.id}: ${record.error}. Will retry on next tick.`);
           continue;
         }
 
