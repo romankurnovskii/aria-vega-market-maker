@@ -322,7 +322,7 @@ paths:
                   example: 'trailing-usdc'
                 mode:
                   type: string
-                  enum: [active, monitoring]
+                  enum: [active]
                   description: Whether the bot should execute trades or just log intended decisions.
                   example: 'active'
       responses:
@@ -400,7 +400,7 @@ components:
           example: '9tA6m91FvP35G9A7eS982Yhd6pE35Z678WjLmoB67Pqr'
         mode:
           type: string
-          enum: [active, monitoring]
+          enum: [active]
           example: 'active'
         createdAt:
           type: integer

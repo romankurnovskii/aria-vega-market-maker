@@ -141,7 +141,7 @@ describe('Positions Router - applyStrategy Action', () => {
       assignmentId: 'asg_123',
       positionId: 'pos_123',
       strategyId: 'strategy_123',
-      mode: 'monitoring',
+      mode: 'active',
       tick: async (_pos: any, market: any) => {
         tickCount++;
         tickMarkets.push(market);

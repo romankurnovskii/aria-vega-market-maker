@@ -155,7 +155,7 @@ export function handlePositionsRouter(
               id: `adhoc_${Date.now()}`,
               positionId,
               strategyId,
-              mode: 'monitoring',
+              mode: 'active',
               createdAt: Date.now(),
             });
           } catch (factoryErr: unknown) {
@@ -225,7 +225,7 @@ export function handlePositionsRouter(
               id: `adhoc_${Date.now()}`,
               positionId,
               strategyId,
-              mode: 'monitoring',
+              mode: 'active',
               createdAt: Date.now(),
             });
           } catch (factoryErr: unknown) {
