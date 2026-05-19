@@ -7,8 +7,8 @@ The `@lp-system/engine` application serves as the composition root, bootstrappin
 ## 1. Core Processes
 
 - **Composition Root**: Bootstraps adapters, RPC connections, dynamic persistence stores, orchestrator registries, and executors. Located in `main.ts`.
-- **Agnostic Discovery Loop**: Synchronizes on-chain live positions with local JSON cache maps. Runs on engine startup and periodically to maintain live orchestrators. Integrates with the Task Store to ensure positions undergoing rebalancing are not pruned.
-- **Stateful Tick Loop**: Processes in-flight `RebalanceTask` intents sequentially via the Execution Monitor, locks executing positions, evaluates standard active positions, and commits rebalance intents to disk.
+- **Background Position Sync**: Periodically synchronizes on-chain live positions for registered wallets with local JSON caches using the `PositionSyncService`. This keeps the local store updated with on-chain changes without overloading the RPC endpoints.
+- **Synchronous Execution Model**: Executes compound actions (such as `close+open` rebalancing) synchronously in a blocking sequence directly on-chain within HTTP Express controller handlers.
 - **REST Control Plane**: Launches an Express HTTP server allowing active monitoring, control, configuration, and manual position tracking.
 
 ---
@@ -20,7 +20,7 @@ The HTTP server loads dynamic routers and exposes the following concrete REST en
 ### A. Assignment Management
 
 - **`GET /assignments`**: Retrieves all persistent strategy assignments.
-- **`POST /assignments`**: Creates and persists a new assignment, then registers and initiates standard tick loop tracking on its orchestrator.
+- **`POST /assignments`**: Creates and persists a new assignment, making it available for on-demand strategy evaluation.
 - **`DELETE /assignments/:id`**: Deletes the specified assignment from persistent storage and de-registers its orchestrator from the runtime.
 
 ### B. Unified Position Actions
@@ -28,7 +28,6 @@ The HTTP server loads dynamic routers and exposes the following concrete REST en
 - **`POST /positions/:positionId/actions`**: Performs a unified action on a position.
   - `action: "evaluateStrategy"`: Runs strategy evaluation (includes price enrichment). Requires `strategyId`.
   - `action: "removeLiquidity"`: Removes 100% liquidity and claims fees (closes position).
-  - `action: "addLiquidity"`: Adds liquidity to an existing position (manual).
   - `action: "applySuggestion"`: Applies a strategy recommendation (close, open, or close+open). Requires `strategyId` and `suggestion`.
 
 ### D. System Introspection & Status

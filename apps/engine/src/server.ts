@@ -18,24 +18,15 @@ import YAML from 'yamljs';
 import { fileURLToPath } from 'url';
 import path, { dirname } from 'path';
 
-import {
-  IStore,
-  IOrchestratorRegistry,
-  IExecutor,
-  IPositionProvider,
-  IPositionStore,
-  Position,
-  PoolInfo,
-  MarketSnapshot,
-} from '@lp-system/core';
+import { IStore, IOrchestratorRegistry, IExecutor, IPositionProvider, IPositionStore } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
-import { getPriceFromBinId } from '@lp-system/providers';
 import {
   createAssignmentsRouter,
   createIntrospectionRouter,
   handlePositionsRouter,
   createWalletsRouter,
+  createGatewayRouter,
 } from './routes/index.js';
 
 const logger = getLogger('server');
@@ -73,144 +64,8 @@ export function startHttpServer(
   app.use('/assignments', createAssignmentsRouter(store, registry, factory));
   app.use('/', createIntrospectionRouter(factory));
   app.use('/wallets', createWalletsRouter(positionProvider));
-  app.get('/positions', async (req, res) => {
-    try {
-      const targetWallet = (req.query.wallet as string) || walletAddress;
-
-      const isDefaultWallet = targetWallet === walletAddress;
-
-      let positions: Position[];
-      let livePositions: Position[];
-
-      if (isDefaultWallet && positionStore) {
-        // Use cache for default wallet, fetch live only for PnL enrichment
-        positions = await positionStore.getKnown();
-        livePositions = await positionProvider.getPositions(targetWallet).catch(() => []);
-      } else {
-        // Fetch live for non-default wallets (positionStore cache only covers default)
-        positions = await positionProvider.getPositions(targetWallet);
-        livePositions = positions;
-      }
-
-      // Batch fetch pool metadata and market snapshots to avoid N+1 redundancy
-      const uniquePools = [...new Set(positions.map((p) => p.poolAddress))];
-      const poolDataMap = new Map<string, { poolInfo: PoolInfo; market: MarketSnapshot }>();
-
-      await Promise.all(
-        uniquePools.map(async (poolAddress) => {
-          try {
-            const [poolInfo, market] = await Promise.all([
-              positionProvider.getPoolInfo(poolAddress),
-              positionProvider.getMarketSnapshot(poolAddress),
-            ]);
-            poolDataMap.set(poolAddress, { poolInfo, market });
-          } catch (e) {
-            logger.warn(`Failed to fetch metadata for pool ${poolAddress}: ${e}`);
-          }
-        })
-      );
-
-      // Enrich positions with price/range data using the batched metadata
-      const positionsWithPriceData = positions.map((pos) => {
-        try {
-          const poolData = poolDataMap.get(pos.poolAddress);
-          if (!poolData) {
-            return pos;
-          }
-
-          const { poolInfo, market } = poolData;
-
-          const lowerBoundPrice = getPriceFromBinId(
-            pos.lowerBound,
-            poolInfo.binStep,
-            pos.tokenX.decimals,
-            pos.tokenY.decimals
-          );
-          const upperBoundPrice = getPriceFromBinId(
-            pos.upperBound,
-            poolInfo.binStep,
-            pos.tokenX.decimals,
-            pos.tokenY.decimals
-          );
-
-          const binCount = pos.upperBound - pos.lowerBound + 1;
-          const rangePercent = lowerBoundPrice > 0 ? ((upperBoundPrice - lowerBoundPrice) / lowerBoundPrice) * 100 : 0;
-
-          const livePnl = livePositions.find((lp) => lp.id === pos.id)?.pnlData || pos.pnlData;
-
-          return {
-            ...pos,
-            lowerBoundPrice,
-            upperBoundPrice,
-            activeBin: market.activeBound,
-            binCount,
-            rangePercent,
-            poolActivePrice: market.price,
-            binStep: poolInfo.binStep,
-            feeRate: poolInfo.feeRate,
-            pnlData: livePnl,
-          };
-        } catch (e) {
-          logger.warn(`Failed to enrich position ${pos.id} with price data: ${e}`);
-          return pos;
-        }
-      });
-
-      res.json({
-        wallet: targetWallet,
-        count: positionsWithPriceData.length,
-        positions: positionsWithPriceData,
-      });
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      res.status(500).json({ error: msg });
-    }
-  });
-
-  app.get(['/positions/history', '/positions/closed'], async (_req, res) => {
-    try {
-      let positions: Position[] = [];
-      if (positionStore) {
-        positions = await positionStore.getArchived();
-      }
-      res.json({
-        wallet: walletAddress,
-        count: positions.length,
-        positions,
-      });
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      res.status(500).json({ error: msg });
-    }
-  });
-
-  app.use('/positions', handlePositionsRouter(positionProvider, executor, registry, factory, store));
-
-  app.get('/tasks/:taskId', async (req, res) => {
-    try {
-      const tasks = await store.getTasks();
-      const task = tasks.find((t) => t.id === req.params.taskId);
-      if (!task) {
-        res.status(404).json({ error: 'Task not found' });
-        return;
-      }
-      res.json(task);
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      res.status(500).json({ error: msg });
-    }
-  });
-
-  app.get('/tasks', async (_req, res) => {
-    try {
-      const tasks = await store.getTasks();
-      const active = tasks.filter((t) => t.status !== 'completed' && t.status !== 'failed');
-      res.json({ count: active.length, tasks: active });
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      res.status(500).json({ error: msg });
-    }
-  });
+  app.use('/gateway', createGatewayRouter(executor));
+  app.use('/positions', handlePositionsRouter(positionProvider, executor, registry, factory, positionStore, walletAddress));
 
   const swaggerDocument = YAML.load(path.join(__dirname, '../src/openapi.yaml'));
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));

@@ -1,7 +1,8 @@
 import { Router } from 'express';
-import { HummingbotProvider } from '@lp-system/providers';
+import { IPositionProvider } from '@lp-system/core';
+import { meteoraProvider } from '@lp-system/providers';
 
-export function createWalletsRouter(positionProvider: HummingbotProvider): Router {
+export function createWalletsRouter(positionProvider: IPositionProvider): Router {
   const router = Router();
 
   /**
@@ -46,14 +47,7 @@ export function createWalletsRouter(positionProvider: HummingbotProvider): Route
   router.get('/:address/portfolio', async (req, res) => {
     try {
       const { address } = req.params;
-      const apiRes = await fetch(`https://dlmm.datapi.meteora.ag/portfolio/open?user=${address}`, {
-        headers: { Accept: 'application/json' },
-      });
-      if (!apiRes.ok) {
-        res.status(apiRes.status).json({ error: `Datapi returned ${apiRes.status}` });
-        return;
-      }
-      const data = await apiRes.json();
+      const data = await meteoraProvider.getPortfolio(address);
       res.json(data);
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);

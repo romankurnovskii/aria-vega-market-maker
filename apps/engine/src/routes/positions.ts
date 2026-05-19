@@ -1,8 +1,17 @@
 import { Router } from 'express';
-import { IPositionProvider, IExecutor, IStore, IOrchestratorRegistry, OpenParams, RebalanceTask } from '@lp-system/core';
+import {
+  IPositionProvider,
+  IExecutor,
+  IOrchestratorRegistry,
+  OpenParams,
+  IPositionStore,
+  Position,
+  PoolInfo,
+  MarketSnapshot,
+} from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
 import { OrchestratorFactory } from '@lp-system/orchestration';
-import { getPriceFromBinId } from '@lp-system/providers';
+import { getPriceFromBinId, enrichOpenParamsForExecution, getMarketSnapshot, meteoraProvider } from '@lp-system/providers';
 
 const logger = getLogger('router-positions');
 
@@ -14,13 +23,14 @@ export function handlePositionsRouter(
   executor: IExecutor,
   registry: IOrchestratorRegistry,
   factory: OrchestratorFactory,
-  store?: IStore
+  positionStore?: IPositionStore,
+  walletAddress: string = ''
 ): Router {
   const router = Router();
 
   /**
    * POST /positions/:positionId/actions
-   * Perform a position action (removeLiquidity, addLiquidity, applySuggestion, evaluateStrategy).
+   * Perform a position action (removeLiquidity, applySuggestion, evaluateStrategy).
    */
   router.post('/:positionId/actions', async (req, res) => {
     const { positionId } = req.params;
@@ -41,7 +51,7 @@ export function handlePositionsRouter(
         }
 
         const position = await positionProvider.getPosition(positionId);
-        const market = await positionProvider.getMarketSnapshot(position.poolAddress);
+        const market = await getMarketSnapshot(position.poolAddress);
 
         const orchestrators = registry.getForPosition(positionId);
         let targetOrch = orchestrators.find((o) => o.strategyId === strategyId);
@@ -73,7 +83,7 @@ export function handlePositionsRouter(
           | undefined;
         if (openParams) {
           try {
-            const poolInfo = await positionProvider.getPoolInfo(position.poolAddress);
+            const poolInfo = await meteoraProvider.getPoolInfo(position.poolAddress);
             const lower = openParams.lowerBinId ?? openParams.lowerBound;
             const upper = openParams.upperBinId ?? openParams.upperBound;
             if (lower !== undefined && upper !== undefined) {
@@ -104,6 +114,204 @@ export function handlePositionsRouter(
         return;
       }
 
+      if (action === 'applyStrategy') {
+        if (!strategyId) {
+          res.status(400).json({ error: 'Missing strategyId in request body for applyStrategy action' });
+          return;
+        }
+
+        const position = await positionProvider.getPosition(positionId);
+        const market = await getMarketSnapshot(position.poolAddress);
+
+        const orchestrators = registry.getForPosition(positionId);
+        let targetOrch = orchestrators.find((o) => o.strategyId === strategyId);
+
+        if (!targetOrch) {
+          logger.info(
+            `[HTTP Server] No active orchestrator for strategy ${strategyId} on position ${positionId}, creating ad-hoc.`
+          );
+          try {
+            targetOrch = factory.create({
+              id: `adhoc_${Date.now()}`,
+              positionId,
+              strategyId,
+              mode: 'monitoring',
+              createdAt: Date.now(),
+            });
+          } catch (factoryErr: unknown) {
+            const msg = factoryErr instanceof Error ? factoryErr.message : String(factoryErr);
+            res.status(404).json({ error: `Strategy ${strategyId} is not registered: ${msg}` });
+            return;
+          }
+        }
+
+        const firstEvaluation = await targetOrch.tick(position, market);
+        logger.info(`[HTTP Server] First evaluation for applyStrategy: ${firstEvaluation.action}`);
+
+        if (firstEvaluation.action === 'close+open') {
+          // 1. Close
+          logger.info(`[HTTP Server][applyStrategy] Closing position ${positionId}...`);
+          const closeRecord = await executor.apply(
+            {
+              positionId,
+              action: 'close',
+              sourceAssignmentId: 'manual',
+              evaluatedAt: Date.now(),
+            },
+            market
+          );
+
+          logger.info(
+            `[HTTP Server][applyStrategy] Close Result: ${closeRecord.status}. Tx: ${closeRecord.txSignatures?.join(', ')}`
+          );
+
+          if (closeRecord.status === 'failed') {
+            res.status(500).json({
+              error: `Close failed: ${closeRecord.error}`,
+              step: 'close',
+              closeRecord,
+            });
+            return;
+          }
+
+          // 2. Re-evaluate strategy with updated market data
+          logger.info(`[HTTP Server][applyStrategy] Re-evaluating strategy ${strategyId} with updated market data...`);
+          const updatedMarket = await getMarketSnapshot(position.poolAddress);
+          const secondEvaluation = await targetOrch.tick(position, updatedMarket);
+          logger.info(`[HTTP Server][applyStrategy] Second evaluation: ${secondEvaluation.action}`);
+
+          const finalOpenParams = secondEvaluation.openParams || firstEvaluation.openParams;
+          if (!finalOpenParams) {
+            res.status(500).json({
+              error: 'Missing openParams in strategy evaluation for opening new position',
+              step: 're-evaluate',
+              closeRecord,
+              secondEvaluation,
+            });
+            return;
+          }
+
+          // 3. Open new position
+          const poolInfo = await meteoraProvider.getPoolInfo(position.poolAddress);
+          const enrichedOpenParams = enrichOpenParamsForExecution(
+            finalOpenParams,
+            { tokenXDecimals: position.tokenX.decimals, tokenYDecimals: position.tokenY.decimals },
+            poolInfo
+          );
+
+          logger.info(`[HTTP Server][applyStrategy] Opening new position in pool ${position.poolAddress}...`);
+          const openRecord = await executor.apply(
+            {
+              positionId,
+              action: 'open',
+              sourceAssignmentId: 'manual',
+              evaluatedAt: Date.now(),
+              openParams: enrichedOpenParams,
+            },
+            updatedMarket
+          );
+
+          logger.info(
+            `[HTTP Server][applyStrategy] Open Result: ${openRecord.status}. Tx: ${openRecord.txSignatures?.join(', ')}`
+          );
+
+          if (openRecord.status === 'failed') {
+            res.status(500).json({
+              error: `Close succeeded but Open failed: ${openRecord.error}`,
+              step: 'open',
+              closeRecord,
+              openRecord,
+            });
+            return;
+          }
+
+          res.json({
+            status: 'success',
+            action: 'applyStrategy',
+            appliedAction: 'close+open',
+            closeRecord,
+            openRecord,
+            message: 'Direct close+open rebalance from strategy completed successfully.',
+          });
+          return;
+        }
+
+        if (firstEvaluation.action === 'close') {
+          logger.info(`[HTTP Server][applyStrategy] Closing position ${positionId}...`);
+          const closeRecord = await executor.apply(
+            {
+              positionId,
+              action: 'close',
+              sourceAssignmentId: 'manual',
+              evaluatedAt: Date.now(),
+            },
+            market
+          );
+
+          if (closeRecord.status === 'failed') {
+            res.status(500).json({ error: `Close failed: ${closeRecord.error}`, closeRecord });
+            return;
+          }
+
+          res.json({
+            status: 'success',
+            action: 'applyStrategy',
+            appliedAction: 'close',
+            closeRecord,
+          });
+          return;
+        }
+
+        if (firstEvaluation.action === 'open') {
+          if (!firstEvaluation.openParams) {
+            res.status(400).json({ error: 'Missing openParams in strategy open recommendation' });
+            return;
+          }
+
+          const poolInfo = await meteoraProvider.getPoolInfo(position.poolAddress);
+          const enrichedOpenParams = enrichOpenParamsForExecution(
+            firstEvaluation.openParams,
+            { tokenXDecimals: position.tokenX.decimals, tokenYDecimals: position.tokenY.decimals },
+            poolInfo
+          );
+
+          logger.info(`[HTTP Server][applyStrategy] Opening position...`);
+          const openRecord = await executor.apply(
+            {
+              positionId,
+              action: 'open',
+              sourceAssignmentId: 'manual',
+              evaluatedAt: Date.now(),
+              openParams: enrichedOpenParams,
+            },
+            market
+          );
+
+          if (openRecord.status === 'failed') {
+            res.status(500).json({ error: `Open failed: ${openRecord.error}`, openRecord });
+            return;
+          }
+
+          res.json({
+            status: 'success',
+            action: 'applyStrategy',
+            appliedAction: 'open',
+            openRecord,
+          });
+          return;
+        }
+
+        // Default case: skip
+        res.json({
+          status: 'success',
+          action: 'applyStrategy',
+          appliedAction: 'skip',
+          result: firstEvaluation,
+          message: 'Strategy suggests skip. No actions performed.',
+        });
+        return;
+      }
+
       if (action === 'applySuggestion') {
         if (!strategyId) {
           res.status(400).json({ error: 'Missing strategyId in request body for applySuggestion action' });
@@ -119,50 +327,83 @@ export function handlePositionsRouter(
 
         const position = await positionProvider.getPosition(positionId);
 
+        // Enrich openParams with decimal amounts and prices before execution
+        let enrichedOpenParams: OpenParams | undefined;
+        if (suggestion.openParams) {
+          const poolInfo = await meteoraProvider.getPoolInfo(position.poolAddress);
+          enrichedOpenParams = enrichOpenParamsForExecution(
+            suggestion.openParams,
+            { tokenXDecimals: position.tokenX.decimals, tokenYDecimals: position.tokenY.decimals },
+            poolInfo
+          );
+        }
+
         // Determine the actual action to perform based on the suggestion
         const actualAction = suggestion.action === 'close+open' ? 'close+open' : suggestion.action;
 
-        // If it's a compound action (close+open), we MUST use the stateful RebalanceTask system
-        // The lifecycle loop will pick up the task on the next tick.
         if (actualAction === 'close+open') {
-          if (!store) {
-            res.status(500).json({ error: 'No persistence store available for compound action' });
+          if (!enrichedOpenParams) {
+            res.status(400).json({ error: 'Missing or invalid openParams in suggestion for close+open action' });
             return;
           }
-          logger.info(`[HTTP Server] Creating stateful RebalanceTask for manual suggestion: ${actualAction}`);
-          const tasksStore = store as unknown as { saveTask: (t: RebalanceTask) => Promise<void> };
-          const task: RebalanceTask = {
-            id: `manual_task_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-            assignmentId: 'manual',
-            status: 'pending_close',
-            originalPositionId: positionId,
-            intent: {
+
+          logger.info(`[HTTP Server] Executing direct close+open for position ${positionId}`);
+
+          // 1. Close
+          logger.info(`[HTTP Server][Close] Closing position ${positionId}...`);
+          const closeRecord = await executor.apply(
+            {
               positionId,
-              action: 'close+open',
-              openParams: suggestion.openParams,
+              action: 'close',
               sourceAssignmentId: 'manual',
               evaluatedAt: Date.now(),
             },
-            evaluatedAt: Date.now(),
-            events: [
-              {
-                stage: 'INIT',
-                timestamp: Date.now(),
-                message: `Manual task initialized for suggestion application: ${actualAction}`,
-              },
-            ],
-          };
+            await getMarketSnapshot(position.poolAddress)
+          );
 
-          await tasksStore.saveTask(task);
+          logger.info(`[HTTP Server][Close] Result: ${closeRecord.status}. Tx: ${closeRecord.txSignatures?.join(', ')}`);
+
+          if (closeRecord.status === 'failed') {
+            res.status(500).json({
+              error: `Close failed: ${closeRecord.error}`,
+              step: 'close',
+              closeRecord,
+            });
+            return;
+          }
+
+          // 2. Open
+          logger.info(`[HTTP Server][Open] Opening new position in pool ${position.poolAddress}...`);
+          const openRecord = await executor.apply(
+            {
+              positionId,
+              action: 'open',
+              sourceAssignmentId: 'manual',
+              evaluatedAt: Date.now(),
+              openParams: enrichedOpenParams,
+            },
+            await getMarketSnapshot(position.poolAddress)
+          );
+
+          logger.info(`[HTTP Server][Open] Result: ${openRecord.status}. Tx: ${openRecord.txSignatures?.join(', ')}`);
+
+          if (openRecord.status === 'failed') {
+            res.status(500).json({
+              error: `Close succeeded but Open failed: ${openRecord.error}`,
+              step: 'open',
+              closeRecord,
+              openRecord,
+            });
+            return;
+          }
 
           res.json({
             status: 'success',
             action: 'applySuggestion',
-            appliedAction: actualAction,
-            message:
-              'Rebalance task successfully queued. The engine will now execute the close and open legs asynchronously. Monitor the Event Log for real-time progress.',
-            taskId: task.id,
-            suggestionApplied: false,
+            appliedAction: 'close+open',
+            closeRecord,
+            openRecord,
+            message: 'Direct close+open rebalance completed successfully.',
           });
           return;
         }
@@ -173,9 +414,9 @@ export function handlePositionsRouter(
             action: actualAction as 'close' | 'open',
             sourceAssignmentId: 'manual',
             evaluatedAt: Date.now(),
-            openParams: suggestion.openParams,
+            openParams: enrichedOpenParams,
           },
-          await positionProvider.getMarketSnapshot(position.poolAddress)
+          await getMarketSnapshot(position.poolAddress)
         );
 
         if (execRecord.status === 'failed') {
@@ -194,6 +435,105 @@ export function handlePositionsRouter(
       }
 
       res.status(400).json({ error: `Unsupported action: ${action}` });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: msg });
+    }
+  });
+
+  router.get('/', async (req, res) => {
+    try {
+      const targetWallet = (req.query.wallet as string) || walletAddress;
+
+      let positions: Position[];
+
+      if (positionStore) {
+        positions = await positionStore.getKnown();
+      } else {
+        positions = await positionProvider.getPositions(targetWallet);
+      }
+
+      const uniquePools = [...new Set(positions.map((p) => p.poolAddress))];
+      const poolDataMap = new Map<string, { poolInfo: PoolInfo; market: MarketSnapshot }>();
+
+      await Promise.all(
+        uniquePools.map(async (poolAddress) => {
+          try {
+            const [poolInfo, market] = await Promise.all([
+              meteoraProvider.getPoolInfo(poolAddress),
+              getMarketSnapshot(poolAddress),
+            ]);
+            poolDataMap.set(poolAddress, { poolInfo, market });
+          } catch (e) {
+            logger.warn(`Failed to fetch metadata for pool ${poolAddress}: ${e}`);
+          }
+        })
+      );
+
+      const positionsWithPriceData = positions.map((pos) => {
+        try {
+          const poolData = poolDataMap.get(pos.poolAddress);
+          if (!poolData) {
+            return pos;
+          }
+
+          const { poolInfo, market } = poolData;
+
+          const lowerBoundPrice = getPriceFromBinId(
+            pos.lowerBound,
+            poolInfo.binStep,
+            pos.tokenX.decimals,
+            pos.tokenY.decimals
+          );
+          const upperBoundPrice = getPriceFromBinId(
+            pos.upperBound,
+            poolInfo.binStep,
+            pos.tokenX.decimals,
+            pos.tokenY.decimals
+          );
+
+          const binCount = pos.upperBound - pos.lowerBound + 1;
+          const rangePercent = lowerBoundPrice > 0 ? ((upperBoundPrice - lowerBoundPrice) / lowerBoundPrice) * 100 : 0;
+
+          return {
+            ...pos,
+            lowerBoundPrice,
+            upperBoundPrice,
+            activeBin: market.activeBound,
+            binCount,
+            rangePercent,
+            poolActivePrice: market.price,
+            binStep: poolInfo.binStep,
+            feeRate: poolInfo.feeRate,
+          };
+        } catch (e) {
+          logger.warn(`Failed to enrich position ${pos.id} with price data: ${e}`);
+          return pos;
+        }
+      });
+
+      res.json({
+        wallet: targetWallet,
+        count: positionsWithPriceData.length,
+        positions: positionsWithPriceData,
+      });
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: msg });
+    }
+  });
+
+  router.get(['/history', '/closed'], async (_req, res) => {
+    try {
+      let positions: Position[] = [];
+      if (positionStore) {
+        positions = await positionStore.getArchived();
+      }
+      res.json({
+        wallet: walletAddress,
+        count: positions.length,
+        positions,
+      });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       res.status(500).json({ error: msg });

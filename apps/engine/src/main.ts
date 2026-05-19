@@ -16,10 +16,10 @@ import { HummingbotProvider } from '@lp-system/providers';
 import { HummingbotExecutor } from '@lp-system/executor';
 import { JsonFileStore, JsonPositionStore } from '@lp-system/persistence';
 import { TrailingUsdcStrategy, ExperimentalRestakeStrategy } from '@lp-system/strategy';
-import { OrchestratorRegistry, OrchestratorFactory, ExecutionGate } from '@lp-system/orchestration';
+import { OrchestratorRegistry, OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
-import { startDiscovery, startTickLoop } from './lifecycle.js';
 import { startHttpServer } from './server.js';
+import { PositionSyncService } from './services/position-sync.js';
 
 const TICK_INTERVAL_MS = Number(process.env.TICK_INTERVAL_MS) || 120_000;
 const HUMMINGBOT_API_URL = process.env.HUMMINGBOT_API_URL || 'http://localhost:8000';
@@ -66,35 +66,28 @@ async function main() {
     },
     { rangePercent: 20 }
   );
-  const executionGate = new ExecutionGate();
-
   // 6. Executor initialization
   const executor = new HummingbotExecutor(HUMMINGBOT_API_URL, walletAddress);
 
-  // 7. Core Loops & Web Control Plane Activation
-  await startDiscovery(walletAddress, positionProvider, positionStore, factory, store, registry);
+  // 7. Position sync service — background fetcher that keeps the store updated
 
-  startTickLoop(
-    TICK_INTERVAL_MS,
-    walletAddress,
-    positionProvider,
-    positionStore,
-    registry,
-    executionGate,
-    executor,
-    store,
-    factory
-  );
+  const positionSync = new PositionSyncService(positionProvider, positionStore);
+  positionSync.addWallet(walletAddress);
+  positionSync.start();
+
+  // 8. Web Control Plane Activation
 
   startHttpServer(store, registry, executor, factory, positionProvider, walletAddress, positionStore);
 
-  // 8. Graceful Shutdown handlers
+  // 9. Graceful Shutdown handlers
   process.on('SIGINT', () => {
     logger.info('[Engine] Received SIGINT shutdown request. Gracefully closing daemon...');
+    positionSync.stop();
     process.exit(0);
   });
   process.on('SIGTERM', () => {
     logger.info('[Engine] Received SIGTERM shutdown request. Gracefully closing daemon...');
+    positionSync.stop();
     process.exit(0);
   });
 }

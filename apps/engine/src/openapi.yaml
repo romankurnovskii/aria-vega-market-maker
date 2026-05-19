@@ -185,7 +185,7 @@ paths:
   /positions/{positionId}/actions:
     post:
       summary: Perform Position Action
-      description: Performs a position action (evaluateStrategy, removeLiquidity, addLiquidity, applySuggestion).
+      description: Performs a position action (evaluateStrategy, applyStrategy, removeLiquidity, openLiquidity, applySuggestion).
       parameters:
         - name: positionId
           in: path
@@ -205,11 +205,11 @@ paths:
               properties:
                 action:
                   type: string
-                  enum: [evaluateStrategy, removeLiquidity, addLiquidity, applySuggestion]
+                  enum: [evaluateStrategy, applyStrategy, removeLiquidity, openLiquidity, applySuggestion]
                   example: 'evaluateStrategy'
                 strategyId:
                   type: string
-                  description: Required for evaluateStrategy and applySuggestion actions.
+                  description: Required for evaluateStrategy, applyStrategy, and applySuggestion actions.
                   example: 'trailing-usdc'
                 suggestion:
                   type: object
@@ -222,11 +222,11 @@ paths:
                       $ref: '#/components/schemas/OpenParams'
                 tokenXAmount:
                   type: string
-                  description: Required for addLiquidity action. Raw token amount.
+                  description: Required for openLiquidity action. Raw token amount.
                   example: '1000000'
                 tokenYAmount:
                   type: string
-                  description: Required for addLiquidity action. Raw token amount.
+                  description: Required for openLiquidity action. Raw token amount.
                   example: '2000000'
                 slippageTolerance:
                   type: integer
