@@ -34,7 +34,13 @@ interface PnLData {
   feePerTvl24h?: string | number;
 }
 
-export const PositionTable = ({ positions, selectedPosId, onSelect, onOpenPositionClick }: PositionTableProps) => {
+export const PositionTable = ({
+  positions,
+  positionOrchestration = {},
+  selectedPosId,
+  onSelect,
+  onOpenPositionClick,
+}: PositionTableProps) => {
   const openPositions = positions.filter((pos: Position) => pos.state !== 'CLOSED');
   const closedPositions = positions.filter((pos: Position) => pos.state === 'CLOSED');
 
@@ -111,6 +117,14 @@ export const PositionTable = ({ positions, selectedPosId, onSelect, onOpenPositi
                   {tokenYSym} per {tokenXSym}
                 </div>
                 {pos.openedAt && <div className="text-[14px] text-gray-400 font-mono mt-0.5">{timeAgo(pos.openedAt)}</div>}
+                {positionOrchestration[pos.id] && positionOrchestration[pos.id].strategyId !== 'NONE' && (
+                  <div className="mt-1.5 flex items-center gap-1">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-green-600 bg-green-50 px-1.5 py-0.5 border border-green-200 rounded font-mono">
+                      {positionOrchestration[pos.id].strategyId}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

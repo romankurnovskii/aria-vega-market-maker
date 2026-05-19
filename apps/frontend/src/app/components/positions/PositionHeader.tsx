@@ -18,6 +18,7 @@ interface PositionHeaderProps {
   state: string;
   openedAt?: number;
   onClose: () => void;
+  orchestration?: { strategyId: string; mode: string } | null;
 }
 
 const timeAgo = (ts?: number): string => {
@@ -34,7 +35,7 @@ const timeAgo = (ts?: number): string => {
   return `${months}mo ago`;
 };
 
-export const PositionHeader = ({ positionId, pool, state, openedAt, onClose }: PositionHeaderProps) => {
+export const PositionHeader = ({ positionId, pool, state, openedAt, onClose, orchestration }: PositionHeaderProps) => {
   const getStateClasses = (state: string): string => {
     if (state === 'OPEN') return 'border-green-500 text-green-600 bg-green-50';
     if (state === 'CREATING') return 'border-blue-500 text-blue-600 bg-blue-50 animate-pulse';
@@ -57,12 +58,23 @@ export const PositionHeader = ({ positionId, pool, state, openedAt, onClose }: P
             {pool}
           </span>
         </div>
-        <div className="mt-2 flex items-center gap-3">
+        <div className="mt-2 flex flex-wrap items-center gap-3">
           <span
             className={`px-2 py-0.5 text-[13px] font-bold border uppercase tracking-widest font-mono-jb ${getStateClasses(state)}`}
           >
             {state}
           </span>
+          {orchestration && orchestration.strategyId !== 'NONE' ? (
+            <span className="px-2 py-0.5 text-[13px] font-bold border border-green-500 text-green-600 bg-green-50 uppercase tracking-widest font-mono-jb flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              Active Strategy: {orchestration.strategyId}
+            </span>
+          ) : (
+            <span className="px-2 py-0.5 text-[13px] font-bold border border-gray-300 text-gray-500 bg-gray-50 uppercase tracking-widest font-mono-jb flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-gray-400" />
+              Manual Mode
+            </span>
+          )}
           {openedAt && <span className="text-[13px] text-gray-400 font-mono">Opened {timeAgo(openedAt)}</span>}
         </div>
       </div>

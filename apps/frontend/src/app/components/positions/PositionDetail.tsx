@@ -55,7 +55,7 @@ interface PositionDetailProps {
   position: Position;
   orchestration: { strategyId: string; mode: string } | null;
   strategies: Strategy[];
-  onAssign: (positionId: string, strategyId: string, mode: string) => Promise<void>;
+  onAssign: (positionId: string, strategyId: string) => Promise<void>;
   onEvaluate: (positionId: string, strategyId: string) => Promise<void>;
   onApplyStrategy: (positionId: string, strategyId: string) => Promise<void>;
   onApplySuggestion: (
@@ -83,7 +83,6 @@ export const PositionDetail = ({
   const [selectedStrategyId, setSelectedStrategyId] = useState<string>(
     orchestration?.strategyId || strategies[0]?.id || 'NONE'
   );
-  const [selectedMode, setSelectedMode] = useState<string>(orchestration?.mode || 'active');
 
   const pnl = (position.pnlData || position.raw || {}) as PnLData;
 
@@ -109,7 +108,7 @@ export const PositionDetail = ({
   const tokenYSym = getTokenSymbol(position.tokenY);
 
   const handleAssign = () => {
-    onAssign(position.id, selectedStrategyId, selectedMode);
+    onAssign(position.id, selectedStrategyId);
   };
 
   const handleEvaluate = () => {
@@ -136,6 +135,7 @@ export const PositionDetail = ({
           state={position.state}
           openedAt={position.openedAt}
           onClose={onClose}
+          orchestration={orchestration}
         />
 
         <div className="flex flex-wrap gap-4 w-full">
@@ -199,9 +199,7 @@ export const PositionDetail = ({
             <OrchestrationControls
               strategies={strategies}
               selectedStrategyId={selectedStrategyId}
-              selectedMode={selectedMode}
               onStrategyChange={setSelectedStrategyId}
-              onModeChange={setSelectedMode}
               onAssign={handleAssign}
               onEvaluate={handleEvaluate}
               onApplyStrategy={handleApplyStrategy}

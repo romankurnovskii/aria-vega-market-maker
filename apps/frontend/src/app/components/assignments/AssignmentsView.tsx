@@ -45,7 +45,6 @@ export const AssignmentsView = ({ assignments, onDelete, evalLogs = [], onApplyS
                   Target Position
                 </th>
                 <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D]">Strategy</th>
-                <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D]">Mode</th>
                 <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D] text-right">
                   Revoke
                 </th>
@@ -63,13 +62,6 @@ export const AssignmentsView = ({ assignments, onDelete, evalLogs = [], onApplyS
                   </td>
                   <td className="py-2 px-3 border-r border-gray-200">
                     <span className="bg-[#0D0D0D] text-[#F4F4F0] px-1.5 py-0.5 text-[13px] font-mono">{asg.strategyId}</span>
-                  </td>
-                  <td className="py-2 px-3 border-r border-gray-200">
-                    <span
-                      className={`px-1.5 py-0.5 text-[13px] border font-bold ${asg.mode === 'active' ? 'border-green-500 text-green-600' : 'border-yellow-500 text-yellow-600'}`}
-                    >
-                      {asg.mode.toUpperCase()}
-                    </span>
                   </td>
                   <td className="py-1 px-3 text-right">
                     <button

@@ -36,7 +36,7 @@ export interface UseAriaVegaApiReturn {
   connectionError: string | null;
   evalLogs: EvalLogEntry[];
   refetch: () => Promise<void>;
-  handleAssignStrategy: (positionId: string, strategyId: string, mode: string) => Promise<void>;
+  handleAssignStrategy: (positionId: string, strategyId: string) => Promise<void>;
   handlePositionAction: (positionId: string, action: string, body?: Record<string, unknown>) => Promise<void>;
   handleApplySuggestion: (
     positionId: string,
@@ -302,7 +302,7 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
 
   useApiPolling(syncState, 25000);
 
-  const handleAssignStrategy = async (positionId: string, strategyId: string, mode: string): Promise<void> => {
+  const handleAssignStrategy = async (positionId: string, strategyId: string): Promise<void> => {
     try {
       const existing = data.assignments.find((a: Assignment) => a.positionId === positionId);
 
@@ -327,7 +327,7 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
           id: newId,
           strategyId,
           positionId,
-          mode,
+          mode: 'active',
         }),
       });
 
