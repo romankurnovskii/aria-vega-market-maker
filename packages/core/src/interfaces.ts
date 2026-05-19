@@ -27,7 +27,6 @@ import {
   Assignment,
   AssignmentMode,
   StepContext,
-  RebalanceTask,
 } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -66,7 +65,6 @@ export interface IPositionProvider {
   getPositions(walletAddress: string, poolAddress?: string): Promise<Position[]>;
   getPosition(positionId: string, poolAddress?: string): Promise<Position>;
   getPoolInfo(poolAddress: string): Promise<PoolInfo>;
-  getMarketSnapshot(poolAddress: string): Promise<MarketSnapshot>;
   getWalletBalances(walletAddress: string, tokenX: string, tokenY: string): Promise<{ amountX: string; amountY: string }>;
   getWalletAddress(chain?: string): Promise<string>;
   listWallets(): Promise<{ chain: string; address: string; is_default: boolean }[]>;
@@ -83,10 +81,6 @@ export interface IStore {
   deleteAssignment(id: string): Promise<void>;
   getExecutionRecords(): Promise<ExecutionRecord[]>;
   saveExecutionRecord(record: ExecutionRecord): Promise<void>;
-  getTasks(): Promise<RebalanceTask[]>;
-  saveTask(task: RebalanceTask): Promise<void>;
-  deleteTask(id: string): Promise<void>;
-  archiveTask(task: RebalanceTask): Promise<void>;
 }
 
 export interface IPositionStore {

@@ -5,12 +5,11 @@
  * @features
  * - Thread-safe atomic read-modify-write operations for Assignment entities
  * - Thread-safe atomic append operations for ExecutionRecord history
- * - Thread-safe atomic read-modify-write operations for RebalanceTask queue
  * - Uses shared AsyncFileMutex singleton `fileMutex` to serialize same-file disk accesses.
  */
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { IStore, Assignment, ExecutionRecord, RebalanceTask } from '@lp-system/core';
+import { IStore, Assignment, ExecutionRecord } from '@lp-system/core';
 import { fileMutex } from './mutex.js';
 import { getLogger } from '@lp-system/logger';
 
@@ -37,14 +36,12 @@ function getShortWallet(wallet: string): string {
 }
 
 /**
- * JsonFileStore: file-system backed store for assignments, execution records, and tasks.
+ * JsonFileStore: file-system backed store for assignments and execution records.
  * Uses path-scoped mutex locks to protect against concurrent modification race conditions.
  */
 export class JsonFileStore implements IStore {
   private assignmentsPath: string;
   private executionsPath: string;
-  private tasksPath: string;
-  private tasksHistoryPath: string;
 
   /**
    * Constructs the store with a directory path and optional namespacing options.
@@ -66,8 +63,6 @@ export class JsonFileStore implements IStore {
     const prefix = parts.length > 0 ? `${parts.join('_')}_` : '';
     this.assignmentsPath = path.join(directoryPath, `${prefix}assignments.json`);
     this.executionsPath = path.join(directoryPath, `${prefix}executions.json`);
-    this.tasksPath = path.join(directoryPath, `${prefix}tasks.json`);
-    this.tasksHistoryPath = path.join(directoryPath, `${prefix}tasks_history.json`);
   }
 
   /**
@@ -196,152 +191,6 @@ export class JsonFileStore implements IStore {
 
       records.push(record);
       await fs.writeFile(this.executionsPath, JSON.stringify(records, null, 2), 'utf-8');
-    });
-  }
-
-  /**
-   * Reads all tasks from disk under a sequential file lock.
-   *
-   * @returns {Promise<RebalanceTask[]>} All persisted tasks.
-   */
-  public async getTasks(): Promise<RebalanceTask[]> {
-    return fileMutex.runExclusive(this.tasksPath, async () => {
-      try {
-        const data = await fs.readFile(this.tasksPath, 'utf-8');
-        return JSON.parse(data) as RebalanceTask[];
-      } catch (error: unknown) {
-        if (error instanceof SyntaxError) {
-          logger.error(
-            `[JsonFileStore] [ALERT] JSON parsing failed for tasks queue. Tasks dropped! Auto-recovering with empty array.`
-          );
-          return [];
-        }
-        if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
-          return [];
-        }
-        throw error;
-      }
-    });
-  }
-
-  /**
-   * Inserts or updates a task in the persistent store under a sequential file lock.
-   *
-   * @param {RebalanceTask} task - The task to persist.
-   */
-  public async saveTask(task: RebalanceTask): Promise<void> {
-    await this.ensureDirectory();
-    await fileMutex.runExclusive(this.tasksPath, async () => {
-      let tasks: RebalanceTask[] = [];
-      try {
-        const data = await fs.readFile(this.tasksPath, 'utf-8');
-        tasks = JSON.parse(data) as RebalanceTask[];
-      } catch (error: unknown) {
-        if (error && typeof error === 'object' && 'code' in error && error.code !== 'ENOENT') {
-          throw error;
-        }
-      }
-
-      const existingLock = tasks.find((t) => {
-        if (t.originalPositionId === task.originalPositionId) return true;
-        if (task.assignmentId !== 'manual' && t.assignmentId === task.assignmentId) return true;
-        return false;
-      });
-      if (existingLock && existingLock.id !== task.id) {
-        throw new Error(
-          `Atomicity Violation: Active task ${existingLock.id} already exists for position ${task.originalPositionId}`
-        );
-      }
-
-      task.lockedAt = task.lockedAt ?? Date.now();
-
-      const index = tasks.findIndex((t) => t.id === task.id);
-      if (index >= 0) {
-        const existing = tasks[index];
-        // Concurrency Guard: Prevent double-claiming
-        const isExecuting = (s: string) => s === 'executing_close' || s === 'executing_open';
-
-        if (isExecuting(task.status) && isExecuting(existing.status)) {
-          // If we are already executing on disk, we only allow saving if this is an update (more events)
-          // and NOT a fresh claim attempt from another process that still thinks it's claiming.
-          const taskEvents = task.events?.length || 0;
-          const existingEvents = existing.events?.length || 0;
-
-          if (taskEvents <= existingEvents && task.status === existing.status) {
-            throw new Error(
-              `Concurrency Violation: Task ${task.id} is already being executed by another process (Status: ${existing.status}).`
-            );
-          }
-        }
-        tasks[index] = task;
-      } else {
-        tasks.push(task);
-      }
-      await fs.writeFile(this.tasksPath, JSON.stringify(tasks, null, 2), 'utf-8');
-    });
-  }
-
-  /**
-   * Removes a task by ID under a sequential file lock.
-   *
-   * @param {string} id - Task identifier to delete.
-   */
-  public async deleteTask(id: string): Promise<void> {
-    await this.ensureDirectory();
-    await fileMutex.runExclusive(this.tasksPath, async () => {
-      let tasks: RebalanceTask[] = [];
-      try {
-        const data = await fs.readFile(this.tasksPath, 'utf-8');
-        tasks = JSON.parse(data) as RebalanceTask[];
-      } catch (error: unknown) {
-        if (error && typeof error === 'object' && 'code' in error && error.code !== 'ENOENT') {
-          throw error;
-        }
-      }
-
-      const filtered = tasks.filter((t) => t.id !== id);
-      await fs.writeFile(this.tasksPath, JSON.stringify(filtered, null, 2), 'utf-8');
-    });
-  }
-
-  /**
-   * Archives a completed or failed task to task_history.json and removes it from active queue.
-   *
-   * @param {RebalanceTask} task - Task to archive.
-   */
-  public async archiveTask(task: RebalanceTask): Promise<void> {
-    await this.ensureDirectory();
-    await fileMutex.runExclusive(this.tasksPath, async () => {
-      // 1. Write to history
-      await fileMutex.runExclusive(this.tasksHistoryPath, async () => {
-        let history: RebalanceTask[] = [];
-        try {
-          const data = await fs.readFile(this.tasksHistoryPath, 'utf-8');
-          history = JSON.parse(data) as RebalanceTask[];
-        } catch (error: unknown) {
-          if (error && typeof error === 'object' && 'code' in error && error.code !== 'ENOENT') {
-            throw error;
-          }
-        }
-        history.push(task);
-        await fs.writeFile(this.tasksHistoryPath, JSON.stringify(history, null, 2), 'utf-8');
-      });
-
-      // 2. Delete from active
-      // NOTE: Do NOT call this.deleteTask() here — it would attempt to re-acquire
-      // the tasksPath mutex while we already hold it (deadlock). Perform the
-      // delete inline below.
-      let tasks: RebalanceTask[] = [];
-      try {
-        const data = await fs.readFile(this.tasksPath, 'utf-8');
-        tasks = JSON.parse(data) as RebalanceTask[];
-      } catch (error: unknown) {
-        if (error && typeof error === 'object' && 'code' in error && error.code !== 'ENOENT') {
-          throw error;
-        }
-      }
-      const filtered = tasks.filter((t) => t.id !== task.id);
-      await fs.writeFile(this.tasksPath, JSON.stringify(filtered, null, 2), 'utf-8');
     });
   }
 }

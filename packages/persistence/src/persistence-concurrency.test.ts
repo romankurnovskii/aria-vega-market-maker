@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { JsonFileStore } from './json-file-store.js';
-import { Assignment, RebalanceTask } from '@lp-system/core';
+import { Assignment } from '@lp-system/core';
 
 const TEST_DATA_DIR = path.join(import.meta.dirname, '../../test-data-concurrency');
 
@@ -54,109 +54,4 @@ test('JsonFileStore - concurrent saveAssignment updates are atomic and no update
     const found = saved.find((a) => a.id === `assign_${i}`);
     assert.ok(found, `Assignment assign_${i} was lost!`);
   }
-});
-
-test('JsonFileStore - concurrent saveTask updates are atomic and no updates are lost', async () => {
-  const store = new JsonFileStore(TEST_DATA_DIR);
-
-  const tasks: RebalanceTask[] = Array.from({ length: 10 }, (_, i) => ({
-    id: `task_${i}`,
-    assignmentId: `assign_${i}`,
-    status: 'pending_close',
-    originalPositionId: `pos_${i}`,
-    intent: {
-      positionId: `pos_${i}`,
-      action: 'close',
-      sourceAssignmentId: `assign_${i}`,
-      evaluatedAt: Date.now(),
-    },
-    evaluatedAt: Date.now(),
-    events: [],
-  }));
-
-  await Promise.all(tasks.map((task) => store.saveTask(task)));
-
-  const saved = await store.getTasks();
-  assert.strictEqual(saved.length, 10);
-
-  for (let i = 0; i < 10; i++) {
-    const found = saved.find((t) => t.id === `task_${i}`);
-    assert.ok(found, `Task task_${i} was lost!`);
-  }
-});
-
-test('JsonFileStore - concurrent saveTask for same position rejects with Atomicity Violation', async () => {
-  const store = new JsonFileStore(TEST_DATA_DIR);
-
-  const task1: RebalanceTask = {
-    id: 'task_1',
-    assignmentId: 'assign_A',
-    status: 'pending_close',
-    originalPositionId: 'pos_A',
-    intent: {
-      positionId: 'pos_A',
-      action: 'close',
-      sourceAssignmentId: 'assign_A',
-      evaluatedAt: Date.now(),
-    },
-    evaluatedAt: Date.now(),
-    events: [],
-  };
-
-  const task2: RebalanceTask = {
-    id: 'task_2',
-    assignmentId: 'assign_A',
-    status: 'pending_close',
-    originalPositionId: 'pos_A',
-    intent: {
-      positionId: 'pos_A',
-      action: 'close',
-      sourceAssignmentId: 'assign_A',
-      evaluatedAt: Date.now(),
-    },
-    evaluatedAt: Date.now(),
-    events: [],
-  };
-
-  await store.saveTask(task1);
-
-  await assert.rejects(
-    async () => {
-      await store.saveTask(task2);
-    },
-    (err: Error) => err.message.includes('Atomicity Violation')
-  );
-});
-
-test('JsonFileStore - RebalanceTask balance snapshot fields and timestamps serialize and deserialize correctly', async () => {
-  const store = new JsonFileStore(TEST_DATA_DIR);
-
-  const taskWithSnapshots: RebalanceTask = {
-    id: 'task_snapshots_1',
-    assignmentId: 'assign_snap_1',
-    status: 'pending_close',
-    originalPositionId: 'pos_snap_1',
-    intent: {
-      positionId: 'pos_snap_1',
-      action: 'close',
-      sourceAssignmentId: 'assign_snap_1',
-      evaluatedAt: 1234567890,
-    },
-    evaluatedAt: 1234567890,
-    events: [],
-    preCloseBalances: { tokenX: '1000', tokenY: '2000', timestamp: 1234567800 },
-    postCloseBalances: { tokenX: '1500', tokenY: '2500', timestamp: 1234567850 },
-    recoveredFunds: { tokenX: '500', tokenY: '500' },
-  };
-
-  await store.saveTask(taskWithSnapshots);
-
-  const saved = await store.getTasks();
-  assert.strictEqual(saved.length, 1);
-
-  const retrieved = saved[0];
-  assert.strictEqual(retrieved.id, 'task_snapshots_1');
-  assert.deepStrictEqual(retrieved.preCloseBalances, { tokenX: '1000', tokenY: '2000', timestamp: 1234567800 });
-  assert.deepStrictEqual(retrieved.postCloseBalances, { tokenX: '1500', tokenY: '2500', timestamp: 1234567850 });
-  assert.deepStrictEqual(retrieved.recoveredFunds, { tokenX: '500', tokenY: '500' });
 });

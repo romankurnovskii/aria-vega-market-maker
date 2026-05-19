@@ -50,6 +50,10 @@ function processArguments(arguments_: unknown[]): string {
         return stringify(argument);
       }
 
+      if (typeof argument === 'string') {
+        return argument;
+      }
+
       try {
         return stringify(argument);
       } catch {
