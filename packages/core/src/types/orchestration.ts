@@ -13,7 +13,7 @@
 import { DecisionAction } from './enums';
 import { OpenParams } from './position';
 
-export type AssignmentMode = 'active' | 'monitoring';
+export type AssignmentMode = 'active';
 
 export interface Assignment {
   id: string;
