@@ -22,9 +22,16 @@ interface PositionTableProps {
   positionOrchestration: Record<string, { strategyId: string; mode: string }>;
   selectedPosId: string | null;
   onSelect: (id: string | null) => void;
+  onOpenPositionClick?: () => void;
 }
 
-export const PositionTable = ({ positions, positionOrchestration, selectedPosId, onSelect }: PositionTableProps) => {
+export const PositionTable = ({
+  positions,
+  positionOrchestration,
+  selectedPosId,
+  onSelect,
+  onOpenPositionClick,
+}: PositionTableProps) => {
   const openPositions = positions.filter((pos: Position) => pos.state !== 'CLOSED');
   const closedPositions = positions.filter((pos: Position) => pos.state === 'CLOSED');
 
@@ -128,6 +135,15 @@ export const PositionTable = ({ positions, positionOrchestration, selectedPosId,
 
   return (
     <div className="flex flex-col h-full border border-[#0D0D0D] bg-white overflow-hidden">
+      <div className="p-2 border-b border-[#0D0D0D] flex justify-between items-center bg-[#F4F4F0]">
+        <h3 className="font-syne text-sm font-bold uppercase">Positions</h3>
+        <button
+          onClick={onOpenPositionClick}
+          className="px-2 py-1 border border-[#0D0D0D] text-xs uppercase hover:bg-[#0D0D0D] hover:text-[#F4F4F0] transition-colors font-mono"
+        >
+          + Open Position
+        </button>
+      </div>
       <div className="flex-1 overflow-auto">
         {positions.length === 0 ? (
           <div className="p-4 text-xs italic text-gray-500">

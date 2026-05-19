@@ -22,6 +22,7 @@ interface OrchestrationControlsProps {
   onModeChange: (value: string) => void;
   onAssign: () => void;
   onEvaluate: () => void;
+  onApplyStrategy: () => void;
 }
 
 export const OrchestrationControls = ({
@@ -32,6 +33,7 @@ export const OrchestrationControls = ({
   onModeChange,
   onAssign,
   onEvaluate,
+  onApplyStrategy,
 }: OrchestrationControlsProps) => {
   return (
     <div className="flex flex-col gap-3 border-t border-[#0D0D0D] pt-4 min-w-0">
@@ -42,6 +44,7 @@ export const OrchestrationControls = ({
             selectedStrategyId={selectedStrategyId}
             onStrategyChange={onStrategyChange}
             onEvaluate={onEvaluate}
+            onApplyStrategy={onApplyStrategy}
           />
         </div>
         <div className="flex-1 min-w-0">

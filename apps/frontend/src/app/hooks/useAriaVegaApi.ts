@@ -44,7 +44,18 @@ export interface UseAriaVegaApiReturn {
     suggestion: { action: string; openParams?: Record<string, unknown> }
   ) => Promise<void>;
   handleEvaluateStrategy: (positionId: string, strategyId: string) => Promise<void>;
+  handleApplyStrategy: (positionId: string, strategyId: string) => Promise<void>;
   handleDeleteAssignment: (id: string) => Promise<void>;
+  handleOpenPosition: (params: {
+    pool_address: string;
+    lower_price: number;
+    upper_price: number;
+    base_token_amount: number;
+    quote_token_amount: number;
+    slippage_pct: number;
+    wallet_address: string;
+    extra_params?: Record<string, unknown>;
+  }) => Promise<void>;
 }
 
 export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
@@ -421,6 +432,10 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
     return handlePositionAction(positionId, 'evaluateStrategy', { strategyId });
   };
 
+  const handleApplyStrategy = async (positionId: string, strategyId: string): Promise<void> => {
+    return handlePositionAction(positionId, 'applyStrategy', { strategyId });
+  };
+
   const handleDeleteAssignment = async (id: string): Promise<void> => {
     try {
       const res = await fetch(`${API_URL}/assignments/${id}`, { method: 'DELETE' });
@@ -434,6 +449,54 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
     }
   };
 
+  const handleOpenPosition = async (params: {
+    pool_address: string;
+    lower_price: number;
+    upper_price: number;
+    base_token_amount: number;
+    quote_token_amount: number;
+    slippage_pct: number;
+    wallet_address: string;
+    extra_params?: Record<string, unknown>;
+  }): Promise<void> => {
+    try {
+      const res = await fetch(`${API_URL}/gateway/open`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+
+      const result = await res.json();
+      if (!res.ok) {
+        throw new Error(result.error || 'Failed to open position');
+      }
+
+      setEvalLogs((prev) => [
+        {
+          id: Date.now(),
+          timestamp: new Date().toLocaleTimeString(),
+          action: 'OPEN_POSITION',
+          result: `Position opened successfully. Tx: ${result.transactionSignatures?.join(', ')}`,
+          transactionSignatures: result.transactionSignatures,
+        },
+        ...prev.slice(0, 49),
+      ]);
+
+      syncState();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Network error';
+      setEvalLogs((prev) => [
+        {
+          id: Date.now(),
+          timestamp: new Date().toLocaleTimeString(),
+          action: 'OPEN_POSITION',
+          error: msg,
+        },
+        ...prev.slice(0, 49),
+      ]);
+    }
+  };
+
   return {
     data,
     loading,
@@ -444,6 +507,8 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
     handlePositionAction,
     handleApplySuggestion,
     handleEvaluateStrategy,
+    handleApplyStrategy,
     handleDeleteAssignment,
+    handleOpenPosition,
   };
 };

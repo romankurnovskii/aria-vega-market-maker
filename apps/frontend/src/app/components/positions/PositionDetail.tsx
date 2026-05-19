@@ -53,6 +53,7 @@ interface PositionDetailProps {
   strategies: Strategy[];
   onAssign: (positionId: string, strategyId: string, mode: string) => Promise<void>;
   onEvaluate: (positionId: string, strategyId: string) => Promise<void>;
+  onApplyStrategy: (positionId: string, strategyId: string) => Promise<void>;
   onApplySuggestion: (
     positionId: string,
     strategyId: string,
@@ -68,6 +69,7 @@ export const PositionDetail = ({
   strategies,
   onAssign,
   onEvaluate,
+  onApplyStrategy,
   onApplySuggestion,
   evalLogs,
   onClose,
@@ -104,6 +106,13 @@ export const PositionDetail = ({
   const handleEvaluate = () => {
     console.log(`[PositionDetail] Evaluate button clicked for position: ${position.id}, strategy: ${selectedStrategyId}`);
     onEvaluate(position.id, selectedStrategyId);
+  };
+
+  const handleApplyStrategy = () => {
+    console.log(
+      `[PositionDetail] Apply Strategy button clicked for position: ${position.id}, strategy: ${selectedStrategyId}`
+    );
+    onApplyStrategy(position.id, selectedStrategyId);
   };
 
   const isClosed = position.state === 'CLOSED';
@@ -178,6 +187,7 @@ export const PositionDetail = ({
               onModeChange={setSelectedMode}
               onAssign={handleAssign}
               onEvaluate={handleEvaluate}
+              onApplyStrategy={handleApplyStrategy}
             />
           </>
         )}

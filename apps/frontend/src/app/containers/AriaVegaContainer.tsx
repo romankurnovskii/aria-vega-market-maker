@@ -31,8 +31,10 @@ export const AriaVegaContainer = () => {
     evalLogs,
     handleAssignStrategy,
     handleEvaluateStrategy,
+    handleApplyStrategy,
     handleApplySuggestion,
     handleDeleteAssignment,
+    handleOpenPosition,
   } = useAriaVegaApi();
 
   if (loading) {
@@ -82,7 +84,9 @@ export const AriaVegaContainer = () => {
                 strategies={data.strategies}
                 onAssign={handleAssignStrategy}
                 onEvaluate={handleEvaluateStrategy}
+                onApplyStrategy={handleApplyStrategy}
                 onApplySuggestion={handleApplySuggestion}
+                onOpenPosition={handleOpenPosition}
                 evalLogs={evalLogs}
               />
             )}

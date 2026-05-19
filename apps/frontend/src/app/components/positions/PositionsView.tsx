@@ -17,6 +17,7 @@
 import React, { useState, useMemo } from 'react';
 import { PositionTable } from './PositionTable';
 import { PositionDetail } from './PositionDetail';
+import { OpenPositionForm } from './OpenPositionForm';
 import type { Assignment, Strategy, Position, EvalLogEntry } from '../../types/api';
 
 interface Props {
@@ -25,11 +26,22 @@ interface Props {
   strategies: Strategy[];
   onAssign: (positionId: string, strategyId: string, mode: string) => Promise<void>;
   onEvaluate: (positionId: string, strategyId: string) => Promise<void>;
+  onApplyStrategy: (positionId: string, strategyId: string) => Promise<void>;
   onApplySuggestion: (
     positionId: string,
     strategyId: string,
     suggestion: { action: string; openParams?: Record<string, unknown> }
   ) => void;
+  onOpenPosition: (params: {
+    pool_address: string;
+    lower_price: number;
+    upper_price: number;
+    base_token_amount: number;
+    quote_token_amount: number;
+    slippage_pct: number;
+    wallet_address: string;
+    extra_params?: Record<string, unknown>;
+  }) => Promise<void>;
   evalLogs: EvalLogEntry[];
 }
 
@@ -39,10 +51,13 @@ export const PositionsView = ({
   strategies,
   onAssign,
   onEvaluate,
+  onApplyStrategy,
   onApplySuggestion,
+  onOpenPosition,
   evalLogs,
 }: Props) => {
   const [selectedPosId, setSelectedPosId] = useState<string | null>(null);
+  const [isOpeningPosition, setIsOpeningPosition] = useState(false);
 
   const positionOrchestration = useMemo(() => {
     const map: Record<string, { strategyId: string; mode: string }> = {};
@@ -58,29 +73,41 @@ export const PositionsView = ({
   return (
     <div className="flex flex-col lg:flex-row h-full gap-4 overflow-hidden">
       <div
-        className={`flex flex-col transition-all duration-300 ${selectedPosId ? 'lg:w-1/3 w-full' : 'w-full'} ${selectedPosId ? 'hidden lg:flex' : 'flex'}`}
+        className={`flex flex-col transition-all duration-300 ${selectedPosId || isOpeningPosition ? 'lg:w-1/3 w-full' : 'w-full'} ${selectedPosId || isOpeningPosition ? 'hidden lg:flex' : 'flex'}`}
       >
         <PositionTable
           positions={positions}
           positionOrchestration={positionOrchestration}
           selectedPosId={selectedPosId}
-          onSelect={setSelectedPosId}
+          onSelect={(id) => {
+            setSelectedPosId(id);
+            if (id) setIsOpeningPosition(false);
+          }}
+          onOpenPositionClick={() => {
+            setIsOpeningPosition(true);
+            setSelectedPosId(null);
+          }}
         />
       </div>
 
-      {selectedPos && (
+      {(selectedPos || isOpeningPosition) && (
         <div className="flex flex-1 gap-4 min-w-0 animate-in slide-in-from-bottom-4 lg:slide-in-from-right-4 duration-300">
-          <PositionDetail
-            key={selectedPos.id}
-            position={selectedPos}
-            orchestration={selectedOrch}
-            strategies={strategies}
-            onAssign={onAssign}
-            onEvaluate={onEvaluate}
-            onApplySuggestion={onApplySuggestion}
-            evalLogs={evalLogs}
-            onClose={() => setSelectedPosId(null)}
-          />
+          {isOpeningPosition ? (
+            <OpenPositionForm onOpen={onOpenPosition} onClose={() => setIsOpeningPosition(false)} />
+          ) : selectedPos ? (
+            <PositionDetail
+              key={selectedPos.id}
+              position={selectedPos}
+              orchestration={selectedOrch}
+              strategies={strategies}
+              onAssign={onAssign}
+              onEvaluate={onEvaluate}
+              onApplyStrategy={onApplyStrategy}
+              onApplySuggestion={onApplySuggestion}
+              evalLogs={evalLogs}
+              onClose={() => setSelectedPosId(null)}
+            />
+          ) : null}
         </div>
       )}
     </div>

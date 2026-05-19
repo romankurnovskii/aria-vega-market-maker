@@ -5,9 +5,16 @@ interface StrategySelectProps {
   selectedStrategyId: string;
   onStrategyChange: (value: string) => void;
   onEvaluate: () => void;
+  onApplyStrategy: () => void;
 }
 
-export const StrategySelect = ({ strategies, selectedStrategyId, onStrategyChange, onEvaluate }: StrategySelectProps) => (
+export const StrategySelect = ({
+  strategies,
+  selectedStrategyId,
+  onStrategyChange,
+  onEvaluate,
+  onApplyStrategy,
+}: StrategySelectProps) => (
   <div className="flex flex-col gap-2 w-full">
     <label className="text-[12px] uppercase font-bold tracking-widest opacity-50">Select Strategy</label>
     <div className="flex gap-2 w-full">
@@ -28,6 +35,12 @@ export const StrategySelect = ({ strategies, selectedStrategyId, onStrategyChang
         className="bg-[#0D0D0D] text-[#F4F4F0] px-3 py-1 text-[12px] uppercase font-bold tracking-widest hover:bg-[#FF4500] transition-colors shrink-0"
       >
         Evaluate
+      </button>
+      <button
+        onClick={onApplyStrategy}
+        className="bg-[#FF4500] text-[#F4F4F0] px-3 py-1 text-[12px] uppercase font-bold tracking-widest hover:bg-[#0D0D0D] transition-colors shrink-0"
+      >
+        Apply
       </button>
     </div>
   </div>
