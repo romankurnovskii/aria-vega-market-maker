@@ -5,7 +5,7 @@ The `persistence` package implements file-system based implementations of the `I
 ## Adapters
 
 - **`JsonFileStore`**: Adapts `IStore` to store assignments and execution histories. Supports optional wallet and environment namespacing to produce dynamic filenames like `{wallet_short}_{env}_assignments.json` and `{wallet_short}_{env}_executions.json` (falling back to `assignments.json` and `executions.json` if namespacing is not configured).
-- **`JsonPositionStore`**: Adapts `IPositionStore` to keep track of known, currently open positions. Supports optional wallet and environment namespacing to produce dynamic filenames like `{wallet_short}_{env}_positions.json` (falling back to `known_positions.json` if namespacing is not configured).
+- **`JsonPositionStore`**: Adapts `IPositionStore` to keep track of known, currently open positions, as well as archived terminal positions (`CLOSED`, `FAILED`). Supports optional wallet and environment namespacing to produce dynamic filenames like `{wallet_short}_{env}_positions.json` and `{wallet_short}_{env}_position_history.json` (falling back to `known_positions.json` and `position_history.json` if namespacing is not configured).
 
 ## Safety & Concurrency Guidelines
 

@@ -140,6 +140,10 @@ export class HummingbotExecutor implements IExecutor {
           txSignatures,
           status: 'success',
           executedAt: Date.now(),
+          metrics: {
+            baseFeeCollected: result.base_fee_collected || '0',
+            quoteFeeCollected: result.quote_fee_collected || '0',
+          },
         };
       } else {
         throw new Error(`Unsupported action: ${decision.action}`);

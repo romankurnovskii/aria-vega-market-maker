@@ -23,9 +23,10 @@ We introduce a single unified REST API endpoint on the engine backend:
 **Action Types**:
 
 - `evaluateStrategy` — Run strategy evaluation and return recommendation. Requires `strategyId`.
+- `applyStrategy` — Evaluate a strategy and immediately execute its recommendation (e.g., close+open rebalance, close, or open). Requires `strategyId`.
+- `applySuggestion` — Execute a specific strategy recommendation passed in the request body (close, open, or close+open). Requires `strategyId` and `suggestion`.
 - `removeLiquidity` — Remove all liquidity and claim fees (closes position).
 - `openLiquidity` — Create new liquidity position.
-- `applySuggestion` — Apply a strategy recommendation (close, open, or close+open). Requires `strategyId` and `suggestion`.
 
 #### 1. Evaluate Strategy Action
 
@@ -51,7 +52,81 @@ We introduce a single unified REST API endpoint on the engine backend:
 }
 ```
 
-#### 2. Remove Liquidity Action
+#### 2. Apply Strategy Action
+
+**Request Body**:
+
+```json
+{
+  "action": "applyStrategy",
+  "strategyId": "trailing-usdc"
+}
+```
+
+**Response (Rebalanced close+open)** (200):
+
+```json
+{
+  "status": "success",
+  "action": "applyStrategy",
+  "appliedAction": "close+open",
+  "closeRecord": {
+    "positionId": "...",
+    "status": "success",
+    "txSignatures": ["..."],
+    "metrics": {
+      "baseFeeCollected": "100.25",
+      "quoteFeeCollected": "50.10"
+    }
+  },
+  "openRecord": {
+    "positionId": "...",
+    "status": "success",
+    "newPositionId": "...",
+    "txSignatures": ["..."]
+  },
+  "newPosition": {
+    "id": "...",
+    "poolAddress": "...",
+    "state": "OPEN",
+    ...
+  },
+  "transactionSignatures": ["close_sig...", "open_sig..."],
+  "result": {
+    "action": "close+open",
+    "reason": "Rebalanced position ... to new position ...",
+    "metrics": "Fees Collected: 100.25 / 50.10",
+    "openParams": { ... }
+  },
+  "message": "Direct close+open rebalance from strategy completed successfully."
+}
+```
+
+#### 3. Apply Suggestion Action
+
+**Request Body**:
+
+```json
+{
+  "action": "applySuggestion",
+  "strategyId": "trailing-usdc",
+  "suggestion": {
+    "action": "close+open",
+    "openParams": {
+      "lowerBinId": 1000,
+      "upperBinId": 1020,
+      "lowerBound": 1000,
+      "upperBound": 1020
+    }
+  }
+}
+```
+
+**Response (Rebalanced close+open)** (200):
+
+Same format as `applyStrategy`, confirming the exact actions executed on-chain and registered locally.
+
+#### 4. Remove Liquidity Action
 
 **Request Body**:
 

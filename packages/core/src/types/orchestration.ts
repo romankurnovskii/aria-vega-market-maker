@@ -40,4 +40,9 @@ export interface ExecutionRecord {
   executedAt: number;
   newPositionId?: string;
   recordVersion?: number;
+  metrics?: {
+    baseFeeCollected?: string;
+    quoteFeeCollected?: string;
+    [key: string]: unknown;
+  };
 }
