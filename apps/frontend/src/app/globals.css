@@ -1,6 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@100..800&family=Syne:wght@400..800&display=swap');
 @import 'tailwindcss';
 
+@theme {
+  --font-size-sm: 0.9rem;
+}
+
 :root {
   --background: #f4f4f0;
   --foreground: #0d0d0d;

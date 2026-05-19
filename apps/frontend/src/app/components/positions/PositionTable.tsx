@@ -1,20 +1,8 @@
-/**
- * @file PositionTable.tsx
- * @description Dumb component rendering the scrollable table of on-chain positions.
- *              Handles row selection via callback — owns no fetch or business logic.
- *
- * @features
- * - Renders sticky-header table with ID, pool, range, state, and orchestration status columns
- * - Highlights the selected row and shows an active indicator for assigned positions
- * - Color-codes orchestration mode labels (active/green, monitor/yellow, unassigned/gray)
- *
- * @sideEffects None
- */
-
 'use client';
 
 import React from 'react';
 import { ChevronRight } from 'lucide-react';
+import { formatAmount, getTokenSymbol } from '../../utils/format';
 import type { Position } from '../../types/api';
 
 interface PositionTableProps {
@@ -25,51 +13,84 @@ interface PositionTableProps {
   onOpenPositionClick?: () => void;
 }
 
-export const PositionTable = ({
-  positions,
-  positionOrchestration,
-  selectedPosId,
-  onSelect,
-  onOpenPositionClick,
-}: PositionTableProps) => {
+interface PnLData {
+  pnlUsd?: string | number;
+  pnlPctChange?: string | number;
+  allTimeFees?: {
+    total?: { usd?: string | number };
+    tokenX?: { usd?: string | number; amount?: string | number };
+    tokenY?: { usd?: string | number; amount?: string | number };
+  };
+  unrealizedPnl?: {
+    balanceTokenX?: { usd?: string | number };
+    balanceTokenY?: { usd?: string | number };
+    unclaimedFeeTokenX?: { amount?: string | number; usd?: string | number };
+    unclaimedFeeTokenY?: { amount?: string | number; usd?: string | number };
+    unclaimedRewardTokenX?: { amount?: string | number; usd?: string | number };
+    unclaimedRewardTokenY?: { amount?: string | number; usd?: string | number };
+  };
+  unclaimedFees?: string | number;
+  unclaimedFeesSol?: string | number;
+  feePerTvl24h?: string | number;
+}
+
+export const PositionTable = ({ positions, selectedPosId, onSelect, onOpenPositionClick }: PositionTableProps) => {
   const openPositions = positions.filter((pos: Position) => pos.state !== 'CLOSED');
   const closedPositions = positions.filter((pos: Position) => pos.state === 'CLOSED');
 
+  const timeAgo = (ts?: number): string => {
+    if (!ts) return '';
+    // eslint-disable-next-line react-hooks/purity
+    const diff = Date.now() - ts;
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    const days = Math.floor(hrs / 24);
+    if (days < 30) return `${days}d ago`;
+    const months = Math.floor(days / 30);
+    return `${months}mo ago`;
+  };
+
+  const getPnLData = (pos: Position): PnLData => (pos.pnlData || pos.raw || {}) as PnLData;
+
   const renderSectionHeader = (label: string, count: number) => (
-    <tr className="bg-[#0D0D0D] text-[#F4F4F0] block md:table-row">
-      <td colSpan={5} className="py-1.5 px-3 font-bold uppercase tracking-widest text-sm block md:table-cell">
+    <tr className="bg-[#0D0D0D] text-[#F4F4F0]">
+      <td colSpan={4} className="py-1.5 px-3 font-bold uppercase tracking-widest text-sm">
         {label} ({count})
       </td>
     </tr>
   );
 
-  const addrShort = (addr: string, len = 4) => `${addr.slice(0, len)}...${addr.slice(-len)}`;
-
-  const tokenSymbol = (mint?: string): string => {
-    if (!mint) return '?';
-    if (mint === 'So11111111111111111111111111111111111111112') return 'SOL';
-    if (mint === 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v') return 'USDC';
-    if (mint === 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB') return 'USDT';
-    return mint.slice(0, 4).toUpperCase();
-  };
-
-  const poolName = (pos: Position): string => {
-    const x = pos.tokenX?.mint || pos.tokenX?.tokenAddress;
-    const y = pos.tokenY?.mint || pos.tokenY?.tokenAddress;
-    if (!x || !y) return '?';
-    return `${tokenSymbol(x)}-${tokenSymbol(y)}`;
-  };
-
   const renderRow = (pos: Position, dimmed = false) => {
-    const orch = positionOrchestration[pos.id];
-    const orchLabel = orch ? orch.mode.toUpperCase() : 'UNASSIGNED';
-    const orchClass =
-      orch?.mode === 'active'
-        ? 'text-green-600 font-bold'
-        : orch?.mode === 'monitor'
-          ? 'text-yellow-600 font-bold'
-          : 'text-gray-400';
     const isSelected = selectedPosId === pos.id;
+    const pnl = getPnLData(pos);
+
+    const pnlUsd = pnl.pnlUsd !== undefined ? Number(pnl.pnlUsd) : undefined;
+    const pnlPctChange = pnl.pnlPctChange !== undefined ? Number(pnl.pnlPctChange) : undefined;
+    const unclaimedFeeXUsd =
+      pnl.unrealizedPnl?.unclaimedFeeTokenX?.usd !== undefined ? Number(pnl.unrealizedPnl.unclaimedFeeTokenX.usd) : 0;
+    const unclaimedFeeYUsd =
+      pnl.unrealizedPnl?.unclaimedFeeTokenY?.usd !== undefined ? Number(pnl.unrealizedPnl.unclaimedFeeTokenY.usd) : 0;
+    const unclaimedRewardXUsd =
+      pnl.unrealizedPnl?.unclaimedRewardTokenX?.usd !== undefined ? Number(pnl.unrealizedPnl.unclaimedRewardTokenX.usd) : 0;
+    const unclaimedRewardYUsd =
+      pnl.unrealizedPnl?.unclaimedRewardTokenY?.usd !== undefined ? Number(pnl.unrealizedPnl.unclaimedRewardTokenY.usd) : 0;
+    const totalClaimableUsd = unclaimedFeeXUsd + unclaimedFeeYUsd + unclaimedRewardXUsd + unclaimedRewardYUsd;
+    const hasClaimable = totalClaimableUsd > 0;
+    const feePct = pnl.feePerTvl24h !== undefined ? Number(pnl.feePerTvl24h) : undefined;
+
+    const tokenXSym = getTokenSymbol(pos.tokenX);
+    const tokenYSym = getTokenSymbol(pos.tokenY);
+    const tokenXAmt = pos.tokenX ? formatAmount(pos.tokenX.amount, pos.tokenX.decimals) : '0';
+    const tokenYAmt = pos.tokenY ? formatAmount(pos.tokenY.amount, pos.tokenY.decimals) : '0';
+    const tokenXUsd =
+      pnl.unrealizedPnl?.balanceTokenX?.usd !== undefined ? Number(pnl.unrealizedPnl.balanceTokenX.usd) : undefined;
+    const tokenYUsd =
+      pnl.unrealizedPnl?.balanceTokenY?.usd !== undefined ? Number(pnl.unrealizedPnl.balanceTokenY.usd) : undefined;
+
+    const inRange = pos.status === 'In Range';
 
     return (
       <tr
@@ -77,57 +98,62 @@ export const PositionTable = ({
         onClick={() => onSelect(pos.id)}
         className={`border-b border-gray-200 hover:bg-[#F4F4F0] transition-colors cursor-pointer flex flex-col md:table-row ${isSelected ? 'bg-[#E5E5DF]' : ''} ${dimmed ? 'opacity-60' : ''}`}
       >
-        <td className="py-2 px-3 border-r-0 md:border-r border-gray-200 font-bold flex items-center gap-2 justify-between md:justify-start block md:table-cell">
-          <div className="flex items-center gap-2">
-            {isSelected && <ChevronRight size={12} className="text-[#FF4500]" />}
-            <span className="font-mono" title={pos.id}>
-              {addrShort(pos.id, 6)}
-            </span>
-          </div>
-          {pos.state && pos.state !== 'OPEN' && (
-            <span
-              className={`text-[13px] px-1 py-0.5 border scale-90 tracking-wide font-mono ${
-                pos.state === 'REBALANCING'
-                  ? 'border-yellow-500 text-yellow-600 animate-pulse bg-yellow-50'
-                  : pos.state === 'CLOSING'
-                    ? 'border-orange-500 text-orange-600 animate-pulse bg-orange-50'
-                    : pos.state === 'CREATING'
-                      ? 'border-blue-500 text-blue-600 bg-blue-50'
-                      : 'border-red-500 text-red-600 bg-red-50'
-              }`}
-            >
-              {pos.state}
-            </span>
-          )}
-        </td>
-        <td className="py-2 px-3 text-[13px] font-mono text-gray-500 block md:table-cell" title={pos._wallet}>
-          <span className="md:hidden text-gray-500 mr-2">Wallet:</span>
-          {pos._wallet ? addrShort(pos._wallet) : '-'}
-        </td>
-        <td className="py-2 px-3 border-r-0 md:border-r border-gray-200 text-gray-600 block md:table-cell" title={pos.pool}>
-          <span className="md:hidden text-gray-500 mr-2">Pool:</span>
-          <span className="font-semibold">{poolName(pos)}</span>{' '}
-          <span className="text-[13px] text-gray-400 font-mono">{addrShort(pos.pool, 4)}</span>
-        </td>
         <td className="py-2 px-3 border-r-0 md:border-r border-gray-200 block md:table-cell">
-          <span className="md:hidden text-gray-500 mr-2">Range:</span>
-          <span
-            className={pos.status === 'In Range' ? 'text-green-600 cursor-help' : 'text-[#FF4500] cursor-help'}
-            title={`Bins: ${pos.minBin} to ${pos.maxBin}`}
-          >
-            {pos.binCount} bins
-            {(pos.lowerBoundPrice || pos.upperBoundPrice) && (
-              <>
-                {' '}
-                | ${Number(pos.lowerBoundPrice).toFixed(2)}–${Number(pos.upperBoundPrice).toFixed(2)}
-              </>
-            )}{' '}
-            <span className="text-[13px] opacity-70">({Number(pos.rangePercent).toFixed(2)}%)</span>
-          </span>
+          <div className="flex items-start gap-2">
+            {isSelected && <ChevronRight size={12} className="text-[#FF4500] mt-0.5 shrink-0" />}
+            <div className="flex items-start gap-1.5">
+              <span className={`mt-1 block w-2 h-2 rounded-full shrink-0 ${inRange ? 'bg-green-500' : 'bg-[#FF4500]'}`} />
+              <div>
+                <div className={`font-mono text-sm ${inRange ? 'text-green-600' : 'text-[#FF4500]'}`}>
+                  ${Number(pos.lowerBoundPrice).toFixed(2)}–${Number(pos.upperBoundPrice).toFixed(2)}
+                </div>
+                <div className="text-[13px] text-gray-400 font-mono">
+                  {tokenYSym} per {tokenXSym}
+                </div>
+                {pos.openedAt && <div className="text-[14px] text-gray-400 font-mono mt-0.5">{timeAgo(pos.openedAt)}</div>}
+              </div>
+            </div>
+          </div>
         </td>
-        <td className={`py-2 px-3 text-left md:text-right ${orchClass} block md:table-cell`}>
-          <span className="md:hidden text-gray-500 mr-2">State:</span>
-          {orchLabel}
+
+        <td className="py-2 px-3 border-r-0 md:border-r border-gray-200 block md:table-cell">
+          {(tokenXUsd !== undefined || tokenYUsd !== undefined) && (
+            <div className="font-mono text-sm font-bold text-[#0D0D0D] mb-1">
+              ${((tokenXUsd || 0) + (tokenYUsd || 0)).toFixed(2)}
+            </div>
+          )}
+          <div className="font-mono text-sm leading-relaxed">
+            <span className="font-bold">{tokenXAmt}</span>
+            <span className="text-gray-500 ml-1">{tokenXSym}</span>
+            {tokenXUsd !== undefined && <span className="text-gray-400 ml-1">(${tokenXUsd.toFixed(2)})</span>}
+          </div>
+          <div className="font-mono text-sm leading-relaxed">
+            <span className="font-bold">{tokenYAmt}</span>
+            <span className="text-gray-500 ml-1">{tokenYSym}</span>
+            {tokenYUsd !== undefined && <span className="text-gray-400 ml-1">(${tokenYUsd.toFixed(2)})</span>}
+          </div>
+        </td>
+
+        <td className="py-2 px-3 border-r-0 md:border-r border-gray-200 block md:table-cell">
+          <div className="font-mono text-sm">
+            {feePct !== undefined && <span className="font-bold mr-1">{feePct.toFixed(2)}%</span>}
+            {hasClaimable && <span className="text-gray-700">${totalClaimableUsd.toFixed(4)}</span>}
+            {!hasClaimable && <span className="text-gray-400">$0.00</span>}
+          </div>
+        </td>
+
+        <td className="py-2 px-3 text-right block md:table-cell">
+          <div
+            className={`font-mono text-sm font-bold ${pnlUsd !== undefined ? (pnlUsd >= 0 ? 'text-green-600' : 'text-[#FF4500]') : 'text-[#0D0D0D]'}`}
+          >
+            {pnlUsd !== undefined ? `${pnlUsd >= 0 ? '+' : ''}$${pnlUsd.toFixed(4)}` : '$0.0000'}
+          </div>
+          {pnlPctChange !== undefined && (
+            <div className={`font-mono text-[13px] ${pnlPctChange >= 0 ? 'text-green-600' : 'text-[#FF4500]'}`}>
+              {pnlPctChange >= 0 ? '+' : ''}
+              {pnlPctChange.toFixed(2)}%
+            </div>
+          )}
         </td>
       </tr>
     );
@@ -153,13 +179,10 @@ export const PositionTable = ({
           <table className="w-full text-left border-collapse text-sm md:whitespace-nowrap block md:table">
             <thead className="sticky top-0 bg-[#0D0D0D] text-[#F4F4F0] z-10 shadow-[0_1px_0_#0D0D0D] hidden md:table-header-group">
               <tr>
-                <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D]">Pos ID</th>
-                <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D]">Wallet</th>
-                <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D]">Target Pool</th>
-                <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D]">Range</th>
-                <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D] text-right">
-                  State
-                </th>
+                <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D]">Price Range</th>
+                <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D]">Your Liquidity</th>
+                <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D]">Claimable Fees</th>
+                <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D] text-right">PnL</th>
               </tr>
             </thead>
             <tbody className="block md:table-row-group">

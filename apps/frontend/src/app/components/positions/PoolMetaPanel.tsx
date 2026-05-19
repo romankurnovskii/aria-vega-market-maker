@@ -3,20 +3,42 @@
 import React from 'react';
 import type { PoolMeta } from '../../stores/app-store';
 
+interface TokenFee {
+  amount?: string | number;
+  usd?: string | number;
+}
+
 interface PoolMetaPanelProps {
   poolMeta?: PoolMeta | null;
   status: string;
   state: string;
   activeBin?: number;
   pnlData?: Record<string, unknown>;
+  unclaimedFeeX?: TokenFee;
+  unclaimedFeeY?: TokenFee;
+  unclaimedRewardX?: TokenFee;
+  unclaimedRewardY?: TokenFee;
 }
 
-export const PoolMetaPanel = ({ poolMeta, status, state, activeBin, pnlData }: PoolMetaPanelProps) => {
+export const PoolMetaPanel = ({
+  poolMeta,
+  status,
+  state,
+  activeBin,
+  pnlData,
+  unclaimedFeeX,
+  unclaimedFeeY,
+  unclaimedRewardX,
+  unclaimedRewardY,
+}: PoolMetaPanelProps) => {
   const outOfRange = status === 'Out of Range';
 
-  const unclaimedFees = pnlData?.unclaimedFees !== undefined ? Number(pnlData.unclaimedFees) : undefined;
-  const unclaimedFeesSol = pnlData?.unclaimedFeesSol !== undefined ? Number(pnlData.unclaimedFeesSol) : undefined;
   const pnlPctChange = pnlData?.pnlPctChange !== undefined ? Number(pnlData.pnlPctChange) : undefined;
+
+  const unclaimedFeeXAmt = unclaimedFeeX?.amount !== undefined ? Number(unclaimedFeeX.amount) : undefined;
+  const unclaimedFeeYAmt = unclaimedFeeY?.amount !== undefined ? Number(unclaimedFeeY.amount) : undefined;
+  const unclaimedRewardXAmt = unclaimedRewardX?.amount !== undefined ? Number(unclaimedRewardX.amount) : undefined;
+  const unclaimedRewardYAmt = unclaimedRewardY?.amount !== undefined ? Number(unclaimedRewardY.amount) : undefined;
 
   return (
     <div className="bg-[#F4F4F0] p-2.5 border border-[#0D0D0D] text-sm flex flex-col gap-1.5">
@@ -69,7 +91,7 @@ export const PoolMetaPanel = ({ poolMeta, status, state, activeBin, pnlData }: P
           <div className="flex justify-between font-mono-jb">
             <span className="text-gray-500">Base Fee:</span>
             <span className="font-bold text-[#0D0D0D]">
-              {poolMeta.feeRate > 0 ? `${poolMeta.feeRate}%` : `${poolMeta.baseFee}%`}
+              {poolMeta.feeRate > 0 ? `${(poolMeta.feeRate * 100).toFixed(5)}%` : `${poolMeta.baseFee.toFixed(5)}%`}
             </span>
           </div>
         </>
@@ -82,17 +104,31 @@ export const PoolMetaPanel = ({ poolMeta, status, state, activeBin, pnlData }: P
         </div>
       )}
 
-      {unclaimedFees !== undefined && (
+      {unclaimedFeeXAmt !== undefined && unclaimedFeeXAmt > 0 && (
         <div className="flex justify-between font-mono-jb">
-          <span className="text-gray-500">Unclaimed Fees (Token):</span>
-          <span className="font-bold text-[#0D0D0D]">{unclaimedFees.toFixed(6)}</span>
+          <span className="text-gray-500">Unclaimed Fee (Token X):</span>
+          <span className="font-bold text-[#0D0D0D]">{unclaimedFeeXAmt.toFixed(6)}</span>
         </div>
       )}
 
-      {unclaimedFeesSol !== undefined && (
+      {unclaimedFeeYAmt !== undefined && unclaimedFeeYAmt > 0 && (
         <div className="flex justify-between font-mono-jb">
-          <span className="text-gray-500">Unclaimed Fees (SOL):</span>
-          <span className="font-bold text-[#0D0D0D]">{unclaimedFeesSol.toFixed(6)}</span>
+          <span className="text-gray-500">Unclaimed Fee (Token Y):</span>
+          <span className="font-bold text-[#0D0D0D]">{unclaimedFeeYAmt.toFixed(6)}</span>
+        </div>
+      )}
+
+      {unclaimedRewardXAmt !== undefined && unclaimedRewardXAmt > 0 && (
+        <div className="flex justify-between font-mono-jb">
+          <span className="text-gray-500">Unclaimed Reward (Token X):</span>
+          <span className="font-bold text-[#0D0D0D]">{unclaimedRewardXAmt.toFixed(6)}</span>
+        </div>
+      )}
+
+      {unclaimedRewardYAmt !== undefined && unclaimedRewardYAmt > 0 && (
+        <div className="flex justify-between font-mono-jb">
+          <span className="text-gray-500">Unclaimed Reward (Token Y):</span>
+          <span className="font-bold text-[#0D0D0D]">{unclaimedRewardYAmt.toFixed(6)}</span>
         </div>
       )}
 

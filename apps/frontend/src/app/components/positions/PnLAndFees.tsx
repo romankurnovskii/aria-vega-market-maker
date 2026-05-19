@@ -11,6 +11,11 @@
 
 import React from 'react';
 
+interface TokenFee {
+  amount?: string | number;
+  usd?: string | number;
+}
+
 interface PnLAndFeesProps {
   pnlUsd?: number;
   pnlPctChange?: number;
@@ -21,6 +26,10 @@ interface PnLAndFeesProps {
   allTimeFeesYAmt?: string;
   tokenXSym: string;
   tokenYSym: string;
+  unclaimedFeeX?: TokenFee;
+  unclaimedFeeY?: TokenFee;
+  unclaimedRewardX?: TokenFee;
+  unclaimedRewardY?: TokenFee;
 }
 
 export const PnLAndFees = ({
@@ -33,11 +42,17 @@ export const PnLAndFees = ({
   allTimeFeesYAmt,
   tokenXSym,
   tokenYSym,
+  unclaimedFeeX,
+  unclaimedFeeY,
+  unclaimedRewardX,
+  unclaimedRewardY,
 }: PnLAndFeesProps) => {
   const getPnLClasses = (value?: number): string => {
     if (value === undefined || value === null) return 'text-[#0D0D0D]';
     return value >= 0 ? 'text-green-600' : 'text-[#FF4500]';
   };
+
+  const hasUnclaimed = unclaimedFeeX || unclaimedFeeY || unclaimedRewardX || unclaimedRewardY;
 
   const renderTokenFees = (usd?: number, amt?: string, symbol?: string) => {
     if (usd !== undefined && usd > 0) {
@@ -73,6 +88,44 @@ export const PnLAndFees = ({
         <span className="text-gray-500">{tokenYSym} Fees:</span>
         <span className="font-bold text-[#0D0D0D]">{renderTokenFees(allTimeFeesYUsd, allTimeFeesYAmt, tokenYSym)}</span>
       </div>
+
+      {hasUnclaimed && (
+        <>
+          <div className="text-[13px] text-gray-500 uppercase tracking-widest font-bold mt-1">Unclaimed Fees</div>
+          {unclaimedFeeX?.usd && Number(unclaimedFeeX.usd) > 0 && (
+            <div className="flex justify-between font-mono-jb text-[13px] pl-2 border-l border-gray-300">
+              <span className="text-gray-500">Unclaimed {tokenXSym} Fee:</span>
+              <span className="font-bold text-[#0D0D0D]">
+                ${Number(unclaimedFeeX.usd).toFixed(4)} ({unclaimedFeeX.amount} {tokenXSym})
+              </span>
+            </div>
+          )}
+          {unclaimedFeeY?.usd && Number(unclaimedFeeY.usd) > 0 && (
+            <div className="flex justify-between font-mono-jb text-[13px] pl-2 border-l border-gray-300">
+              <span className="text-gray-500">Unclaimed {tokenYSym} Fee:</span>
+              <span className="font-bold text-[#0D0D0D]">
+                ${Number(unclaimedFeeY.usd).toFixed(4)} ({unclaimedFeeY.amount} {tokenYSym})
+              </span>
+            </div>
+          )}
+          {unclaimedRewardX?.usd && Number(unclaimedRewardX.usd) > 0 && (
+            <div className="flex justify-between font-mono-jb text-[13px] pl-2 border-l border-gray-300">
+              <span className="text-gray-500">Unclaimed {tokenXSym} Reward:</span>
+              <span className="font-bold text-[#0D0D0D]">
+                ${Number(unclaimedRewardX.usd).toFixed(4)} ({unclaimedRewardX.amount} {tokenXSym})
+              </span>
+            </div>
+          )}
+          {unclaimedRewardY?.usd && Number(unclaimedRewardY.usd) > 0 && (
+            <div className="flex justify-between font-mono-jb text-[13px] pl-2 border-l border-gray-300">
+              <span className="text-gray-500">Unclaimed {tokenYSym} Reward:</span>
+              <span className="font-bold text-[#0D0D0D]">
+                ${Number(unclaimedRewardY.usd).toFixed(4)} ({unclaimedRewardY.amount} {tokenYSym})
+              </span>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };

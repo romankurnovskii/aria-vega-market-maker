@@ -71,9 +71,9 @@ export const PositionsView = ({
   const selectedOrch = selectedPos ? positionOrchestration[selectedPos.id] : null;
 
   return (
-    <div className="flex flex-col lg:flex-row h-full gap-4 overflow-hidden">
+    <div className="flex flex-col lg:flex-row h-full gap-2 overflow-hidden">
       <div
-        className={`flex flex-col transition-all duration-300 ${selectedPosId || isOpeningPosition ? 'lg:w-1/3 w-full' : 'w-full'} ${selectedPosId || isOpeningPosition ? 'hidden lg:flex' : 'flex'}`}
+        className={`flex flex-col transition-all duration-300 ${selectedPosId || isOpeningPosition ? 'lg:w-1/2 w-full' : 'w-full'} ${selectedPosId || isOpeningPosition ? 'hidden lg:flex' : 'flex'}`}
       >
         <PositionTable
           positions={positions}
@@ -91,7 +91,7 @@ export const PositionsView = ({
       </div>
 
       {(selectedPos || isOpeningPosition) && (
-        <div className="flex flex-1 gap-4 min-w-0 animate-in slide-in-from-bottom-4 lg:slide-in-from-right-4 duration-300">
+        <div className="flex flex-1 gap-2 min-w-0 animate-in slide-in-from-bottom-4 lg:slide-in-from-right-4 duration-300">
           {isOpeningPosition ? (
             <OpenPositionForm onOpen={onOpenPosition} onClose={() => setIsOpeningPosition(false)} />
           ) : selectedPos ? (

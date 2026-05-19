@@ -44,6 +44,10 @@ interface PnLData {
   unrealizedPnl?: {
     balanceTokenX?: { usd?: string | number };
     balanceTokenY?: { usd?: string | number };
+    unclaimedFeeTokenX?: { amount?: string | number; usd?: string | number };
+    unclaimedFeeTokenY?: { amount?: string | number; usd?: string | number };
+    unclaimedRewardTokenX?: { amount?: string | number; usd?: string | number };
+    unclaimedRewardTokenY?: { amount?: string | number; usd?: string | number };
   };
 }
 
@@ -96,6 +100,11 @@ export const PositionDetail = ({
   const allTimeFeesYUsd = pnl.allTimeFees?.tokenY?.usd !== undefined ? Number(pnl.allTimeFees.tokenY.usd) : undefined;
   const allTimeFeesYAmt = pnl.allTimeFees?.tokenY?.amount !== undefined ? pnl.allTimeFees.tokenY.amount : undefined;
 
+  const unclaimedFeeX = pnl.unrealizedPnl?.unclaimedFeeTokenX;
+  const unclaimedFeeY = pnl.unrealizedPnl?.unclaimedFeeTokenY;
+  const unclaimedRewardX = pnl.unrealizedPnl?.unclaimedRewardTokenX;
+  const unclaimedRewardY = pnl.unrealizedPnl?.unclaimedRewardTokenY;
+
   const tokenXSym = getTokenSymbol(position.tokenX);
   const tokenYSym = getTokenSymbol(position.tokenY);
 
@@ -118,7 +127,7 @@ export const PositionDetail = ({
   const isClosed = position.state === 'CLOSED';
 
   return (
-    <div className="flex flex-1 flex-col gap-4 min-h-0">
+    <div className="flex flex-1 flex-col gap-2 min-h-0">
       {/* Actions Pane */}
       <div className="flex-1 border border-[#0D0D0D] bg-white p-4 flex flex-col gap-4 overflow-y-auto min-h-[300px]">
         <PositionHeader
@@ -137,6 +146,10 @@ export const PositionDetail = ({
               state={position.state}
               activeBin={position.activeBin}
               pnlData={pnl as Record<string, unknown>}
+              unclaimedFeeX={unclaimedFeeX}
+              unclaimedFeeY={unclaimedFeeY}
+              unclaimedRewardX={unclaimedRewardX}
+              unclaimedRewardY={unclaimedRewardY}
             />
           </div>
           <div className="flex-1 min-w-[280px] max-w-[400px]">
@@ -173,6 +186,10 @@ export const PositionDetail = ({
               allTimeFeesYAmt={allTimeFeesYAmt as string | undefined}
               tokenXSym={tokenXSym}
               tokenYSym={tokenYSym}
+              unclaimedFeeX={unclaimedFeeX}
+              unclaimedFeeY={unclaimedFeeY}
+              unclaimedRewardX={unclaimedRewardX}
+              unclaimedRewardY={unclaimedRewardY}
             />
           </div>
         </div>
