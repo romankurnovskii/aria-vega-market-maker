@@ -10,7 +10,6 @@ This document tracks critical technical findings, SDK quirks, and architecture "
 
 - **The Bug**: Calling `dlmm.addLiquidityByStrategy` (or `addLiquidityByWeight`) on a newly generated Keypair address fails with `AccountOwnedByWrongProgram` (Anchor Error 3007).
 - **The Finding**: On Solana, a new address is owned by the System Program. The Meteora DLMM program requires the position account to be initialized and owned by its own program ID (`LBUZKh...`).
-- **The Solution**: Always use `dlmm.initializePositionAndAddLiquidityByStrategy` when opening a **new** position. Only use `addLiquidity...` when adding to an existing, already-initialized position account.
 
 ### Transaction vs. Instructions
 
@@ -22,11 +21,11 @@ This document tracks critical technical findings, SDK quirks, and architecture "
 
 ## 2. Engine Orchestration & State
 
-### The "Discovery" Sync Requirement
+### Continuous Position Synchronization
 
-- **The Bug**: After a successful rebalance (Close -> Open), the engine would error with "Position not found on-chain".
-- **The Finding**: The engine uses a local "Known Position" cache. If `Discovery` only runs on startup, the cache becomes stale as soon as a position ID changes (which happens on every rebalance).
-- **The Solution**: **Periodic Discovery is mandatory.** Run `startDiscovery` at the beginning of every tick cycle to sync the local cache with on-chain reality.
+- **The Bug**: After a successful rebalance (Close -> Open), the engine would error with "Position not found on-chain" because the local known-position cache became stale when the position ID changed.
+- **The Finding**: The engine uses a local "Known Position" cache. Rather than relying on a complex startup discovery routine, position sync must run continuously in the background to ensure that on-chain reality is represented accurately.
+- **The Solution**: **Use the background `PositionSyncService`**. It runs in a background thread, polling and syncing on-chain position data for all monitored wallets to the `positionStore` at defined intervals while applying safe RPC rate-limit throttling.
 
 ### Market Snapshot Targeting
 
@@ -36,16 +35,16 @@ This document tracks critical technical findings, SDK quirks, and architecture "
 
 ---
 
-## 3. Atomic Task Execution
+## 3. Synchronous Execution Model & Robustness
 
-### The "Stuck Task" Recovery
+### Asynchronous Tick Loops Removed
 
-- **The Bug**: If the engine crashed or was force-restarted during a rebalance, the task would remain in `executing_...` status forever, locking the position.
-- **The Finding**: Stateful rebalance tasks need a "Boot Recovery" phase.
-- **The Solution**: On engine startup (first run of `processTasks`), explicitly scan for any tasks in `executing_...` states and revert them to `pending_...`. This allows the state machine to resume the interrupted rebalance safely.
+- **The Architecture**: All background daemon tick loops and stateful `RebalanceTask` queues have been removed. The engine now operates under a **synchronous API-driven model** where execution requests (`applyStrategy`, `applySuggestion`) are triggered via HTTP endpoints and executed directly on-chain in a blocking sequence.
 
-### Concurrency Guards
+### Robust Synchronous Rebalancing
 
-- **The Bug**: Concurrent HTTP requests and Tick Loops were "stealing" tasks from each other, leading to "Task already claimed" warnings or double execution.
-- **The Finding**: `JsonFileStore` needs a non-blocking but atomic "Claim" check.
-- **The Solution**: Refine `saveTask` to allow updates to a task **only if** the status change is valid (e.g., from `pending` to `executing`) or if the caller is updating an already-claimed task with new events/logs.
+- **The Challenge**: Solana transactions can be slow, and compound operations (Close -> Open) run the risk of HTTP timeouts or partial success (i.e. Close succeeds, but Open fails).
+- **The Best Practices**:
+  1. **Detailed Error Reporting**: If the second leg (`open`) of a rebalance fails after the `close` has completed successfully, the router must return a `500` error with the detailed `closeRecord` and `openRecord` objects included in the response. This guarantees the client UI or caller has full visibility of the transaction signatures and can facilitate manual recovery.
+  2. **Compute Budget & RPC Optimization**: Always rely on the `SolanaExecutor`'s internal high-level transaction simulation, priority fee adjustment, and automated rebroadcast loop. This maximizes the probability of transaction land-rate success within the request-response lifecycle.
+  3. **Strict Validation**: Validate that any suggestion/strategy output contains all necessary open parameters (`openParams`) and token balance allocations before executing the transaction leg.

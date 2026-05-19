@@ -24,7 +24,7 @@ We introduce a single unified REST API endpoint on the engine backend:
 
 - `evaluateStrategy` — Run strategy evaluation and return recommendation. Requires `strategyId`.
 - `removeLiquidity` — Remove all liquidity and claim fees (closes position).
-- `addLiquidity` — Add liquidity to existing position (manual).
+- `openLiquidity` — Create new liquidity position.
 - `applySuggestion` — Apply a strategy recommendation (close, open, or close+open). Requires `strategyId` and `suggestion`.
 
 #### 1. Evaluate Strategy Action
