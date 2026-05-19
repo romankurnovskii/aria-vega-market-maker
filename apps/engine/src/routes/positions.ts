@@ -8,12 +8,102 @@ import {
   Position,
   PoolInfo,
   MarketSnapshot,
+  ExecutionRecord,
 } from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getPriceFromBinId, enrichOpenParamsForExecution, getMarketSnapshot, meteoraProvider } from '@lp-system/providers';
 
 const logger = getLogger('router-positions');
+
+async function getPositionForArchival(
+  positionId: string,
+  poolAddress: string,
+  positionProvider: IPositionProvider,
+  positionStore?: IPositionStore
+): Promise<Position> {
+  if (positionStore) {
+    try {
+      const known = await positionStore.getKnown();
+      const found = known.find((p) => p.id === positionId);
+      if (found) return found;
+    } catch (err) {
+      logger.warn(`Failed to read from positionStore.getKnown() in getPositionForArchival: ${err}`);
+    }
+  }
+  return await positionProvider.getPosition(positionId, poolAddress);
+}
+
+async function handleArchiveAndCleanup(
+  positionId: string,
+  poolAddress: string,
+  closeRecord: ExecutionRecord,
+  positionProvider: IPositionProvider,
+  positionStore?: IPositionStore
+): Promise<void> {
+  if (!positionStore) return;
+  try {
+    const pos = await getPositionForArchival(positionId, poolAddress, positionProvider, positionStore);
+
+    pos.state = 'CLOSED';
+    pos.closedAt = Date.now();
+    pos.metadata = {
+      ...pos.metadata,
+      closeTxSignature: closeRecord.txSignatures?.[0] || 'unknown',
+      baseFeeCollected: closeRecord.metrics?.baseFeeCollected || '0',
+      quoteFeeCollected: closeRecord.metrics?.quoteFeeCollected || '0',
+    };
+
+    // Save to archived position history
+    await positionStore.archivePosition(pos);
+
+    // Remove from active known positions
+    const known = await positionStore.getKnown();
+    const updatedKnown = known.filter((p) => p.id !== positionId);
+    await positionStore.saveKnown(updatedKnown);
+
+    logger.info(`[positions router] Position ${positionId} successfully archived as CLOSED with collected fees.`);
+  } catch (err) {
+    logger.error(`[positions router] Failed to archive closed position ${positionId}: ${err}`);
+  }
+}
+
+async function handleRegisterNewPosition(
+  newPositionId: string,
+  poolAddress: string,
+  positionProvider: IPositionProvider,
+  positionStore?: IPositionStore
+): Promise<Position | undefined> {
+  if (!positionStore) return undefined;
+  try {
+    let newPos: Position | undefined;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        newPos = await positionProvider.getPosition(newPositionId, poolAddress);
+        break;
+      } catch (err) {
+        if (attempt === 3) throw err;
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
+
+    if (newPos) {
+      newPos.state = 'OPEN';
+      const known = await positionStore.getKnown();
+
+      const exists = known.some((p) => p.id === newPositionId);
+      if (!exists) {
+        known.push(newPos);
+        await positionStore.saveKnown(known);
+        logger.info(`[positions router] Registered new position ${newPositionId} in known positions.`);
+      }
+      return newPos;
+    }
+  } catch (err) {
+    logger.error(`[positions router] Failed to fetch and register new position ${newPositionId}: ${err}`);
+  }
+  return undefined;
+}
 
 /**
  * Creates the positions router handling unified position actions.
@@ -174,13 +264,18 @@ export function handlePositionsRouter(
             return;
           }
 
+          // Cleanup and archive closed position immediately
+          await handleArchiveAndCleanup(positionId, position.poolAddress, closeRecord, positionProvider, positionStore);
+
           // 2. Re-evaluate strategy with updated market data
           logger.info(`[HTTP Server][applyStrategy] Re-evaluating strategy ${strategyId} with updated market data...`);
           const updatedMarket = await getMarketSnapshot(position.poolAddress);
           const secondEvaluation = await targetOrch.tick(position, updatedMarket);
           logger.info(`[HTTP Server][applyStrategy] Second evaluation: ${secondEvaluation.action}`);
 
-          const finalOpenParams = secondEvaluation.openParams || firstEvaluation.openParams;
+          const finalOpenParams =
+            (secondEvaluation as { openParams?: OpenParams }).openParams ||
+            (firstEvaluation as { openParams?: OpenParams }).openParams;
           if (!finalOpenParams) {
             res.status(500).json({
               error: 'Missing openParams in strategy evaluation for opening new position',
@@ -225,12 +320,30 @@ export function handlePositionsRouter(
             return;
           }
 
+          // Fetch and register new position immediately
+          const newPos = openRecord.newPositionId
+            ? await handleRegisterNewPosition(
+                openRecord.newPositionId,
+                position.poolAddress,
+                positionProvider,
+                positionStore
+              )
+            : undefined;
+
           res.json({
             status: 'success',
             action: 'applyStrategy',
             appliedAction: 'close+open',
             closeRecord,
             openRecord,
+            newPosition: newPos,
+            transactionSignatures: [closeRecord.txSignatures?.[0], openRecord.txSignatures?.[0]].filter(Boolean),
+            result: {
+              action: 'close+open',
+              reason: `Rebalanced position ${positionId} to new position ${openRecord.newPositionId || 'unknown'}. Collected fees: ${closeRecord.metrics?.baseFeeCollected || '0'} Base, ${closeRecord.metrics?.quoteFeeCollected || '0'} Quote.`,
+              metrics: `Fees Collected: ${closeRecord.metrics?.baseFeeCollected || '0'} / ${closeRecord.metrics?.quoteFeeCollected || '0'}`,
+              openParams: finalOpenParams,
+            },
             message: 'Direct close+open rebalance from strategy completed successfully.',
           });
           return;
@@ -253,11 +366,20 @@ export function handlePositionsRouter(
             return;
           }
 
+          // Cleanup and archive closed position immediately
+          await handleArchiveAndCleanup(positionId, position.poolAddress, closeRecord, positionProvider, positionStore);
+
           res.json({
             status: 'success',
             action: 'applyStrategy',
             appliedAction: 'close',
             closeRecord,
+            transactionSignatures: closeRecord.txSignatures || [],
+            result: {
+              action: 'close',
+              reason: `Closed position ${positionId}. Collected fees: ${closeRecord.metrics?.baseFeeCollected || '0'} Base, ${closeRecord.metrics?.quoteFeeCollected || '0'} Quote.`,
+              metrics: `Fees Collected: ${closeRecord.metrics?.baseFeeCollected || '0'} / ${closeRecord.metrics?.quoteFeeCollected || '0'}`,
+            },
           });
           return;
         }
@@ -292,11 +414,28 @@ export function handlePositionsRouter(
             return;
           }
 
+          // Fetch and register new position immediately
+          const newPos = openRecord.newPositionId
+            ? await handleRegisterNewPosition(
+                openRecord.newPositionId,
+                position.poolAddress,
+                positionProvider,
+                positionStore
+              )
+            : undefined;
+
           res.json({
             status: 'success',
             action: 'applyStrategy',
             appliedAction: 'open',
             openRecord,
+            newPosition: newPos,
+            transactionSignatures: openRecord.txSignatures || [],
+            result: {
+              action: 'open',
+              reason: `Opened new position ${openRecord.newPositionId || 'unknown'}.`,
+              openParams: firstEvaluation.openParams,
+            },
           });
           return;
         }
@@ -306,7 +445,10 @@ export function handlePositionsRouter(
           status: 'success',
           action: 'applyStrategy',
           appliedAction: 'skip',
-          result: firstEvaluation,
+          result: {
+            action: 'skip',
+            reason: 'Strategy suggests skip. No actions performed.',
+          },
           message: 'Strategy suggests skip. No actions performed.',
         });
         return;
@@ -372,6 +514,9 @@ export function handlePositionsRouter(
             return;
           }
 
+          // Cleanup and archive closed position immediately
+          await handleArchiveAndCleanup(positionId, position.poolAddress, closeRecord, positionProvider, positionStore);
+
           // 2. Open
           logger.info(`[HTTP Server][Open] Opening new position in pool ${position.poolAddress}...`);
           const openRecord = await executor.apply(
@@ -397,12 +542,30 @@ export function handlePositionsRouter(
             return;
           }
 
+          // Fetch and register new position immediately
+          const newPos = openRecord.newPositionId
+            ? await handleRegisterNewPosition(
+                openRecord.newPositionId,
+                position.poolAddress,
+                positionProvider,
+                positionStore
+              )
+            : undefined;
+
           res.json({
             status: 'success',
             action: 'applySuggestion',
             appliedAction: 'close+open',
             closeRecord,
             openRecord,
+            newPosition: newPos,
+            transactionSignatures: [closeRecord.txSignatures?.[0], openRecord.txSignatures?.[0]].filter(Boolean),
+            result: {
+              action: 'close+open',
+              reason: `Applied close+open rebalance for suggestion. Rebalanced position ${positionId} to new position ${openRecord.newPositionId || 'unknown'}. Collected fees: ${closeRecord.metrics?.baseFeeCollected || '0'} Base, ${closeRecord.metrics?.quoteFeeCollected || '0'} Quote.`,
+              metrics: `Fees Collected: ${closeRecord.metrics?.baseFeeCollected || '0'} / ${closeRecord.metrics?.quoteFeeCollected || '0'}`,
+              openParams: suggestion.openParams,
+            },
             message: 'Direct close+open rebalance completed successfully.',
           });
           return;
@@ -421,6 +584,54 @@ export function handlePositionsRouter(
 
         if (execRecord.status === 'failed') {
           res.status(500).json({ error: execRecord.error || 'Execution failed' });
+          return;
+        }
+
+        if (actualAction === 'close') {
+          // Cleanup and archive closed position immediately
+          await handleArchiveAndCleanup(positionId, position.poolAddress, execRecord, positionProvider, positionStore);
+
+          res.json({
+            status: 'success',
+            action: 'applySuggestion',
+            appliedAction: 'close',
+            closeRecord: execRecord,
+            transactionSignatures: execRecord.txSignatures || [],
+            result: {
+              action: 'close',
+              reason: `Closed position ${positionId}. Collected fees: ${execRecord.metrics?.baseFeeCollected || '0'} Base, ${execRecord.metrics?.quoteFeeCollected || '0'} Quote.`,
+              metrics: `Fees Collected: ${execRecord.metrics?.baseFeeCollected || '0'} / ${execRecord.metrics?.quoteFeeCollected || '0'}`,
+            },
+            suggestionApplied: true,
+          });
+          return;
+        }
+
+        if (actualAction === 'open') {
+          // Fetch and register new position immediately
+          const newPos = execRecord.newPositionId
+            ? await handleRegisterNewPosition(
+                execRecord.newPositionId,
+                position.poolAddress,
+                positionProvider,
+                positionStore
+              )
+            : undefined;
+
+          res.json({
+            status: 'success',
+            action: 'applySuggestion',
+            appliedAction: 'open',
+            openRecord: execRecord,
+            newPosition: newPos,
+            transactionSignatures: execRecord.txSignatures || [],
+            result: {
+              action: 'open',
+              reason: `Opened new position ${execRecord.newPositionId || 'unknown'}.`,
+              openParams: suggestion.openParams,
+            },
+            suggestionApplied: true,
+          });
           return;
         }
 

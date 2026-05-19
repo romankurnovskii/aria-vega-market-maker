@@ -21,12 +21,26 @@ describe('Positions Router - applyStrategy Action', () => {
   let closeStatus: 'success' | 'failed' = 'success';
   let openStatus: 'success' | 'failed' = 'success';
 
+  let knownPositions: any[] = [];
+  let archivedPositions: any[] = [];
+
+  const mockPositionStore = {
+    getKnown: async () => knownPositions,
+    saveKnown: async (positions: any[]) => {
+      knownPositions = positions;
+    },
+    getArchived: async () => archivedPositions,
+    archivePosition: async (position: any) => {
+      archivedPositions.push(position);
+    },
+  } as any;
+
   before(() => {
     // Save original fetch
     originalFetch = globalThis.fetch;
 
     // Mock global fetch to intercept Meteora Datapi calls
-    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    globalThis.fetch = (async (url: string | URL | Request, _init?: RequestInit) => {
       const urlStr = String(url);
       if (urlStr.includes('/pools/pool_123/ohlcv')) {
         return new Response(JSON.stringify({ data: [] }), { status: 200 });
@@ -64,7 +78,24 @@ describe('Positions Router - applyStrategy Action', () => {
     };
 
     const mockPositionProvider = {
-      getPosition: async (id: string) => mockPosition,
+      getPosition: async (id: string) => {
+        if (id === 'new_pos_456') {
+          return {
+            id: 'new_pos_456',
+            poolAddress: 'pool_123',
+            chain: 'solana',
+            protocol: 'meteora_dlmm',
+            lowerBound: 110,
+            upperBound: 210,
+            tokenX: { amount: '1200', decimals: 6, mint: 'tokenX_mint', tokenAddress: 'tokenX_mint' },
+            tokenY: { amount: '2200', decimals: 6, mint: 'tokenY_mint', tokenAddress: 'tokenY_mint' },
+            isInRange: true,
+            openedAt: Date.now(),
+            metadata: {},
+          };
+        }
+        return mockPosition;
+      },
       getPositions: async () => [mockPosition],
       getPoolInfo: async () => ({ binStep: 100, feeRate: 0.01 }),
       getWalletBalances: async () => ({ amountX: '0', amountY: '0' }),
@@ -73,7 +104,7 @@ describe('Positions Router - applyStrategy Action', () => {
     } as any;
 
     const mockExecutor = {
-      apply: async (decision: any, market: any) => {
+      apply: async (decision: any, _market: any) => {
         applyCalls.push(decision.action);
         if (decision.action === 'close') {
           lastCloseDecision = decision;
@@ -83,6 +114,10 @@ describe('Positions Router - applyStrategy Action', () => {
             txSignatures: ['sig_close'],
             status: closeStatus,
             executedAt: Date.now(),
+            metrics: {
+              baseFeeCollected: '1.25',
+              quoteFeeCollected: '2.50',
+            },
           };
         }
         if (decision.action === 'open') {
@@ -93,6 +128,7 @@ describe('Positions Router - applyStrategy Action', () => {
             txSignatures: ['sig_open'],
             status: openStatus,
             executedAt: Date.now(),
+            newPositionId: 'new_pos_456',
           };
         }
         return { id: 'unknown', decision, txSignatures: [], status: 'failed', executedAt: Date.now() };
@@ -106,7 +142,7 @@ describe('Positions Router - applyStrategy Action', () => {
       positionId: 'pos_123',
       strategyId: 'strategy_123',
       mode: 'monitoring',
-      tick: async (pos: any, market: any) => {
+      tick: async (_pos: any, market: any) => {
         tickCount++;
         tickMarkets.push(market);
         const action = tickCount === 1 ? firstTickAction : secondTickAction;
@@ -157,7 +193,7 @@ describe('Positions Router - applyStrategy Action', () => {
     app.use(express.json());
     app.use(
       '/positions',
-      handlePositionsRouter(mockPositionProvider, mockExecutor, mockRegistry, mockFactory, undefined, 'wallet_123')
+      handlePositionsRouter(mockPositionProvider, mockExecutor, mockRegistry, mockFactory, mockPositionStore, 'wallet_123')
     );
   });
 
@@ -203,6 +239,22 @@ describe('Positions Router - applyStrategy Action', () => {
     secondTickAction = 'close+open';
     closeStatus = 'success';
     openStatus = 'success';
+    knownPositions = [
+      {
+        id: 'pos_123',
+        poolAddress: 'pool_123',
+        chain: 'solana',
+        protocol: 'meteora_dlmm',
+        lowerBound: 100,
+        upperBound: 200,
+        tokenX: { amount: '1000', decimals: 6, mint: 'tokenX_mint', tokenAddress: 'tokenX_mint' },
+        tokenY: { amount: '2000', decimals: 6, mint: 'tokenY_mint', tokenAddress: 'tokenY_mint' },
+        isInRange: true,
+        openedAt: Date.now(),
+        metadata: {},
+      },
+    ];
+    archivedPositions = [];
 
     const res = await runRequest({ action: 'applyStrategy', strategyId: 'strategy_123' });
 
@@ -215,6 +267,29 @@ describe('Positions Router - applyStrategy Action', () => {
     assert.ok(lastOpenDecision);
     assert.strictEqual(lastOpenDecision.openParams.tokenXAmount, '0.0012'); // Enriched decimal base token amount
     assert.strictEqual(lastOpenDecision.openParams.tokenYAmount, '0.0022'); // Enriched decimal quote token amount
+
+    // Check fee collection and metrics
+    assert.ok(res.body.closeRecord);
+    assert.deepStrictEqual(res.body.closeRecord.metrics, {
+      baseFeeCollected: '1.25',
+      quoteFeeCollected: '2.50',
+    });
+
+    // Check newly opened position details
+    assert.ok(res.body.newPosition);
+    assert.strictEqual(res.body.newPosition.id, 'new_pos_456');
+
+    // Check transaction signatures links
+    assert.deepStrictEqual(res.body.transactionSignatures, ['sig_close', 'sig_open']);
+
+    // Check state storage updates
+    assert.strictEqual(knownPositions.length, 1);
+    assert.strictEqual(knownPositions[0].id, 'new_pos_456');
+    assert.strictEqual(archivedPositions.length, 1);
+    assert.strictEqual(archivedPositions[0].id, 'pos_123');
+    assert.strictEqual(archivedPositions[0].state, 'CLOSED');
+    assert.strictEqual(archivedPositions[0].metadata.baseFeeCollected, '1.25');
+    assert.strictEqual(archivedPositions[0].metadata.quoteFeeCollected, '2.50');
   });
 
   test('should handle applyStrategy suggesting close only', async () => {
