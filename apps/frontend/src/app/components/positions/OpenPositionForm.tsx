@@ -107,7 +107,7 @@ export const OpenPositionForm = ({ onOpen, onClose }: OpenPositionFormProps) => 
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex-1 overflow-auto p-4 flex flex-col gap-4 text-xs font-mono">
+      <form onSubmit={handleSubmit} className="flex-1 overflow-auto p-4 flex flex-col gap-4 text-sm font-mono">
         {error && <div className="p-2 border border-[#FF4500] text-[#FF4500] bg-red-50">Error: {error}</div>}
 
         <div className="flex flex-col gap-1">
@@ -121,7 +121,7 @@ export const OpenPositionForm = ({ onOpen, onClose }: OpenPositionFormProps) => 
             required
           />
           {marketPrice !== null && (
-            <div className="text-xs text-gray-500 mt-1">
+            <div className="text-sm text-gray-500 mt-1">
               Market Price: <span className="font-bold text-[#FF4500]">{marketPrice.toFixed(6)}</span>
             </div>
           )}

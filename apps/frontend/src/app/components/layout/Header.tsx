@@ -26,7 +26,7 @@ export const Header = ({ health, assignments, wallets }: HeaderProps) => {
         </h1>
       </div>
 
-      <div className="flex flex-wrap gap-4 md:gap-6 text-xs border-t md:border-t-0 md:border-l border-[#0D0D0D] pt-2 md:pt-0 md:pl-4 w-full md:w-auto">
+      <div className="flex flex-wrap gap-4 md:gap-6 text-sm border-t md:border-t-0 md:border-l border-[#0D0D0D] pt-2 md:pt-0 md:pl-4 w-full md:w-auto">
         {wallets.length > 0 && (
           <div>
             <div className="text-gray-500 mb-0.5 uppercase tracking-wider text-[13px]">Wallets</div>

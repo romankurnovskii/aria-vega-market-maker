@@ -18,7 +18,7 @@ const TABLE_HEADERS = [
 export const WalletsTable = ({ wallets }: WalletsTableProps) => {
   return (
     <div className="border border-[#0D0D0D] bg-[#F4F4F0] overflow-hidden">
-      <table className="w-full text-xs font-mono-jb">
+      <table className="w-full text-sm font-mono-jb">
         <thead>
           <tr className="bg-[#0D0D0D] text-[#F4F4F0]">
             {TABLE_HEADERS.map((header) => (

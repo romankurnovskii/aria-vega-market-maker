@@ -17,7 +17,7 @@ interface StepsViewProps {
 }
 
 export const StepsView = ({ steps }: StepsViewProps) => {
-  if (steps.length === 0) return <div className="text-gray-500 italic text-xs">No active pipeline steps registered.</div>;
+  if (steps.length === 0) return <div className="text-gray-500 italic text-sm">No active pipeline steps registered.</div>;
 
   return (
     <div className="flex-1 overflow-auto pr-2 grid grid-cols-1 lg:grid-cols-2 gap-3 content-start">
@@ -32,7 +32,7 @@ export const StepsView = ({ steps }: StepsViewProps) => {
               {step.type}
             </div>
             <h4 className="font-bold text-sm mb-1 truncate">{step.id}</h4>
-            <p className="text-xs text-gray-600 max-w-[85%]">{step.description}</p>
+            <p className="text-sm text-gray-600 max-w-[85%]">{step.description}</p>
           </div>
         </div>
       ))}

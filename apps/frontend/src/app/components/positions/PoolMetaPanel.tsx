@@ -19,7 +19,7 @@ export const PoolMetaPanel = ({ poolMeta, status, state, activeBin, pnlData }: P
   const pnlPctChange = pnlData?.pnlPctChange !== undefined ? Number(pnlData.pnlPctChange) : undefined;
 
   return (
-    <div className="bg-[#F4F4F0] p-2.5 border border-[#0D0D0D] text-xs flex flex-col gap-1.5">
+    <div className="bg-[#F4F4F0] p-2.5 border border-[#0D0D0D] text-sm flex flex-col gap-1.5">
       <div className="text-[14px] text-gray-500 uppercase tracking-widest font-bold">Pool Info</div>
 
       {poolMeta && (

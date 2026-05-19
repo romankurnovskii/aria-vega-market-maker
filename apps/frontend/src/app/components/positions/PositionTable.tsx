@@ -37,7 +37,7 @@ export const PositionTable = ({
 
   const renderSectionHeader = (label: string, count: number) => (
     <tr className="bg-[#0D0D0D] text-[#F4F4F0] block md:table-row">
-      <td colSpan={5} className="py-1.5 px-3 font-bold uppercase tracking-widest text-xs block md:table-cell">
+      <td colSpan={5} className="py-1.5 px-3 font-bold uppercase tracking-widest text-sm block md:table-cell">
         {label} ({count})
       </td>
     </tr>
@@ -139,18 +139,18 @@ export const PositionTable = ({
         <h3 className="font-syne text-sm font-bold uppercase">Positions</h3>
         <button
           onClick={onOpenPositionClick}
-          className="px-2 py-1 border border-[#0D0D0D] text-xs uppercase hover:bg-[#0D0D0D] hover:text-[#F4F4F0] transition-colors font-mono"
+          className="px-2 py-1 border border-[#0D0D0D] text-sm uppercase hover:bg-[#0D0D0D] hover:text-[#F4F4F0] transition-colors font-mono"
         >
           + Open Position
         </button>
       </div>
       <div className="flex-1 overflow-auto">
         {positions.length === 0 ? (
-          <div className="p-4 text-xs italic text-gray-500">
+          <div className="p-4 text-sm italic text-gray-500">
             No active positions fetched. Confirm liquidity provider assignments are running on-chain.
           </div>
         ) : (
-          <table className="w-full text-left border-collapse text-xs md:whitespace-nowrap block md:table">
+          <table className="w-full text-left border-collapse text-sm md:whitespace-nowrap block md:table">
             <thead className="sticky top-0 bg-[#0D0D0D] text-[#F4F4F0] z-10 shadow-[0_1px_0_#0D0D0D] hidden md:table-header-group">
               <tr>
                 <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D]">Pos ID</th>

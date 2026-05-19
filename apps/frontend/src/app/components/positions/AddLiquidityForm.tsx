@@ -49,7 +49,7 @@ export const AddLiquidityForm = ({ positionId, onSuccess, onCancel }: AddLiquidi
   return (
     <div className="border border-[#0D0D0D] bg-white p-4 shadow-[4px_4px_0_#0D0D0D]">
       <h2 className="font-syne text-lg font-bold uppercase mb-4">Add Liquidity</h2>
-      {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 text-xs">{error}</div>}
+      {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 text-sm">{error}</div>}
       <form onSubmit={handleSubmit} className="space-y-3">
         <div>
           <label className="block text-[12px] uppercase tracking-widest font-bold mb-1">Token X Amount</label>
@@ -57,7 +57,7 @@ export const AddLiquidityForm = ({ positionId, onSuccess, onCancel }: AddLiquidi
             type="text"
             value={tokenXAmount}
             onChange={(e) => setTokenXAmount(e.target.value)}
-            className="w-full border border-[#0D0D0D] p-2 text-xs outline-none focus:border-[#FF4500] transition-colors"
+            className="w-full border border-[#0D0D0D] p-2 text-sm outline-none focus:border-[#FF4500] transition-colors"
             placeholder="e.g. 1000000"
             required
           />
@@ -68,7 +68,7 @@ export const AddLiquidityForm = ({ positionId, onSuccess, onCancel }: AddLiquidi
             type="text"
             value={tokenYAmount}
             onChange={(e) => setTokenYAmount(e.target.value)}
-            className="w-full border border-[#0D0D0D] p-2 text-xs outline-none focus:border-[#FF4500] transition-colors"
+            className="w-full border border-[#0D0D0D] p-2 text-sm outline-none focus:border-[#FF4500] transition-colors"
             placeholder="e.g. 1000000"
             required
           />
@@ -77,7 +77,7 @@ export const AddLiquidityForm = ({ positionId, onSuccess, onCancel }: AddLiquidi
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 bg-[#0D0D0D] text-[#F4F4F0] py-2 px-4 text-xs font-bold uppercase hover:bg-[#FF4500] hover:text-[#0D0D0D] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 bg-[#0D0D0D] text-[#F4F4F0] py-2 px-4 text-sm font-bold uppercase hover:bg-[#FF4500] hover:text-[#0D0D0D] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Processing...' : 'Add Liquidity'}
           </button>
@@ -85,7 +85,7 @@ export const AddLiquidityForm = ({ positionId, onSuccess, onCancel }: AddLiquidi
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 border border-[#0D0D0D] py-2 px-4 text-xs font-bold uppercase hover:bg-[#F4F4F0] transition-colors"
+              className="flex-1 border border-[#0D0D0D] py-2 px-4 text-sm font-bold uppercase hover:bg-[#F4F4F0] transition-colors"
             >
               Cancel
             </button>

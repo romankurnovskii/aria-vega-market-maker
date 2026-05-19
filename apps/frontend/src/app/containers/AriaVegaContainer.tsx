@@ -45,7 +45,7 @@ export const AriaVegaContainer = () => {
             <div className="w-6 h-6 bg-[#FF4500]"></div>
           </div>
           <h1 className="font-syne text-2xl font-bold uppercase tracking-widest animate-pulse">Aria Vega</h1>
-          {connectionError && <p className="text-xs text-[#FF4500] mt-4 max-w-sm text-center">{connectionError}</p>}
+          {connectionError && <p className="text-sm text-[#FF4500] mt-4 max-w-sm text-center">{connectionError}</p>}
         </div>
       </div>
     );

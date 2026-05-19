@@ -20,7 +20,7 @@ interface PriceAnalyticsProps {
 
 export const PriceAnalytics = ({ minPrice, maxPrice, poolActivePrice, feePerTvl24h }: PriceAnalyticsProps) => {
   return (
-    <div className="bg-[#F4F4F0] p-2.5 border border-[#0D0D0D] text-xs flex flex-col gap-1.5">
+    <div className="bg-[#F4F4F0] p-2.5 border border-[#0D0D0D] text-sm flex flex-col gap-1.5">
       <div className="text-[13px] text-gray-500 uppercase tracking-widest font-bold">Price Analytics</div>
       <div className="flex justify-between font-mono-jb">
         <span className="text-gray-500">Min / Max Price:</span>

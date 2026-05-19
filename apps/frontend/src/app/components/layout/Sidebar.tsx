@@ -42,7 +42,7 @@ export const Sidebar = ({ activeTab, onTabChange }: SidebarProps) => {
           }`}
         >
           <tab.icon size={14} className={activeTab === tab.id ? 'text-[#FF4500]' : 'group-hover:text-[#FF4500]'} />
-          <span className="uppercase text-xs tracking-widest font-semibold">{tab.label}</span>
+          <span className="uppercase text-sm tracking-widest font-semibold">{tab.label}</span>
           {activeTab === tab.id && <div className="absolute right-0 top-0 bottom-0 w-1 bg-[#FF4500]"></div>}
         </button>
       ))}

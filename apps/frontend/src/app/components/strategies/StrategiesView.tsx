@@ -18,7 +18,7 @@ interface StrategiesViewProps {
 
 export const StrategiesView = ({ strategies }: StrategiesViewProps) => {
   if (strategies.length === 0)
-    return <div className="text-gray-500 italic text-xs">No strategies registered in the system.</div>;
+    return <div className="text-gray-500 italic text-sm">No strategies registered in the system.</div>;
 
   return (
     <div className="flex-1 overflow-auto pr-2 grid grid-cols-1 md:grid-cols-2 gap-4 content-start">
@@ -36,7 +36,7 @@ export const StrategiesView = ({ strategies }: StrategiesViewProps) => {
                 {strat.risk} RISK
               </span>
             </div>
-            <p className="text-xs text-gray-600 leading-relaxed">{strat.description}</p>
+            <p className="text-sm text-gray-600 leading-relaxed">{strat.description}</p>
           </div>
           <div className="text-[13px] mt-4 pt-2 border-t border-gray-200 text-gray-400 font-mono-jb">ID: {strat.id}</div>
         </div>

@@ -51,7 +51,7 @@ export const PositionHeader = ({ positionId, pool, state, openedAt, onClose }: P
         <div className="font-syne font-bold text-sm truncate" title={positionId}>
           {positionId}
         </div>
-        <div className="text-xs text-gray-600 truncate mt-1">
+        <div className="text-sm text-gray-600 truncate mt-1">
           Pool:{' '}
           <span className="font-mono text-[13px]" title={pool}>
             {pool}

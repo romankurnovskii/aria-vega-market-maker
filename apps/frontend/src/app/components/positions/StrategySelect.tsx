@@ -21,7 +21,7 @@ export const StrategySelect = ({
       <select
         value={selectedStrategyId}
         onChange={(e) => onStrategyChange(e.target.value)}
-        className="flex-1 bg-[#F4F4F0] border border-[#0D0D0D] px-2 py-1 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[#FF4500] min-w-0"
+        className="flex-1 bg-[#F4F4F0] border border-[#0D0D0D] px-2 py-1 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[#FF4500] min-w-0"
       >
         <option value="NONE">-- NONE --</option>
         {strategies.map((s) => (

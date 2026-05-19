@@ -40,7 +40,7 @@ export const WalletsView = ({ wallets }: WalletsViewProps) => {
       <WalletsTable wallets={wallets} />
 
       {wallets.length > 0 && (
-        <div className="text-xs text-[#0D0D0D]/50">
+        <div className="text-sm text-[#0D0D0D]/50">
           <p>
             Showing {wallets.length} wallet{wallets.length !== 1 ? 's' : ''} with portfolio data from Meteora DLMM.
           </p>

@@ -46,7 +46,7 @@ export const WalletTableRow = ({ wallet, idx }: WalletTableRowProps) => {
       {hasData && portfolio?.pools && portfolio.pools.length > 0 && (
         <tr className="bg-[#0D0D0D]/5">
           <td colSpan={6} className="px-6 py-3">
-            <div className="text-xs uppercase tracking-wider text-[#0D0D0D]/50 mb-2">Pool Details</div>
+            <div className="text-sm uppercase tracking-wider text-[#0D0D0D]/50 mb-2">Pool Details</div>
             <div className="space-y-2">
               {portfolio.pools.map((pool) => (
                 <div key={pool.poolAddress} className="border-l-2 border-[#FF4500] pl-3 py-1">
@@ -60,7 +60,7 @@ export const WalletTableRow = ({ wallet, idx }: WalletTableRowProps) => {
                         <span className="text-[12px] px-1 py-0.5 bg-red-100 text-red-700 rounded">Out of Range</span>
                       )}
                     </div>
-                    <div className="flex gap-6 text-xs">
+                    <div className="flex gap-6 text-sm">
                       <span>
                         <span className="text-[#0D0D0D]/50">Pos:</span> {pool.openPositionCount}
                       </span>

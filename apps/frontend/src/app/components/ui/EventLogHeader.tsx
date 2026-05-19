@@ -23,14 +23,14 @@ export const EventLogHeader = ({ collapsed, onToggle }: EventLogHeaderProps) => 
       >
         <div className="w-2 h-2 bg-[#FF4500] shrink-0"></div>
         <span className="uppercase font-bold tracking-widest text-[#FF4500]">Strategy Event Log</span>
-        <span className="ml-auto text-[#F4F4F0]/40 text-xs">{'\u25B6'}</span>
+        <span className="ml-auto text-[#F4F4F0]/40 text-sm">{'\u25B6'}</span>
       </button>
     );
   }
 
   return (
     <>
-      <div className="absolute top-0 right-0 p-2 opacity-20 pointer-events-none uppercase tracking-tighter text-xs">
+      <div className="absolute top-0 right-0 p-2 opacity-20 pointer-events-none uppercase tracking-tighter text-sm">
         Live CRT Terminal
       </div>
       <button
@@ -39,7 +39,7 @@ export const EventLogHeader = ({ collapsed, onToggle }: EventLogHeaderProps) => 
       >
         <div className="w-2 h-2 bg-[#FF4500] animate-pulse shrink-0"></div>
         <span className="uppercase font-bold tracking-widest text-[#FF4500]">Strategy Event Log</span>
-        <span className="ml-auto text-[#F4F4F0]/40 text-xs">{'\u25BC'}</span>
+        <span className="ml-auto text-[#F4F4F0]/40 text-sm">{'\u25BC'}</span>
       </button>
     </>
   );

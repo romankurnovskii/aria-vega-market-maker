@@ -29,15 +29,15 @@ interface AssignmentsViewProps {
 
 export const AssignmentsView = ({ assignments, onDelete, evalLogs = [], onApplySuggestion }: AssignmentsViewProps) => {
   if (assignments.length === 0 && evalLogs.length === 0)
-    return <div className="text-gray-500 italic text-xs">No active assignments found. Use positions pane to create.</div>;
+    return <div className="text-gray-500 italic text-sm">No active assignments found. Use positions pane to create.</div>;
 
   return (
     <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0">
       <div className="flex-1 border border-[#0D0D0D] bg-white overflow-auto min-w-0">
         {assignments.length === 0 ? (
-          <div className="text-gray-500 italic text-xs p-4">No active assignments found. Use positions pane to create.</div>
+          <div className="text-gray-500 italic text-sm p-4">No active assignments found. Use positions pane to create.</div>
         ) : (
-          <table className="w-full text-left border-collapse text-xs whitespace-nowrap">
+          <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
             <thead className="sticky top-0 bg-[#0D0D0D] text-[#F4F4F0] z-10">
               <tr>
                 <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D]">Assignment ID</th>

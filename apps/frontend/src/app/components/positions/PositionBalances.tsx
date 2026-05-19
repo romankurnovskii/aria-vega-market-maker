@@ -43,7 +43,7 @@ export const PositionBalances = ({
   };
 
   return (
-    <div className="bg-[#F4F4F0] p-2.5 border border-[#0D0D0D] text-xs">
+    <div className="bg-[#F4F4F0] p-2.5 border border-[#0D0D0D] text-sm">
       <div className="text-[13px] text-gray-500 uppercase tracking-widest mb-1.5 font-bold">Position Balances</div>
       <div className="flex flex-col gap-1 font-mono-jb">
         <div className="flex justify-between">
