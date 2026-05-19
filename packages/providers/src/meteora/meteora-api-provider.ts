@@ -10,9 +10,9 @@
  * @dependencies @lp-system/core (IPositionProvider interface types)
  * @sideEffects None — all methods are pure data fetchers with no local state mutation
  */
-import { IPositionProvider, Position, PoolInfo, MarketSnapshot } from '@lp-system/core';
+import { IPositionProvider, Position, PoolInfo } from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
-import { PoolResponse, OhlcvResponse, PositionsPnlResponse } from './types';
+import { PoolResponse, PositionsPnlResponse } from './types';
 import { getBinIdFromPrice, parseDecimalToRaw } from './meteora.utils';
 
 const logger = getLogger('meteora-api-provider');
@@ -22,14 +22,15 @@ const logger = getLogger('meteora-api-provider');
  * Currently uses mock data; replace with real API calls in production.
  */
 export class MeteoraApiProvider implements IPositionProvider {
+  private apiUrl: string;
+
   private poolTokenMetadataCache = new Map<
     string,
-    Promise<{ decimalsX: number; decimalsY: number; tokenXMint: string; tokenYMint: string }>
+    Promise<{ decimalsX: number; decimalsY: number; tokenXMint: string; tokenYMint: string; binStep: number }>
   >();
 
   private getPositionsCache = new Map<string, { data: Position[]; timestamp: number }>();
   private poolInfoCache = new Map<string, { data: PoolInfo; timestamp: number }>();
-  private marketSnapshotCache = new Map<string, { data: MarketSnapshot; timestamp: number }>();
   private poolDataCache = new Map<string, { data: PoolResponse; timestamp: number }>();
 
   /**
@@ -39,22 +40,22 @@ export class MeteoraApiProvider implements IPositionProvider {
    * @param {string} [walletAddress] - Optional cached operational wallet address.
    */
   constructor(
-    private apiUrl: string,
     private walletAddress?: string,
     private options?: { leverage?: number }
   ) {
-    this.apiUrl = apiUrl || 'https://dlmm.datapi.meteora.ag';
+    this.apiUrl = 'https://dlmm.datapi.meteora.ag';
   }
 
   /**
    * Fetches full token metadata (decimals and addresses) for a given pool address dynamically.
    * Caches results to prevent redundant API queries.
    */
-  private async getPoolTokenMetadata(poolAddress: string): Promise<{
+  public async getPoolTokenMetadata(poolAddress: string): Promise<{
     decimalsX: number;
     decimalsY: number;
     tokenXMint: string;
     tokenYMint: string;
+    binStep: number;
   }> {
     if (this.poolTokenMetadataCache.has(poolAddress)) {
       return this.poolTokenMetadataCache.get(poolAddress)!;
@@ -71,12 +72,17 @@ export class MeteoraApiProvider implements IPositionProvider {
           `[MeteoraApiProvider] Failed to fetch token metadata for pool ${poolAddress}: HTTP ${response.status} ${response.statusText}`
         );
       }
+
+      logger.info(`[Meteora API] Received request to open position in pool ${poolAddress}`);
+
       const data = (await response.json()) as PoolResponse;
+
       return {
         decimalsX: data.token_x.decimals,
         decimalsY: data.token_y.decimals,
         tokenXMint: data.token_x.address,
         tokenYMint: data.token_y.address,
+        binStep: data.pool_config.bin_step,
       };
     });
 
@@ -111,6 +117,15 @@ export class MeteoraApiProvider implements IPositionProvider {
     const data = (await response.json()) as PoolResponse;
     this.poolDataCache.set(poolAddress, { data, timestamp: now });
     return data;
+  }
+
+  public async getWalletBalances(
+    walletAddress: string,
+    tokenX: string,
+    tokenY: string
+  ): Promise<{ amountX: string; amountY: string }> {
+    const { hummingbotProvider } = await import('../hummingbot/hummingbot-provider.js');
+    return hummingbotProvider.getWalletBalances(walletAddress, tokenX, tokenY);
   }
 
   /**
@@ -305,24 +320,25 @@ export class MeteoraApiProvider implements IPositionProvider {
    *
    * @param {string} positionId - Unique position ID (pubkey on Solana).
    * @param {string} [poolAddress] - Optional specific pool address to query.
+   * @param {string} [walletAddress] - Optional wallet address to override configured wallet.
    * @returns {Promise<Position>} The position object.
    */
-  public async getPosition(positionId: string, poolAddress?: string): Promise<Position> {
+  public async getPosition(positionId: string, poolAddress?: string, walletAddress?: string): Promise<Position> {
     logger.info(`[MeteoraApiProvider] Fetching position details for ${positionId}`);
 
-    const walletAddress = this.walletAddress || process.env.WALLET_PUBKEY;
-    if (!walletAddress) {
+    const targetWallet = walletAddress || this.walletAddress || process.env.WALLET_PUBKEY;
+    if (!targetWallet) {
       throw new Error('Cannot fetch position: walletAddress is not configured');
     }
 
-    const positions = await this.getPositions(walletAddress, poolAddress);
+    const positions = await this.getPositions(targetWallet, poolAddress);
 
     const position = positions.find((p) => p.id === positionId);
     if (position) {
       return position;
     }
 
-    throw new Error(`Position ${positionId} not found on-chain for wallet ${walletAddress}`);
+    throw new Error(`Position ${positionId} not found on-chain for wallet ${targetWallet}`);
   }
 
   /**
@@ -364,109 +380,21 @@ export class MeteoraApiProvider implements IPositionProvider {
       activeBinId,
       tokenXMint: data.token_x.address,
       tokenYMint: data.token_y.address,
+      tokenXDecimals: data.token_x.decimals,
+      tokenYDecimals: data.token_y.decimals,
     };
 
     this.poolInfoCache.set(poolAddress, { data: poolInfo, timestamp: now });
     return poolInfo;
   }
 
-  /**
-   * Fetches current market snapshot: price, history, active bin, and fee rate.
-   *
-   * @param {string} poolAddress - The pool's on-chain address.
-   * @returns {Promise<MarketSnapshot>} Live market data including price history.
-   */
-  public async getMarketSnapshot(poolAddress: string): Promise<MarketSnapshot> {
-    const cached = this.marketSnapshotCache.get(poolAddress);
-    const now = Date.now();
-
-    if (cached && now - cached.timestamp < 10000) {
-      return cached.data;
-    }
-
-    logger.info(`[MeteoraApiProvider] Assembling Market Snapshot for pool ${poolAddress}`);
-
-    const poolData = await this.fetchPoolData(poolAddress);
-
-    const activeBinId = getBinIdFromPrice(
-      poolData.current_price,
-      poolData.pool_config.bin_step,
-      poolData.token_x.decimals,
-      poolData.token_y.decimals
-    );
-
-    const feeRate = poolData.dynamic_fee_pct > 0 ? poolData.dynamic_fee_pct : poolData.pool_config.base_fee_pct / 100;
-
-    const ohlcvUrl = `${this.apiUrl}/pools/${poolAddress}/ohlcv?timeframe=1h`;
-    const ohlcvResponse = await fetch(ohlcvUrl, {
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': 'MeteoraLPBot/1.0',
-      },
-    });
-
-    let priceHistory: { price: number; timestamp: number }[] = [];
-
-    if (ohlcvResponse.ok) {
-      try {
-        const ohlcvData = (await ohlcvResponse.json()) as OhlcvResponse;
-        if (ohlcvData && Array.isArray(ohlcvData.data)) {
-          priceHistory = ohlcvData.data
-            .map((candle) => ({
-              price: candle.close,
-              timestamp: candle.timestamp * 1000,
-            }))
-            .slice(-24);
-        }
-      } catch (err) {
-        logger.warn(`[MeteoraApiProvider] Failed to parse OHLCV data for pool ${poolAddress}: ${err}`);
-      }
-    } else {
-      logger.warn(`[MeteoraApiProvider] Failed to fetch OHLCV data: ${ohlcvResponse.status} ${ohlcvResponse.statusText}`);
-    }
-
-    if (priceHistory.length === 0) {
-      priceHistory = [{ price: poolData.current_price, timestamp: Date.now() }];
-    }
-
-    logger.info(
-      `[MeteoraApiProvider] Assembling Market Snapshot for pool ${poolAddress} - price=${poolData.current_price}, activeBinId=${activeBinId}, feeRate=${feeRate}`
-    );
-
-    const snapshot: MarketSnapshot = {
-      poolAddress: poolData.address,
-      chain: 'solana',
-      protocol: 'meteora_dlmm',
-      activeBinId,
-      activeBound: activeBinId,
-      price: poolData.current_price,
-      priceHistory,
-      feeRate,
-      capturedAt: Date.now(),
-    };
-
-    this.marketSnapshotCache.set(poolAddress, { data: snapshot, timestamp: now });
-    return snapshot;
-  }
-
   // ---------------------------------------------------------------------------
   // Wallet methods (Meteora API does not manage wallets; stub implementations)
   // ---------------------------------------------------------------------------
 
-  public async getWalletBalances(
-    _walletAddress: string,
-    _tokenX: string,
-    _tokenY: string
-  ): Promise<{ amountX: string; amountY: string }> {
-    void _walletAddress;
-    void _tokenX;
-    void _tokenY;
-    return { amountX: '0', amountY: '0' };
-  }
-
   public async getWalletAddress(chain?: string): Promise<string> {
     void chain;
-    return this.walletAddress || process.env.WALLET_PUBKEY || '';
+    return this.walletAddress || '';
   }
 
   public async listWallets(): Promise<{ chain: string; address: string; is_default: boolean }[]> {
@@ -493,3 +421,5 @@ export class MeteoraApiProvider implements IPositionProvider {
     return response.json();
   }
 }
+
+export const meteoraProvider = new MeteoraApiProvider();

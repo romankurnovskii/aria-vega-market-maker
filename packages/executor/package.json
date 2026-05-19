@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@lp-system/core": "workspace:*",
-    "@lp-system/logger": "workspace:*"
+    "@lp-system/logger": "workspace:*",
+    "@lp-system/providers": "workspace:*"
   }
 }

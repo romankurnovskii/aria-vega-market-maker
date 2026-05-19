@@ -1,4 +1,6 @@
-import { CalculatedPrices, OpenParams } from '@lp-system/core';
+import { CalculatedPrices, OpenParams, MarketSnapshot, ProtocolType } from '@lp-system/core';
+import { PoolResponse, OhlcvResponse } from './types';
+import { getLogger } from '@lp-system/logger';
 
 /**
  * Calculates the active bin ID (boundary) from the current price.
@@ -145,4 +147,99 @@ export function enrichOpenParamsForExecution(
     ...(lowerBoundPrice !== undefined ? { lowerBoundPrice } : {}),
     ...(upperBoundPrice !== undefined ? { upperBoundPrice } : {}),
   };
+}
+
+const poolDataCache = new Map<string, { data: PoolResponse; timestamp: number }>();
+const marketSnapshotCache = new Map<string, { data: MarketSnapshot; timestamp: number }>();
+const METEORA_DATAPI_URL = 'https://dlmm.datapi.meteora.ag';
+const logger = getLogger('meteora-utils');
+
+/**
+ * Fetches full pool data from Meteora Datapi with shared 10s cache.
+ */
+async function fetchPoolData(poolAddress: string): Promise<PoolResponse> {
+  const cached = poolDataCache.get(poolAddress);
+  const now = Date.now();
+  if (cached && now - cached.timestamp < 10000) {
+    return cached.data;
+  }
+
+  const response = await fetch(`${METEORA_DATAPI_URL}/pools/${poolAddress}`, {
+    headers: { Accept: 'application/json', 'User-Agent': 'MeteoraUtils/1.0' },
+  });
+
+  if (!response.ok) {
+    throw new Error(`[MeteoraUtils] Failed to fetch pool data for ${poolAddress}: HTTP ${response.status}`);
+  }
+
+  const data = (await response.json()) as PoolResponse;
+  poolDataCache.set(poolAddress, { data, timestamp: now });
+  return data;
+}
+
+/**
+ * Fetches a market snapshot for a pool via Meteora Datapi.
+ * Includes price history from OHLCV endpoint.
+ */
+export async function getMarketSnapshot(poolAddress: string): Promise<MarketSnapshot> {
+  const cached = marketSnapshotCache.get(poolAddress);
+  const now = Date.now();
+  if (cached && now - cached.timestamp < 10000) {
+    return cached.data;
+  }
+
+  logger.info(`[MeteoraUtils] Fetching market snapshot for ${poolAddress}`);
+
+  const poolData = await fetchPoolData(poolAddress);
+
+  const activeBinId = getBinIdFromPrice(
+    poolData.current_price,
+    poolData.pool_config.bin_step,
+    poolData.token_x.decimals,
+    poolData.token_y.decimals
+  );
+
+  const feeRate = poolData.dynamic_fee_pct > 0 ? poolData.dynamic_fee_pct : poolData.pool_config.base_fee_pct / 100;
+
+  let priceHistory: { price: number; timestamp: number }[] = [];
+
+  try {
+    const ohlcvUrl = `${METEORA_DATAPI_URL}/pools/${poolAddress}/ohlcv?timeframe=1h`;
+    const ohlcvResponse = await fetch(ohlcvUrl, {
+      headers: { Accept: 'application/json', 'User-Agent': 'MeteoraUtils/1.0' },
+    });
+
+    if (ohlcvResponse.ok) {
+      const ohlcvData = (await ohlcvResponse.json()) as OhlcvResponse;
+      if (ohlcvData && Array.isArray(ohlcvData.data)) {
+        priceHistory = ohlcvData.data
+          .map((candle) => ({
+            price: candle.close,
+            timestamp: candle.timestamp * 1000,
+          }))
+          .slice(-24);
+      }
+    }
+  } catch (err) {
+    logger.warn(`[MeteoraUtils] Failed to fetch OHLCV for ${poolAddress}: ${err}`);
+  }
+
+  if (priceHistory.length === 0) {
+    priceHistory = [{ price: poolData.current_price, timestamp: Date.now() }];
+  }
+
+  const snapshot: MarketSnapshot = {
+    poolAddress: poolData.address,
+    chain: 'solana',
+    protocol: 'meteora_dlmm' as ProtocolType,
+    activeBound: activeBinId,
+    activeBinId,
+    price: poolData.current_price,
+    priceHistory,
+    feeRate,
+    capturedAt: Date.now(),
+  };
+
+  marketSnapshotCache.set(poolAddress, { data: snapshot, timestamp: now });
+  return snapshot;
 }

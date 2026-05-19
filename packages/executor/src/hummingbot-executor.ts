@@ -1,11 +1,5 @@
-import {
-  IExecutor,
-  Decision,
-  MarketSnapshot,
-  ExecutionRecord,
-  StrategyResult,
-  CLMMClosePositionResponse,
-} from '@lp-system/core';
+import { IExecutor, Decision, MarketSnapshot, ExecutionRecord, StrategyResult } from '@lp-system/core';
+import { CLMMClosePositionResponse } from '@lp-system/providers';
 import { getLogger } from '@lp-system/logger';
 
 const logger = getLogger('hummingbot-executor');
