@@ -10,7 +10,7 @@
  * - Emits skip when position remains healthy; emits close for zero-liquidity positions
  *
  * @dependencies IStrategy interface, Workflow (pipeline orchestration), all step classes from @lp-system/steps
- * @sideEffects None — pure computation, recommendations passed to ExecutionGate for dispatch
+ * @sideEffects None — pure computation
  */
 import { IStrategy, Position, MarketSnapshot, StrategyResult, StepContext } from '@lp-system/core';
 import {

@@ -6,7 +6,6 @@
  * - IStep: Executable pipeline step with context transformation
  * - IStrategy: Strategy interface for trading decisions (execute → StrategyResult)
  * - IOrchestrator: Per-position orchestrator managing strategy lifecycle
- * - IExecutionGate: Decision filtering and prioritization gate
  * - IExecutor: Transaction execution handler for on-chain operations
  * - IPositionProvider: External data source abstraction for positions/markets
  * - IRpcProvider: RPC connection abstraction with retry logic
@@ -20,7 +19,6 @@ import {
   Position,
   MarketSnapshot,
   PoolInfo,
-  Recommendation,
   Decision,
   ExecutionRecord,
   StrategyResult,
@@ -50,10 +48,6 @@ export interface IOrchestrator {
   strategyId: string;
   mode: AssignmentMode;
   tick(position: Position, market: MarketSnapshot): Promise<StrategyResult>;
-}
-
-export interface IExecutionGate {
-  consider(recommendations: Recommendation[], positionId: string): Decision | null;
 }
 
 export interface IExecutor {
