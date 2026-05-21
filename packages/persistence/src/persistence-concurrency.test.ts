@@ -1,3 +1,17 @@
+/**
+ * @file persistence-concurrency.test.ts
+ * @description Tests concurrent saveAssignment operations on JsonFileStore to verify
+ *              atomic reads and writes under contention.
+ *
+ * @features
+ * - Tests concurrent saveAssignment calls with unique IDs
+ * - Verifies all assignments are persisted without data loss or corruption
+ * - Uses temporary directories for isolated file I/O
+ *
+ * @dependencies node:test, JsonFileStore
+ * @sideEffects Creates/deletes temporary files in the OS temp directory
+ */
+
 import { test } from 'node:test';
 import assert from 'node:assert';
 import * as fs from 'node:fs/promises';

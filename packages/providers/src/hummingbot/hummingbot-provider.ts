@@ -1,3 +1,18 @@
+/**
+ * @file hummingbot-provider.ts
+ * @description IPositionProvider implementation that fetches position data from the Meteora DLMM
+ *              Datapi and manages wallets via the Hummingbot Gateway API.
+ *
+ * @features
+ * - getPositions(wallet) — fetches open positions for a given wallet via Meteora Datapi
+ * - getWalletPositions() — iterates all known wallets and aggregates their positions
+ * - getPoolInfo(poolAddress) — fetches pool metadata (token pair, fee, bin step)
+ * - Integrates with HummingbotWalletManager for wallet lifecycle
+ *
+ * @dependencies @lp-system/core (IPositionProvider), @lp-system/logger, meteora-api-provider, wallet-manager
+ * @sideEffects Makes HTTP requests to Hummingbot Gateway and Meteora Datapi
+ */
+
 import { IPositionProvider, Position, PoolInfo } from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
 import { HummingbotWalletManager } from './wallet-manager.js';

@@ -1,3 +1,17 @@
+/**
+ * @file mutex.test.ts
+ * @description Tests for AsyncFileMutex — verifies exclusive concurrent access to a shared file
+ *              via file-system-based locking, including serialization and contention.
+ *
+ * @features
+ * - Tests basic acquire/release cycle
+ * - Tests concurrent access serialization (no two acquires overlap)
+ * - Uses temporary files for isolated testing
+ *
+ * @dependencies node:test, AsyncFileMutex
+ * @sideEffects Creates/deletes temporary lock files
+ */
+
 import { test } from 'node:test';
 import assert from 'node:assert';
 import { AsyncFileMutex } from './mutex.js';

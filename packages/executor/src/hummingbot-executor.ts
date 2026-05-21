@@ -1,3 +1,17 @@
+/**
+ * @file hummingbot-executor.ts
+ * @description Implements IExecutor for the Hummingbot Gateway API. Handles
+ *              open and close position operations via HTTP calls to a Hummingbot instance.
+ *
+ * @features
+ * - apply(decision) — executes 'open' or 'close' actions via POST to /gateway/clmm/{open,close}
+ * - setReEvaluate(callback) — registers a re-evaluation callback for post-execution use
+ * - Credentials loaded from HUMMINGBOT_API_USERNAME / HUMMINGBOT_API_PASSWORD env vars
+ *
+ * @dependencies @lp-system/core (IExecutor, types), @lp-system/providers, @lp-system/logger
+ * @sideEffects Makes HTTP requests to the Hummingbot Gateway API
+ */
+
 import { IExecutor, Decision, MarketSnapshot, ExecutionRecord, StrategyResult } from '@lp-system/core';
 import { CLMMClosePositionResponse } from '@lp-system/providers';
 import { getLogger } from '@lp-system/logger';

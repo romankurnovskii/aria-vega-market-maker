@@ -1,9 +1,21 @@
+/**
+ * @file helpers.ts
+ * @description Utility functions for the logger package — deep-stringify for complex objects
+ *              and date formatting helpers.
+ *
+ * @features
+ * - stringify — robust deep-stringify supporting Maps, Sets, Error objects, and circular refs
+ * - formatDate — returns ISO-like timestamp string suitable for log file naming
+ *
+ * @dependencies node:util
+ */
+
 import util from 'node:util';
 
 /**
  * Standard robust deep-stringify function used for inspecting nested complex objects like Maps/Sets/Objects.
  */
-export const stringify = (object: any): string => {
+export const stringify = (object: unknown): string => {
   return util.inspect(object, {
     showHidden: false,
     depth: 10,

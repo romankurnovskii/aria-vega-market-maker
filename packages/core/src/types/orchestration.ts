@@ -24,7 +24,8 @@ export interface Assignment {
   createdAt: number;
   recoveryData?: {
     poolAddress: string;
-    oldPosition: Position;
+    oldPosition?: Position;
+    openParams?: OpenParams;
     closeTxSignature: string;
   };
 }

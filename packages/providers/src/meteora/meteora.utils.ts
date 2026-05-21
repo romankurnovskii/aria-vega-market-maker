@@ -1,3 +1,17 @@
+/**
+ * @file meteora.utils.ts
+ * @description Math and conversion utilities for Meteora CLMM pools — bin<->price conversion,
+ *              price range calculation, and market snapshot building.
+ *
+ * @features
+ * - calculatePriceRange — computes lower/upper prices from bin range or price bounds
+ * - getBinIdFromPrice — converts a price to the nearest bin ID for a given bin step
+ * - calculateConcentratedLiquidityPrices — derives price range from bin IDs and pool metadata
+ * - getMarketSnapshot — builds a MarketSnapshot from pool data and OHLCV
+ *
+ * @dependencies @lp-system/core types, Meteora pool/OHLCV response types, @lp-system/logger
+ */
+
 import { CalculatedPrices, OpenParams, MarketSnapshot, ProtocolType } from '@lp-system/core';
 import { PoolResponse, OhlcvResponse } from './types';
 import { getLogger } from '@lp-system/logger';

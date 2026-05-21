@@ -1,3 +1,17 @@
+/**
+ * @file wallet-manager.ts
+ * @description Manages Hummingbot Gateway wallet addresses — fetches registered wallets
+ *              from the Gateway API and caches them for the provider layer.
+ *
+ * @features
+ * - getWallets() — fetches all wallets from Hummingbot Gateway /wallet endpoint
+ * - getDefaultWalletAddress() — returns the first/default wallet address
+ * - Caches wallet list in-memory to reduce API calls
+ *
+ * @dependencies @lp-system/logger
+ * @sideEffects Makes HTTP requests to Hummingbot Gateway; maintains in-memory wallet cache
+ */
+
 import { getLogger } from '@lp-system/logger';
 
 const logger = getLogger('hummingbot-wallet-manager');

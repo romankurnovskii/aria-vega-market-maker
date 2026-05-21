@@ -1,3 +1,18 @@
+/**
+ * @file logger.ts
+ * @description Winston-based logging service with console and rotating file transports.
+ *              Configured via LOG_LEVEL / LOG_DIR env vars and @lp-system/config paths.
+ *
+ * @features
+ * - getLogger(name) — creates or returns a named Winston logger instance
+ * - Console transport with colorized output for development
+ * - File transport (JSON) to LOG_DIR for production persistence
+ * - Supports debug, info, warn, error log levels
+ *
+ * @dependencies winston, dotenv, @lp-system/config (paths)
+ * @sideEffects Writes log files to the configured log directory
+ */
+
 import path from 'node:path';
 import process from 'node:process';
 import fs from 'node:fs';

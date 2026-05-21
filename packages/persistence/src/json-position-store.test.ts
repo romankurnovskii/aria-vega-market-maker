@@ -1,3 +1,17 @@
+/**
+ * @file json-position-store.test.ts
+ * @description Tests for JsonPositionStore — verifies closed/failed position state retention,
+ *              position mutations, and read-after-write consistency.
+ *
+ * @features
+ * - Tests that closed positions are persisted correctly
+ * - Tests that failed positions are retained with error info
+ * - Uses temporary directories for isolated file I/O
+ *
+ * @dependencies node:test, JsonPositionStore
+ * @sideEffects Creates/deletes temporary files in the OS temp directory
+ */
+
 import { test } from 'node:test';
 import assert from 'node:assert';
 import * as fs from 'node:fs/promises';

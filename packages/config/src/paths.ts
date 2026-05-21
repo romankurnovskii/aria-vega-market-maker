@@ -1,3 +1,15 @@
+/**
+ * @file paths.ts
+ * @description Resolves monorepo root directory and canonical data/log directory paths
+ *              from environment variables or CWD-based heuristic.
+ *
+ * @features
+ * - getRootDir — resolves monorepo root by looking for pnpm-workspace.yaml or falling back to cwd
+ * - getDataDir / getLogDir — returns paths under the monorepo root for persistent storage
+ *
+ * @dependencies node:path, node:fs, dotenv
+ */
+
 import process from 'node:process';
 import path from 'node:path';
 import fs from 'node:fs';

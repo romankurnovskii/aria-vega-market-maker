@@ -1,3 +1,18 @@
+/**
+ * @file types.ts
+ * @description TypeScript interfaces for the Hummingbot Gateway CLMM API — pool bins,
+ *              position data, wallet info, OHLCV, and open/close response types.
+ *
+ * @features
+ * - CLMMPoolBin — individual bin within a concentrated liquidity pool
+ * - CLMMPosition — full position data from the Gateway API
+ * - GatewayWallet — wallet info returned from the Gateway
+ * - CLMMClosePositionResponse — response shape from close-position endpoint
+ * - OhlcvResponse — OHLCV data point for price analytics
+ *
+ * @dependencies None — pure type definitions
+ */
+
 export interface CLMMPoolBin {
   binId: number;
   price: string;
