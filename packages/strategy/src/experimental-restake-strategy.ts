@@ -1,3 +1,17 @@
+/**
+ * @file experimental-restake-strategy.ts
+ * @description WIP trailing + restake strategy: trails USDC-only up as price rises,
+ *              averages in with SOL-only down as price falls. Uses a multi-step workflow.
+ *
+ * @features
+ * - Composes InitializationCheckStep, ClmmPricingStep, and ExperimentalRestakeStep
+ * - Implements IStrategy with evaluate() returning a rebalance suggestion or skip
+ * - Delegates step execution to Workflow orchestrator
+ *
+ * @dependencies @lp-system/core (IStrategy), @lp-system/steps, @lp-system/logger, Workflow
+ * @sideEffects None — pure composition and evaluation
+ */
+
 import { IStrategy, Position, MarketSnapshot, StrategyResult, StepContext } from '@lp-system/core';
 import { InitializationCheckStep, ClmmPricingStep, ExperimentalRestakeStep } from '@lp-system/steps';
 import { getLogger } from '@lp-system/logger';

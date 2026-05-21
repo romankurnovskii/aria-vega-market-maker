@@ -1,3 +1,17 @@
+/**
+ * @file experimental-restake-step.ts
+ * @description WIP step that evaluates whether a position needs restaking based on
+ *              where the active bin sits relative to the position's price range.
+ *
+ * @features
+ * - Evaluates active bin position vs. position bounds
+ * - Computes new bin range if active bin has drifted out of acceptable range
+ * - Returns a StrategyResult with suggestion for rebalance (close + open)
+ *
+ * @dependencies @lp-system/core (IStep), @lp-system/providers (bin/price utils), @lp-system/logger
+ * @sideEffects None — pure evaluation, no external calls
+ */
+
 import { IStep, StepContext } from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
 import { getBinIdFromPrice, calculateConcentratedLiquidityPrices } from '@lp-system/providers';
