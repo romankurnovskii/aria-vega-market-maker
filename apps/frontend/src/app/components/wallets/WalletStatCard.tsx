@@ -1,3 +1,16 @@
+/**
+ * @file WalletStatCard.tsx
+ * @description Small stat card displaying a single wallet metric label-value pair,
+ *              with optional PnL-based color formatting.
+ *
+ * @features
+ * - Renders a label and a formatted value
+ * - Applies color class from getPnlColor when label indicates PnL
+ * - Compact inline layout for the wallet summary bar
+ *
+ * @dependencies wallet utils (getPnlColor, formatNumber)
+ */
+
 import React from 'react';
 import { getPnlColor, formatNumber } from './utils';
 

@@ -1,3 +1,14 @@
+/**
+ * @file StrategySelect.tsx
+ * @description Dropdown selector for choosing a strategy to assign to a position.
+ *              Highlights the currently selected strategy.
+ *
+ * @features
+ * - Renders a labeled <select> element with strategy options
+ * - Includes a "None" option to clear the selection
+ * - Calls onChange with the selected strategy ID
+ */
+
 import React from 'react';
 
 interface StrategySelectProps {

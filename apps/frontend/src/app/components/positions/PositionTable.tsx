@@ -1,3 +1,17 @@
+/**
+ * @file PositionTable.tsx
+ * @description Presentational component that renders a sortable, selectable table of positions
+ *              with pool name, price range, status badges, and token balances.
+ *
+ * @features
+ * - Renders a row per position with pool name, price range, status, balances
+ * - Highlights selected position with active styling
+ * - Handles empty state with a placeholder message
+ * - Delegates detailed view to PositionDetail on row click
+ *
+ * @dependencies format utils, api types
+ */
+
 'use client';
 
 import React from 'react';

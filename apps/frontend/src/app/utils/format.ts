@@ -1,3 +1,12 @@
+/**
+ * @file format.ts
+ * @description Utility functions for formatting token amounts and resolving token symbols by mint address.
+ *
+ * @features
+ * - formatAmount — converts raw on-chain amount (string, decimals) to human-readable string
+ * - getTokenSymbol — resolves known mint addresses (SOL, USDC, USDT) or returns a short prefix
+ */
+
 export const formatAmount = (amountStr: string, decimals: number): string => {
   if (!amountStr) return '0.00';
   const amt = parseFloat(amountStr) / Math.pow(10, decimals);

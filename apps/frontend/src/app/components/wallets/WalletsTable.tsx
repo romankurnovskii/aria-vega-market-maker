@@ -1,3 +1,16 @@
+/**
+ * @file WalletsTable.tsx
+ * @description Presentational component rendering a table of wallets with per-wallet rows
+ *              delegated to WalletTableRow. Shows summary stat cards above the table.
+ *
+ * @features
+ * - Renders wallet stat cards (total, default, positions count) via WalletStatCard
+ * - Maps over wallets array to produce WalletTableRow components
+ * - Empty state handled by WalletTableRow (no extra empty message needed)
+ *
+ * @dependencies WalletTableRow, WalletStatCard, wallet types
+ */
+
 import React from 'react';
 import { Wallet } from './types';
 import { WalletTableRow } from './WalletTableRow';

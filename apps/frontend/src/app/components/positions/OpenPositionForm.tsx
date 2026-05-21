@@ -1,3 +1,19 @@
+/**
+ * @file OpenPositionForm.tsx
+ * @description Modal form for opening a new liquidity position. Collects pool address,
+ *              price range, deposit amounts, slippage, and wallet selection.
+ *
+ * @features
+ * - Full modal overlay with backdrop close
+ * - Price range inputs (lower / upper) with reverse detection
+ * - Base and quote token amount fields
+ * - Slippage percentage field
+ * - Wallet selector dropdown populated from wallets prop
+ * - Autofocus on first input when opened
+ *
+ * @dependencies lucide-react icons, format utils
+ */
+
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';

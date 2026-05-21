@@ -1,3 +1,14 @@
+/**
+ * @file types.ts
+ * @description Shared TypeScript interfaces for the wallets domain — wallet data model
+ *              and per-pool summaries for portfolio display.
+ *
+ * @features
+ * - Wallet — core wallet model with chain, address, default flag, and portfolio
+ * - WalletPool — per-pool summary within a wallet portfolio
+ * - WalletPortfolio — aggregate portfolio data (balances, PnL, position counts)
+ */
+
 export interface WalletPool {
   poolAddress: string;
   tokenX: string;

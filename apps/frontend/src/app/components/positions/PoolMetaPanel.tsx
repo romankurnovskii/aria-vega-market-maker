@@ -1,3 +1,16 @@
+/**
+ * @file PoolMetaPanel.tsx
+ * @description Presentational component that displays pool metadata: token pair, fee tier,
+ *              bin step, and pool address with a copy-to-clipboard button.
+ *
+ * @features
+ * - Shows token symbols (X / Y) and pool address (truncated plus copy)
+ * - Displays bin step, base fee, and fee rate
+ * - Handles missing/null pool meta gracefully with "—" fallback
+ *
+ * @dependencies app-store types (PoolMeta)
+ */
+
 'use client';
 
 import React from 'react';

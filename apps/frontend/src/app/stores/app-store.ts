@@ -1,3 +1,17 @@
+/**
+ * @file app-store.ts
+ * @description Global Zustand store for pool metadata and position data keyed by pool address.
+ *
+ * @features
+ * - PoolMetaByAddress — maps pool address to pool metadata (name, tokens, fee params)
+ * - PositionsByPool — maps pool address to an array of Position objects
+ * - setPoolMeta — upserts pool metadata for a given address
+ * - setPositionsByPool — rebuilds the positions map from a flat position list
+ *
+ * @dependencies Zustand
+ * @sideEffects None — pure client-side state only
+ */
+
 'use client';
 
 import { create } from 'zustand';

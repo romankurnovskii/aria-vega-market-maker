@@ -1,3 +1,13 @@
+/**
+ * @file 404.tsx
+ * @description Next.js Pages Router 404 page — fallback when no route matches.
+ *              Provides a centered "Page Not Found" message with a home link.
+ *
+ * @features
+ * - Renders a 404 title and "Page Not Found" subtitle
+ * - Links back to the home page
+ */
+
 import React from 'react';
 
 export default function Custom404() {

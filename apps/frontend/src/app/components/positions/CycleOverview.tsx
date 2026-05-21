@@ -1,3 +1,16 @@
+/**
+ * @file CycleOverview.tsx
+ * @description Presentational component that visualizes a position lifecycle chain (cycle)
+ *              with a timeline of all positions in the chain and aggregate metrics.
+ *
+ * @features
+ * - Displays cycle timeline: root position creation, chain length, active/closed state
+ * - Shows aggregate metrics: amount open, amount closed, total fees, total PnL
+ * - Renders indicator badges for active vs closed cycles
+ *
+ * @dependencies cycleCalculations types, format utils
+ */
+
 import React from 'react';
 import type { CycleMetrics } from '../../utils/cycleCalculations';
 import { getTokenSymbol } from '../../utils/format';

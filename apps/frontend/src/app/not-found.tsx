@@ -1,3 +1,13 @@
+/**
+ * @file not-found.tsx
+ * @description Next.js 404 page rendered when no route matches the requested URL.
+ *
+ * @features
+ * - Displays a minimalist "404 / Page Not Found" message
+ * - Provides a link back to the home page
+ * - Uses force-dynamic to avoid static generation for this path
+ */
+
 import React from 'react';
 
 export const dynamic = 'force-dynamic';

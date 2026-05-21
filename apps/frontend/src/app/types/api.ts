@@ -1,3 +1,16 @@
+/**
+ * @file api.ts
+ * @description Shared TypeScript interfaces for the Aria Vega API domain — data models
+ *              for positions, wallets, assignments, strategies, steps, lineage, and eval logs.
+ *
+ * @features
+ * - AriaVegaData — top-level aggregation of all dashboard data
+ * - Position, Wallet, Assignment, Strategy, Step — core entity interfaces
+ * - RawApiPosition — raw API response shape for positions (snake_case fields)
+ * - EvalLogEntry — event log entry for strategy evaluation results
+ * - PositionLineageRecord — closed-to-new position chain tracking
+ */
+
 export interface HealthData {
   epoch: number;
   status: string;

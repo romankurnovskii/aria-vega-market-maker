@@ -1,3 +1,14 @@
+/**
+ * @file error.tsx
+ * @description Next.js error boundary UI — displays a fallback page when an
+ *              unhandled render error occurs in any client component.
+ *
+ * @features
+ * - Catches and logs render errors to console
+ * - Renders "Something went wrong" message with a retry button
+ * - Uses reset() to attempt recovery
+ */
+
 'use client';
 
 import React, { useEffect } from 'react';

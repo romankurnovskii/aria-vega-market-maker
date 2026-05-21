@@ -1,3 +1,15 @@
+/**
+ * @file cycleCalculations.ts
+ * @description Builds position lifecycle chains (cycles) from flat position and lineage data,
+ *              computing aggregate metrics per chain (open/closed amounts, fees, PnL).
+ *
+ * @features
+ * - buildPositionCycles — constructs a Map of CycleMetrics keyed by root position ID
+ * - getCycleForPosition — looks up which cycle a given position belongs to
+ *
+ * @dependencies api types (Position, PositionLineageRecord)
+ */
+
 import type { Position, PositionLineageRecord } from '../types/api';
 
 export interface CycleMetrics {

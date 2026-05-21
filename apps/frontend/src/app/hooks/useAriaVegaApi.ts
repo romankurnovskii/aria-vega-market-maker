@@ -1,3 +1,19 @@
+/**
+ * @file useAriaVegaApi.ts
+ * @description Central data-fetching hook for the Aria Vega dashboard. Manages all API
+ *              interaction: polling, state sync, strategy actions, position operations, and task tracking.
+ *
+ * @features
+ * - Polls /health, /wallets, /assignments, /strategies, /steps, /lineage every 25 s
+ * - Enriches positions with portfolio data and pool metadata
+ * - Exposes action handlers: assign strategy, evaluate, apply suggestion, open position
+ * - Polls async task status for long-running rebalance operations
+ * - Maintains eval log event stream from task events and action results
+ *
+ * @dependencies Zustand (useAppStore), useApiPolling
+ * @sideEffects Continuous HTTP polling via useApiPolling; writes to useAppStore
+ */
+
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -68,11 +84,12 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
   const taskEventCounts = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
+    const timers = taskPollTimers.current;
     return () => {
-      for (const timer of taskPollTimers.current.values()) {
+      for (const timer of timers.values()) {
         clearInterval(timer);
       }
-      taskPollTimers.current.clear();
+      timers.clear();
     };
   }, []);
 

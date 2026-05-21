@@ -1,3 +1,16 @@
+/**
+ * @file Header.tsx
+ * @description Presentational component for the top app bar — displays health status,
+ *              epoch counter, assignment count, and wallet count with icon badges.
+ *
+ * @features
+ * - Shows live health indicator dot (green/red)
+ * - Displays epoch, assignments, and wallets summary badges
+ * - Purely presentational — all data received via props
+ *
+ * @dependencies api types (HealthData, Assignment, Wallet)
+ */
+
 import type { HealthData, Assignment } from '../../types/api';
 
 interface Wallet {

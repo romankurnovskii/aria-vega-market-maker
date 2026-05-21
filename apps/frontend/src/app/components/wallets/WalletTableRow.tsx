@@ -1,3 +1,17 @@
+/**
+ * @file WalletTableRow.tsx
+ * @description Presentational row component for a single wallet — shows address, chain,
+ *              balances, PnL, and status indicators.
+ *
+ * @features
+ * - Displays wallet address (truncated), chain badge, default star indicator
+ * - Shows portfolio balances (total USDC, total SOL)
+ * - Renders PnL with directional icon (TrendingUp/TrendingDown) and color coding
+ * - Handles missing portfolio data gracefully
+ *
+ * @dependencies lucide-react icons, wallet utils
+ */
+
 import React from 'react';
 import { Wallet } from './types';
 import { formatNumber, getPnlColor } from './utils';

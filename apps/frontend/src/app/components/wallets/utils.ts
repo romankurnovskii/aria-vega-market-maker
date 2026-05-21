@@ -1,3 +1,12 @@
+/**
+ * @file utils.ts
+ * @description Utility functions for the wallets domain — number formatting and PnL color mapping.
+ *
+ * @features
+ * - formatNumber — safely formats an optional string number to fixed decimals
+ * - getPnlColor — returns a Tailwind text color class based on PnL sign (green, red, or gray)
+ */
+
 export const formatNumber = (val: string | undefined, decimals: number = 4): string => {
   if (!val) return '—';
   const num = parseFloat(val);

@@ -1,3 +1,16 @@
+/**
+ * @file AddLiquidityForm.tsx
+ * @description Inline form for adding extra liquidity (token X and/or Y amounts)
+ *              to an existing open position.
+ *
+ * @features
+ * - Dual input fields for token X and token Y amounts
+ * - Submit button triggers onAdd callback with position ID and amounts
+ * - Inline layout designed to sit inside a position detail pane
+ *
+ * @dependencies lucide-react (Plus icon)
+ */
+
 'use client';
 
 import React, { useState } from 'react';
