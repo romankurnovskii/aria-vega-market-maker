@@ -1,3 +1,17 @@
+/**
+ * @file positions.test.ts
+ * @description Integration tests for the positions router's applyStrategy action.
+ *              Uses node:test with an in-memory Express app to validate strategy
+ *              lifecycle (evaluate → apply), error handling, and edge cases.
+ *
+ * @features
+ * - Tests evaluateStrategy: success, failure, and missing position scenarios
+ * - Tests applyStrategy: close+open rebalance flow and error propagation
+ * - Mocks IStore, IExecutor, and IPositionProvider for isolated testing
+ *
+ * @dependencies node:test, Express, @lp-system/core mocks
+ */
+
 /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';

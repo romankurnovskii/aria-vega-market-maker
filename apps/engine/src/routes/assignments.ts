@@ -1,3 +1,17 @@
+/**
+ * @file assignments.ts
+ * @description Express router for CRUD operations on strategy-to-position assignments.
+ *              Supports create, list, and delete of assignments via REST endpoints.
+ *
+ * @features
+ * - POST / — creates a new assignment (strategy + position binding)
+ * - GET / — lists all current assignments
+ * - DELETE /:id — removes an assignment by ID
+ *
+ * @dependencies Express, @lp-system/core (IStore), @lp-system/orchestration
+ * @sideEffects Modifies assignment state in the IStore
+ */
+
 import { Router } from 'express';
 import { IStore, IOrchestratorRegistry, Assignment, AssignmentMode } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
@@ -13,8 +27,9 @@ export function createAssignmentsRouter(
     try {
       const assignments = await store.getAssignments();
       res.json(assignments);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || String(error) });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: message });
     }
   });
 
@@ -41,8 +56,9 @@ export function createAssignmentsRouter(
       registry.register(orchestrator);
 
       res.status(201).json({ message: 'Assignment registered successfully', assignment });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || String(error) });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: message });
     }
   });
 
@@ -54,8 +70,9 @@ export function createAssignmentsRouter(
       registry.deregisterByAssignmentId(id);
 
       res.json({ message: `Assignment ${id} removed successfully` });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || String(error) });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: message });
     }
   });
 

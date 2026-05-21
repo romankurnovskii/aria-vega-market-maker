@@ -23,6 +23,7 @@ import {
   ILineageStore,
   Position,
   ExecutionRecord,
+  OpenParams,
 } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
@@ -137,21 +138,14 @@ export class TickLoopService {
               continue;
             }
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const {
-              poolAddress,
-              oldPosition,
-              openParams: legacyOpenParams,
-              closeTxSignature,
-            } = assignment.recoveryData as any;
+            const { poolAddress, oldPosition, openParams: legacyOpenParams, closeTxSignature } = assignment.recoveryData!;
             const market = await getMarketSnapshot(poolAddress);
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            let enrichedOpenParams: any;
+            let enrichedOpenParams: OpenParams | undefined;
             if (oldPosition) {
               logger.info(`[TickLoopService] Retrying OPEN for pool ${poolAddress}... Re-evaluating strategy...`);
               const retryEval = await orchestrator.tick(oldPosition, market);
-              const openParams = retryEval.openParams;
+              const openParams = 'openParams' in retryEval ? retryEval.openParams : undefined;
               if (!openParams) {
                 logger.error(`[TickLoopService] Re-evaluation returned no openParams. Aborting retry.`);
                 continue;

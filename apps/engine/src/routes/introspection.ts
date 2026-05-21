@@ -1,3 +1,14 @@
+/**
+ * @file introspection.ts
+ * @description Express router exposing system metadata, available strategies, steps, and their documentation.
+ *
+ * @features
+ * - GET /strategies — lists all registered strategies with descriptions
+ * - GET /steps — lists all available pipeline steps with documentation
+ *
+ * @dependencies Express, @lp-system/orchestration
+ */
+
 import { Router } from 'express';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 
@@ -24,8 +35,9 @@ export function createIntrospectionRouter(factory: OrchestratorFactory): Router 
           description: s.description || 'Custom strategy implementation',
         })),
       });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || String(error) });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: message });
     }
   });
 
@@ -39,8 +51,9 @@ export function createIntrospectionRouter(factory: OrchestratorFactory): Router 
         availableSteps: ['InitializationCheckStep', 'TrailingRangeCheckStep', 'RangeCalculatorStep', 'AmountCalculatorStep'],
         documentation: 'Steps are atomic logical units combined to form strategy workflows.',
       });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || String(error) });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: message });
     }
   });
 

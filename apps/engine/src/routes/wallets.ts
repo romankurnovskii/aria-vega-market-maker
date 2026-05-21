@@ -1,3 +1,16 @@
+/**
+ * @file wallets.ts
+ * @description Express router that lists registered wallets and fetches per-wallet
+ *              portfolio data including balances, positions, and PnL.
+ *
+ * @features
+ * - GET / — lists all wallets with chain, address, and default flag
+ * - GET /:address/portfolio — fetches portfolio breakdown for a specific wallet
+ *
+ * @dependencies Express, @lp-system/core, @lp-system/providers
+ * @sideEffects Fetches wallet portfolio data from Meteora provider
+ */
+
 import { Router } from 'express';
 import { IPositionProvider } from '@lp-system/core';
 import { meteoraProvider } from '@lp-system/providers';

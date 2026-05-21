@@ -1,3 +1,16 @@
+/**
+ * @file position-sync.ts
+ * @description Background service that periodically fetches on-chain positions from a provider
+ *              and syncs them into the local position store for queries and evaluation.
+ *
+ * @features
+ * - syncPositions — fetches all positions for a wallet and upserts them into IPositionStore
+ * - Can be called on a timer or triggered by external events
+ *
+ * @dependencies @lp-system/core (IPositionProvider, IPositionStore), @lp-system/logger
+ * @sideEffects Writes position data to the IPositionStore on each sync
+ */
+
 import { IPositionProvider, IPositionStore } from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
 

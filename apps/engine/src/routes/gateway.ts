@@ -1,3 +1,16 @@
+/**
+ * @file gateway.ts
+ * @description Express router for the position-opening gateway endpoint. Accepts
+ *              open-position requests, computes bin range, and delegates execution.
+ *
+ * @features
+ * - POST /open — validates params, computes price→bin range, triggers execution via IExecutor
+ * - Integrates with meteoraProvider for market snapshots and bin calculations
+ *
+ * @dependencies Express, @lp-system/core, @lp-system/providers, @lp-system/logger
+ * @sideEffects Triggers on-chain position creation via IExecutor
+ */
+
 import { Router } from 'express';
 import { IExecutor, OpenParams, Decision } from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';

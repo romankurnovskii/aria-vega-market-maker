@@ -1,3 +1,18 @@
+/**
+ * @file positions.ts
+ * @description Express router for position CRUD, strategy evaluation, and rebalance lifecycle.
+ *              The largest router — handles listing, history, actions, and strategy application.
+ *
+ * @features
+ * - GET / — lists all positions (open + closed) for a wallet
+ * - GET /history — lists closed position history
+ * - POST /:id/actions — dispatches strategy actions (evaluateStrategy, applyStrategy, applySuggestion)
+ * - Integrates with IStore, IPositionProvider, IExecutor, IOrchestratorRegistry
+ *
+ * @dependencies Express, @lp-system/core, @lp-system/providers, @lp-system/logger
+ * @sideEffects Triggers strategy evaluation and on-chain rebalance execution
+ */
+
 import { Router } from 'express';
 import {
   IPositionProvider,
