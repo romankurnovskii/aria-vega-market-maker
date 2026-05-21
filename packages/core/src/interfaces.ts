@@ -9,7 +9,7 @@
  * - IExecutor: Transaction execution handler for on-chain operations
  * - IPositionProvider: External data source abstraction for positions/markets
  * - IRpcProvider: RPC connection abstraction with retry logic
- * - IStore / IPositionStore: Persistence layer interfaces
+ * - IStore / IPositionStore / ILineageStore: Persistence layer interfaces
  * - IOrchestratorRegistry: In-memory orchestrator lifecycle manager
  *
  * @dependencies None — defines contract types only
@@ -25,6 +25,7 @@ import {
   Assignment,
   AssignmentMode,
   StepContext,
+  PositionLineageRecord,
 } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -82,6 +83,12 @@ export interface IPositionStore {
   saveKnown(positions: Position[]): Promise<void>;
   archivePosition(position: Position): Promise<void>;
   getArchived(): Promise<Position[]>;
+}
+
+export interface ILineageStore {
+  getLineage(): Promise<PositionLineageRecord[]>;
+  saveLineageRecord(record: PositionLineageRecord): Promise<void>;
+  getLineageForPosition(positionId: string): Promise<PositionLineageRecord[]>;
 }
 
 export interface IOrchestratorRegistry {

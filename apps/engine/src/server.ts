@@ -18,7 +18,7 @@ import YAML from 'yamljs';
 import { fileURLToPath } from 'url';
 import path, { dirname } from 'path';
 
-import { IStore, IOrchestratorRegistry, IExecutor, IPositionProvider, IPositionStore } from '@lp-system/core';
+import { IStore, IOrchestratorRegistry, IExecutor, IPositionProvider, IPositionStore, ILineageStore } from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
 import {
@@ -27,6 +27,7 @@ import {
   handlePositionsRouter,
   createWalletsRouter,
   createGatewayRouter,
+  createLineageRouter,
 } from './routes/index.js';
 
 const logger = getLogger('server');
@@ -53,6 +54,7 @@ export function startHttpServer(
   factory: OrchestratorFactory,
   positionProvider: IPositionProvider,
   walletAddress: string,
+  lineageStore: ILineageStore,
   positionStore?: IPositionStore
 ): express.Application {
   const app = express();
@@ -65,7 +67,11 @@ export function startHttpServer(
   app.use('/', createIntrospectionRouter(factory));
   app.use('/wallets', createWalletsRouter(positionProvider));
   app.use('/gateway', createGatewayRouter(executor));
-  app.use('/positions', handlePositionsRouter(positionProvider, executor, registry, factory, positionStore, walletAddress));
+  app.use(
+    '/positions',
+    handlePositionsRouter(positionProvider, executor, registry, factory, store, lineageStore, positionStore, walletAddress)
+  );
+  app.use('/lineage', createLineageRouter(lineageStore));
 
   const swaggerDocument = YAML.load(path.join(__dirname, '../src/openapi.yaml'));
   app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));

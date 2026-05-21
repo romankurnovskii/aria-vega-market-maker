@@ -51,6 +51,19 @@ export interface Step {
   description: string;
 }
 
+export interface PositionLineageRecord {
+  closedPositionId: string;
+  newPositionId: string;
+  poolAddress: string;
+  strategyId: string;
+  closedAt: number;
+  openedAt: number;
+  oldAssignmentId: string;
+  newAssignmentId: string;
+  closeTxSignature: string;
+  openTxSignature: string;
+}
+
 export interface AriaVegaData {
   health: HealthData;
   positions: Position[];
@@ -58,6 +71,7 @@ export interface AriaVegaData {
   strategies: Strategy[];
   steps: Step[];
   wallets: Wallet[];
+  lineage: PositionLineageRecord[];
 }
 
 export interface RawApiPosition {

@@ -25,6 +25,8 @@ import { PriceAnalytics } from './PriceAnalytics';
 import { PnLAndFees } from './PnLAndFees';
 import { OrchestrationControls } from './OrchestrationControls';
 import { EventLog } from '../ui/EventLog';
+import { CycleOverview } from './CycleOverview';
+import type { CycleMetrics } from '../../utils/cycleCalculations';
 import type { Position, Strategy, EvalLogEntry } from '../../types/api';
 
 interface PnLData {
@@ -53,6 +55,7 @@ interface PnLData {
 
 interface PositionDetailProps {
   position: Position;
+  cycle?: CycleMetrics;
   orchestration: { strategyId: string; mode: string } | null;
   strategies: Strategy[];
   onAssign: (positionId: string, strategyId: string) => Promise<void>;
@@ -65,10 +68,12 @@ interface PositionDetailProps {
   ) => void;
   evalLogs: EvalLogEntry[];
   onClose: () => void;
+  onSelectPosition: (id: string) => void;
 }
 
 export const PositionDetail = ({
   position,
+  cycle,
   orchestration,
   strategies,
   onAssign,
@@ -77,6 +82,7 @@ export const PositionDetail = ({
   onApplySuggestion,
   evalLogs,
   onClose,
+  onSelectPosition,
 }: PositionDetailProps) => {
   const poolMeta = useAppStore((s) => s.poolMetaByAddress[position.pool]);
 
@@ -152,7 +158,7 @@ export const PositionDetail = ({
               unclaimedRewardY={unclaimedRewardY}
             />
           </div>
-          <div className="flex-1 min-w-[280px] max-w-[400px]">
+          <div className="flex-1 min-w-[150px] max-w-[200px]">
             <PositionBalances
               tokenXSym={tokenXSym}
               tokenYSym={tokenYSym}
@@ -173,6 +179,11 @@ export const PositionDetail = ({
               maxPrice={maxPrice}
               poolActivePrice={poolActivePrice}
               feePerTvl24h={feePerTvl24h}
+              minBin={position.minBin}
+              maxBin={position.maxBin}
+              binCount={position.binCount}
+              rangePercent={position.rangePercent}
+              activeBin={position.activeBin}
             />
           </div>
           <div className="flex-1 min-w-[280px] max-w-[400px]">
@@ -193,6 +204,8 @@ export const PositionDetail = ({
             />
           </div>
         </div>
+
+        {cycle && <CycleOverview cycle={cycle} currentPositionId={position.id} onSelectPosition={onSelectPosition} />}
 
         {!isClosed && (
           <>

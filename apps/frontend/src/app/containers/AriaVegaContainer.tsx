@@ -80,6 +80,7 @@ export const AriaVegaContainer = () => {
             {activeTab === 'positions' && (
               <PositionsView
                 positions={data.positions}
+                lineage={data.lineage}
                 assignments={data.assignments}
                 strategies={data.strategies}
                 onAssign={handleAssignStrategy}

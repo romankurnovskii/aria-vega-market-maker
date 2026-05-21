@@ -14,12 +14,13 @@
 
 import { HummingbotProvider } from '@lp-system/providers';
 import { HummingbotExecutor } from '@lp-system/executor';
-import { JsonFileStore, JsonPositionStore } from '@lp-system/persistence';
+import { JsonFileStore, JsonPositionStore, JsonLineageStore } from '@lp-system/persistence';
 import { TrailingUsdcStrategy, ExperimentalRestakeStrategy } from '@lp-system/strategy';
 import { OrchestratorRegistry, OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
 import { startHttpServer } from './server.js';
 import { PositionSyncService } from './services/position-sync.js';
+import { TickLoopService } from './services/tick-loop.js';
 
 const TICK_INTERVAL_MS = Number(process.env.TICK_INTERVAL_MS) || 120_000;
 const HUMMINGBOT_API_URL = process.env.HUMMINGBOT_API_URL || 'http://localhost:8000';
@@ -52,6 +53,7 @@ async function main() {
     wallet: walletAddress,
     env: APP_ENV,
   });
+  const lineageStore = new JsonLineageStore('./data', { wallet: walletAddress, env: APP_ENV });
 
   // 4. Strategy initialization
   const trailingUsdcStrategy = new TrailingUsdcStrategy({ rangePercent: 20 });
@@ -66,6 +68,19 @@ async function main() {
     },
     { rangePercent: 20 }
   );
+
+  // 5.5 Restore persisted assignments → orchestrators
+  const assignments = await store.getAssignments();
+  for (const assignment of assignments) {
+    try {
+      const orchestrator = factory.create(assignment);
+      registry.register(orchestrator);
+      logger.info(`[Engine] Restored orchestrator for assignment ${assignment.id} → position ${assignment.positionId}`);
+    } catch (err) {
+      logger.warn(`[Engine] Failed to restore orchestrator for assignment ${assignment.id}: ${err}`);
+    }
+  }
+  logger.info(`[Engine] Restored ${registry.getAll().length} orchestrators from ${assignments.length} assignments.`);
   // 6. Executor initialization
   const executor = new HummingbotExecutor(HUMMINGBOT_API_URL, walletAddress);
 
@@ -75,19 +90,35 @@ async function main() {
   positionSync.addWallet(walletAddress);
   positionSync.start();
 
+  // 7.5 Background Tick Loop Service
+  const tickLoop = new TickLoopService(
+    registry,
+    positionProvider,
+    executor,
+    store,
+    positionStore,
+    lineageStore,
+    factory,
+    walletAddress,
+    TICK_INTERVAL_MS
+  );
+  tickLoop.start();
+
   // 8. Web Control Plane Activation
 
-  startHttpServer(store, registry, executor, factory, positionProvider, walletAddress, positionStore);
+  startHttpServer(store, registry, executor, factory, positionProvider, walletAddress, lineageStore, positionStore);
 
   // 9. Graceful Shutdown handlers
   process.on('SIGINT', () => {
     logger.info('[Engine] Received SIGINT shutdown request. Gracefully closing daemon...');
     positionSync.stop();
+    tickLoop.stop();
     process.exit(0);
   });
   process.on('SIGTERM', () => {
     logger.info('[Engine] Received SIGTERM shutdown request. Gracefully closing daemon...');
     positionSync.stop();
+    tickLoop.stop();
     process.exit(0);
   });
 }

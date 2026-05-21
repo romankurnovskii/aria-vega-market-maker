@@ -14,6 +14,7 @@ const INITIAL_DATA: AriaVegaData = {
   strategies: [],
   steps: [],
   wallets: [],
+  lineage: [],
   health: { epoch: 0, status: '' },
 };
 
@@ -156,7 +157,7 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
 
   const syncState = async (): Promise<void> => {
     try {
-      const [healthRes, walletsRes, assignmentsRes, strategiesRes, stepsRes] = await Promise.all([
+      const [healthRes, walletsRes, assignmentsRes, strategiesRes, stepsRes, lineageRes] = await Promise.all([
         fetch(`${API_URL}/health`)
           .then((r) => r.json())
           .catch(() => ({ status: 'offline', timestamp: Date.now() })),
@@ -172,6 +173,9 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
         fetch(`${API_URL}/steps`)
           .then((r) => r.json())
           .catch(() => ({ availableSteps: [], documentation: '' })),
+        fetch(`${API_URL}/lineage`)
+          .then((r) => r.json())
+          .catch(() => ({ count: 0, records: [] })),
       ]);
 
       const wallets = (walletsRes.wallets || []) as Wallet[];
@@ -196,12 +200,20 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
       })) as Wallet[];
 
       const positionsResults = await Promise.all(
-        wallets.map((w) =>
-          fetch(`${API_URL}/positions?wallet=${w.address}`)
-            .then((r) => r.json())
-            .then((d: { positions?: RawApiPosition[] }) => ({ wallet: w.address, positions: d.positions || [] }))
-            .catch(() => ({ wallet: w.address, positions: [] as RawApiPosition[] }))
-        )
+        wallets.map(async (w) => {
+          const [openRes, closedRes] = await Promise.all([
+            fetch(`${API_URL}/positions?wallet=${w.address}`)
+              .then((r) => r.json())
+              .catch(() => ({ positions: [] })),
+            fetch(`${API_URL}/positions/history?wallet=${w.address}`)
+              .then((r) => r.json())
+              .catch(() => ({ positions: [] })),
+          ]);
+          return {
+            wallet: w.address,
+            positions: [...(openRes.positions || []), ...(closedRes.positions || [])],
+          };
+        })
       );
 
       const enrichedStrategies = (strategiesRes.strategies || []).map((s: { id: string; description?: string }) => {
@@ -290,6 +302,7 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
         strategies: enrichedStrategies,
         steps: enrichedSteps,
         wallets: walletsWithPortfolio,
+        lineage: lineageRes.records || [],
       });
       setConnectionError(null);
     } catch (error: unknown) {

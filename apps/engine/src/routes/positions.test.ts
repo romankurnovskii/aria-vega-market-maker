@@ -183,17 +183,42 @@ describe('Positions Router - applyStrategy Action', () => {
 
     const mockRegistry = {
       getForPosition: () => [mockOrchestrator],
+      register: () => {},
+      deregisterByAssignmentId: () => {},
     } as any;
 
     const mockFactory = {
       create: () => mockOrchestrator,
     } as any;
 
+    const mockStore = {
+      getAssignments: async () => [],
+      saveAssignment: async () => {},
+      deleteAssignment: async () => {},
+      getExecutionRecords: async () => [],
+      saveExecutionRecord: async () => {},
+    } as any;
+
+    const mockLineageStore = {
+      getLineage: async () => [],
+      saveLineageRecord: async () => {},
+      getLineageForPosition: async () => [],
+    } as any;
+
     app = express();
     app.use(express.json());
     app.use(
       '/positions',
-      handlePositionsRouter(mockPositionProvider, mockExecutor, mockRegistry, mockFactory, mockPositionStore, 'wallet_123')
+      handlePositionsRouter(
+        mockPositionProvider,
+        mockExecutor,
+        mockRegistry,
+        mockFactory,
+        mockStore,
+        mockLineageStore,
+        mockPositionStore,
+        'wallet_123'
+      )
     );
   });
 

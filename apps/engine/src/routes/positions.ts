@@ -9,10 +9,13 @@ import {
   PoolInfo,
   MarketSnapshot,
   ExecutionRecord,
+  IStore,
+  ILineageStore,
 } from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
 import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getPriceFromBinId, enrichOpenParamsForExecution, getMarketSnapshot, meteoraProvider } from '@lp-system/providers';
+import { handleReassignStrategy } from '../services/strategy-reassignment.js';
 
 const logger = getLogger('router-positions');
 
@@ -43,19 +46,20 @@ async function handleArchiveAndCleanup(
 ): Promise<void> {
   if (!positionStore) return;
   try {
-    const pos = await getPositionForArchival(positionId, poolAddress, positionProvider, positionStore);
+    const originalPos = await getPositionForArchival(positionId, poolAddress, positionProvider, positionStore);
+    const posToArchive = { ...originalPos };
 
-    pos.state = 'CLOSED';
-    pos.closedAt = Date.now();
-    pos.metadata = {
-      ...pos.metadata,
+    posToArchive.state = 'CLOSED';
+    posToArchive.closedAt = Date.now();
+    posToArchive.metadata = {
+      ...posToArchive.metadata,
       closeTxSignature: closeRecord.txSignatures?.[0] || 'unknown',
       baseFeeCollected: closeRecord.metrics?.baseFeeCollected || '0',
       quoteFeeCollected: closeRecord.metrics?.quoteFeeCollected || '0',
     };
 
     // Save to archived position history
-    await positionStore.archivePosition(pos);
+    await positionStore.archivePosition(posToArchive);
 
     // Remove from active known positions
     const known = await positionStore.getKnown();
@@ -113,6 +117,8 @@ export function handlePositionsRouter(
   executor: IExecutor,
   registry: IOrchestratorRegistry,
   factory: OrchestratorFactory,
+  store: IStore,
+  lineageStore: ILineageStore,
   positionStore?: IPositionStore,
   walletAddress: string = ''
 ): Router {
@@ -239,13 +245,14 @@ export function handlePositionsRouter(
         logger.info(`[HTTP Server] First evaluation for applyStrategy: ${firstEvaluation.action}`);
 
         if (firstEvaluation.action === 'close+open') {
+          const assignmentId = targetOrch ? targetOrch.assignmentId : 'manual';
           // 1. Close
           logger.info(`[HTTP Server][applyStrategy] Closing position ${positionId}...`);
           const closeRecord = await executor.apply(
             {
               positionId,
               action: 'close',
-              sourceAssignmentId: 'manual',
+              sourceAssignmentId: assignmentId,
               evaluatedAt: Date.now(),
             },
             market
@@ -297,9 +304,9 @@ export function handlePositionsRouter(
           logger.info(`[HTTP Server][applyStrategy] Opening new position in pool ${position.poolAddress}...`);
           const openRecord = await executor.apply(
             {
-              positionId,
+              positionId: 'new',
               action: 'open',
-              sourceAssignmentId: 'manual',
+              sourceAssignmentId: assignmentId,
               evaluatedAt: Date.now(),
               openParams: enrichedOpenParams,
             },
@@ -311,6 +318,22 @@ export function handlePositionsRouter(
           );
 
           if (openRecord.status === 'failed') {
+            if (targetOrch && !targetOrch.assignmentId.startsWith('adhoc_')) {
+              const assignments = await store.getAssignments();
+              const oldAssignment = assignments.find((a) => a.id === targetOrch!.assignmentId);
+              if (oldAssignment) {
+                oldAssignment.mode = 'pending_open';
+                oldAssignment.recoveryData = {
+                  poolAddress: position.poolAddress,
+                  openParams: enrichedOpenParams,
+                  closeTxSignature: closeRecord.txSignatures?.[0] || 'unknown',
+                };
+                await store.saveAssignment(oldAssignment);
+                targetOrch.mode = 'pending_open';
+                logger.info(`[HTTP Server] Assignment ${oldAssignment.id} set to pending_open. Will retry on next tick.`);
+              }
+            }
+
             res.status(500).json({
               error: `Close succeeded but Open failed: ${openRecord.error}`,
               step: 'open',
@@ -329,6 +352,23 @@ export function handlePositionsRouter(
                 positionStore
               )
             : undefined;
+
+          // Reassign strategy assignment to the new position if it was NOT an adhoc orchestrator
+          if (targetOrch && !targetOrch.assignmentId.startsWith('adhoc_') && openRecord.newPositionId) {
+            await handleReassignStrategy({
+              oldPositionId: positionId,
+              newPositionId: openRecord.newPositionId,
+              poolAddress: position.poolAddress,
+              strategyId,
+              oldAssignmentId: targetOrch.assignmentId,
+              closeTxSignature: closeRecord.txSignatures?.[0] || 'unknown',
+              openTxSignature: openRecord.txSignatures?.[0] || 'unknown',
+              store,
+              registry,
+              factory,
+              lineageStore,
+            });
+          }
 
           res.json({
             status: 'success',
@@ -350,12 +390,13 @@ export function handlePositionsRouter(
         }
 
         if (firstEvaluation.action === 'close') {
+          const assignmentId = targetOrch ? targetOrch.assignmentId : 'manual';
           logger.info(`[HTTP Server][applyStrategy] Closing position ${positionId}...`);
           const closeRecord = await executor.apply(
             {
               positionId,
               action: 'close',
-              sourceAssignmentId: 'manual',
+              sourceAssignmentId: assignmentId,
               evaluatedAt: Date.now(),
             },
             market
@@ -397,12 +438,13 @@ export function handlePositionsRouter(
             poolInfo
           );
 
+          const assignmentId = targetOrch ? targetOrch.assignmentId : 'manual';
           logger.info(`[HTTP Server][applyStrategy] Opening position...`);
           const openRecord = await executor.apply(
             {
-              positionId,
+              positionId: 'new',
               action: 'open',
-              sourceAssignmentId: 'manual',
+              sourceAssignmentId: assignmentId,
               evaluatedAt: Date.now(),
               openParams: enrichedOpenParams,
             },
@@ -469,6 +511,12 @@ export function handlePositionsRouter(
 
         const position = await positionProvider.getPosition(positionId);
 
+        // Determine assignment if one exists
+        const orchestrators = registry.getForPosition(positionId);
+        const activeOrch = orchestrators.find((o) => !o.assignmentId.startsWith('adhoc_'));
+        const assignmentId = activeOrch ? activeOrch.assignmentId : 'manual';
+        const suggestionStrategyId = activeOrch ? activeOrch.strategyId : strategyId;
+
         // Enrich openParams with decimal amounts and prices before execution
         let enrichedOpenParams: OpenParams | undefined;
         if (suggestion.openParams) {
@@ -497,7 +545,7 @@ export function handlePositionsRouter(
             {
               positionId,
               action: 'close',
-              sourceAssignmentId: 'manual',
+              sourceAssignmentId: assignmentId,
               evaluatedAt: Date.now(),
             },
             await getMarketSnapshot(position.poolAddress)
@@ -521,9 +569,9 @@ export function handlePositionsRouter(
           logger.info(`[HTTP Server][Open] Opening new position in pool ${position.poolAddress}...`);
           const openRecord = await executor.apply(
             {
-              positionId,
+              positionId: 'new',
               action: 'open',
-              sourceAssignmentId: 'manual',
+              sourceAssignmentId: assignmentId,
               evaluatedAt: Date.now(),
               openParams: enrichedOpenParams,
             },
@@ -533,6 +581,22 @@ export function handlePositionsRouter(
           logger.info(`[HTTP Server][Open] Result: ${openRecord.status}. Tx: ${openRecord.txSignatures?.join(', ')}`);
 
           if (openRecord.status === 'failed') {
+            if (activeOrch) {
+              const assignments = await store.getAssignments();
+              const oldAssignment = assignments.find((a) => a.id === activeOrch.assignmentId);
+              if (oldAssignment) {
+                oldAssignment.mode = 'pending_open';
+                oldAssignment.recoveryData = {
+                  poolAddress: position.poolAddress,
+                  oldPosition: position,
+                  closeTxSignature: closeRecord.txSignatures?.[0] || 'unknown',
+                };
+                await store.saveAssignment(oldAssignment);
+                activeOrch.mode = 'pending_open';
+                logger.info(`[HTTP Server] Assignment ${oldAssignment.id} set to pending_open. Will retry on next tick.`);
+              }
+            }
+
             res.status(500).json({
               error: `Close succeeded but Open failed: ${openRecord.error}`,
               step: 'open',
@@ -551,6 +615,23 @@ export function handlePositionsRouter(
                 positionStore
               )
             : undefined;
+
+          // Reassign strategy assignment to the new position if it was NOT an adhoc orchestrator
+          if (activeOrch && openRecord.newPositionId) {
+            await handleReassignStrategy({
+              oldPositionId: positionId,
+              newPositionId: openRecord.newPositionId,
+              poolAddress: position.poolAddress,
+              strategyId: suggestionStrategyId,
+              oldAssignmentId: activeOrch.assignmentId,
+              closeTxSignature: closeRecord.txSignatures?.[0] || 'unknown',
+              openTxSignature: openRecord.txSignatures?.[0] || 'unknown',
+              store,
+              registry,
+              factory,
+              lineageStore,
+            });
+          }
 
           res.json({
             status: 'success',
@@ -573,9 +654,9 @@ export function handlePositionsRouter(
 
         const execRecord = await executor.apply(
           {
-            positionId,
+            positionId: actualAction === 'open' ? 'new' : positionId,
             action: actualAction as 'close' | 'open',
-            sourceAssignmentId: 'manual',
+            sourceAssignmentId: assignmentId,
             evaluatedAt: Date.now(),
             openParams: enrichedOpenParams,
           },
@@ -652,6 +733,67 @@ export function handlePositionsRouter(
     }
   });
 
+  async function enrichPositionsWithPriceData(positions: Position[]): Promise<Position[]> {
+    const uniquePools = [...new Set(positions.map((p) => p.poolAddress))];
+    const poolDataMap = new Map<string, { poolInfo: PoolInfo; market: MarketSnapshot }>();
+
+    await Promise.all(
+      uniquePools.map(async (poolAddress) => {
+        try {
+          const [poolInfo, market] = await Promise.all([
+            meteoraProvider.getPoolInfo(poolAddress),
+            getMarketSnapshot(poolAddress),
+          ]);
+          poolDataMap.set(poolAddress, { poolInfo, market });
+        } catch (e) {
+          logger.warn(`Failed to fetch metadata for pool ${poolAddress}: ${e}`);
+        }
+      })
+    );
+
+    return positions.map((pos) => {
+      try {
+        const poolData = poolDataMap.get(pos.poolAddress);
+        if (!poolData) {
+          return pos;
+        }
+
+        const { poolInfo, market } = poolData;
+
+        const lowerBoundPrice = getPriceFromBinId(
+          pos.lowerBound,
+          poolInfo.binStep,
+          pos.tokenX.decimals,
+          pos.tokenY.decimals
+        );
+        const upperBoundPrice = getPriceFromBinId(
+          pos.upperBound,
+          poolInfo.binStep,
+          pos.tokenX.decimals,
+          pos.tokenY.decimals
+        );
+
+        const binCount = pos.upperBound - pos.lowerBound + 1;
+        const rangePercent = lowerBoundPrice > 0 ? ((upperBoundPrice - lowerBoundPrice) / lowerBoundPrice) * 100 : 0;
+
+        return {
+          ...pos,
+          lowerBoundPrice,
+          upperBoundPrice,
+          activeBin: market.activeBound,
+          binCount,
+          rangePercent,
+          poolActivePrice: market.price,
+          binStep: poolInfo.binStep,
+          feeRate: poolInfo.feeRate,
+        };
+      } catch (e) {
+        logger.warn(`Failed to enrich position ${pos.id} with price data: ${e}`);
+        return pos;
+      }
+    });
+  }
+
   router.get('/', async (req, res) => {
     try {
       const targetWallet = (req.query.wallet as string) || walletAddress;
@@ -664,64 +806,7 @@ export function handlePositionsRouter(
         positions = await positionProvider.getPositions(targetWallet);
       }
 
-      const uniquePools = [...new Set(positions.map((p) => p.poolAddress))];
-      const poolDataMap = new Map<string, { poolInfo: PoolInfo; market: MarketSnapshot }>();
-
-      await Promise.all(
-        uniquePools.map(async (poolAddress) => {
-          try {
-            const [poolInfo, market] = await Promise.all([
-              meteoraProvider.getPoolInfo(poolAddress),
-              getMarketSnapshot(poolAddress),
-            ]);
-            poolDataMap.set(poolAddress, { poolInfo, market });
-          } catch (e) {
-            logger.warn(`Failed to fetch metadata for pool ${poolAddress}: ${e}`);
-          }
-        })
-      );
-
-      const positionsWithPriceData = positions.map((pos) => {
-        try {
-          const poolData = poolDataMap.get(pos.poolAddress);
-          if (!poolData) {
-            return pos;
-          }
-
-          const { poolInfo, market } = poolData;
-
-          const lowerBoundPrice = getPriceFromBinId(
-            pos.lowerBound,
-            poolInfo.binStep,
-            pos.tokenX.decimals,
-            pos.tokenY.decimals
-          );
-          const upperBoundPrice = getPriceFromBinId(
-            pos.upperBound,
-            poolInfo.binStep,
-            pos.tokenX.decimals,
-            pos.tokenY.decimals
-          );
-
-          const binCount = pos.upperBound - pos.lowerBound + 1;
-          const rangePercent = lowerBoundPrice > 0 ? ((upperBoundPrice - lowerBoundPrice) / lowerBoundPrice) * 100 : 0;
-
-          return {
-            ...pos,
-            lowerBoundPrice,
-            upperBoundPrice,
-            activeBin: market.activeBound,
-            binCount,
-            rangePercent,
-            poolActivePrice: market.price,
-            binStep: poolInfo.binStep,
-            feeRate: poolInfo.feeRate,
-          };
-        } catch (e) {
-          logger.warn(`Failed to enrich position ${pos.id} with price data: ${e}`);
-          return pos;
-        }
-      });
+      const positionsWithPriceData = await enrichPositionsWithPriceData(positions);
 
       res.json({
         wallet: targetWallet,
@@ -740,10 +825,13 @@ export function handlePositionsRouter(
       if (positionStore) {
         positions = await positionStore.getArchived();
       }
+
+      const positionsWithPriceData = await enrichPositionsWithPriceData(positions);
+
       res.json({
         wallet: walletAddress,
-        count: positions.length,
-        positions,
+        count: positionsWithPriceData.length,
+        positions: positionsWithPriceData,
       });
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);

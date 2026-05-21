@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Plus, Minus } from 'lucide-react';
+import { getTokenSymbol } from '../../utils/format';
 
 interface OpenPositionFormProps {
   onOpen: (params: {
@@ -29,9 +30,39 @@ export const OpenPositionForm = ({ onOpen, onClose }: OpenPositionFormProps) => 
   });
 
   const [marketPrice, setMarketPrice] = useState<number | null>(null);
-  const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const [binStep, setBinStep] = useState<number | null>(null);
+  const [tokenXSym, setTokenXSym] = useState<string | null>(null);
+  const [tokenYSym, setTokenYSym] = useState<string | null>(null);
+  const isFirstLoadRef = useRef(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const binStepFactor = binStep ? 1 + binStep / 10000 : null;
+
+  // Compute range info from current prices (re-renders on formData change)
+  let rangePct: number | null = null;
+  let binCount: number | null = null;
+  if (binStepFactor) {
+    const lower = parseFloat(formData.lower_price);
+    const upper = parseFloat(formData.upper_price);
+    if (!isNaN(lower) && !isNaN(upper) && lower > 0 && upper > 0) {
+      const minP = Math.min(lower, upper);
+      const maxP = Math.max(lower, upper);
+      rangePct = ((maxP - minP) / minP) * 100;
+      binCount = Math.abs(Math.round(Math.log(maxP / minP) / Math.log(binStepFactor)));
+    }
+  }
+
+  const adjustPrice = (field: 'lower_price' | 'upper_price', direction: 'up' | 'down') => {
+    if (!binStepFactor) return;
+    const current = parseFloat(formData[field]);
+    if (isNaN(current)) return;
+    const factor = direction === 'up' ? binStepFactor : 1 / binStepFactor;
+    setFormData((prev) => ({
+      ...prev,
+      [field]: (current * factor).toFixed(2),
+    }));
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -40,8 +71,11 @@ export const OpenPositionForm = ({ onOpen, onClose }: OpenPositionFormProps) => 
       [name]: value,
     }));
     if (name === 'pool_address') {
-      setIsFirstLoad(true);
+      isFirstLoadRef.current = true;
       setMarketPrice(null);
+      setBinStep(null);
+      setTokenXSym(null);
+      setTokenYSym(null);
     }
   };
 
@@ -56,14 +90,17 @@ export const OpenPositionForm = ({ onOpen, onClose }: OpenPositionFormProps) => 
         const data = await res.json();
 
         setMarketPrice(data.market.price);
+        setBinStep(data.poolInfo?.binStep ?? null);
+        setTokenXSym(getTokenSymbol({ mint: data.poolInfo?.tokenXMint }));
+        setTokenYSym(getTokenSymbol({ mint: data.poolInfo?.tokenYMint }));
 
-        if (isFirstLoad) {
+        if (isFirstLoadRef.current) {
           setFormData((prev) => ({
             ...prev,
-            upper_price: String(data.market.price),
-            lower_price: String(data.market.price * 0.99),
+            upper_price: data.market.price.toFixed(2),
+            lower_price: (data.market.price * 0.99).toFixed(2),
           }));
-          setIsFirstLoad(false);
+          isFirstLoadRef.current = false;
         }
       } catch (err) {
         console.error('Error fetching pool info:', err);
@@ -74,7 +111,7 @@ export const OpenPositionForm = ({ onOpen, onClose }: OpenPositionFormProps) => 
     const interval = setInterval(fetchPoolInfo, 2000);
 
     return () => clearInterval(interval);
-  }, [formData.pool_address, isFirstLoad]);
+  }, [formData.pool_address]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,8 +158,18 @@ export const OpenPositionForm = ({ onOpen, onClose }: OpenPositionFormProps) => 
             required
           />
           {marketPrice !== null && (
-            <div className="text-sm text-gray-500 mt-1">
-              Market Price: <span className="font-bold text-[#FF4500]">{marketPrice.toFixed(6)}</span>
+            <div className="text-sm text-gray-500 mt-1 flex flex-wrap gap-x-3">
+              <span>
+                Market Price: <span className="font-bold text-[#FF4500]">{marketPrice.toFixed(2)}</span>
+              </span>
+              {tokenXSym && tokenYSym && (
+                <span>
+                  Pool:{' '}
+                  <span className="font-bold text-[#0D0D0D]">
+                    {tokenXSym}-{tokenYSym}
+                  </span>
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -142,29 +189,81 @@ export const OpenPositionForm = ({ onOpen, onClose }: OpenPositionFormProps) => 
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1">
             <label className="uppercase font-bold text-gray-600">Lower Price</label>
-            <input
-              type="number"
-              step="any"
-              name="lower_price"
-              value={formData.lower_price}
-              onChange={handleChange}
-              className="border border-[#0D0D0D] p-1.5 focus:outline-none focus:bg-[#F4F4F0]"
-              required
-            />
+            <div className="flex">
+              <input
+                type="number"
+                step="any"
+                name="lower_price"
+                value={formData.lower_price}
+                onChange={handleChange}
+                className="flex-1 border border-[#0D0D0D] p-1.5 focus:outline-none focus:bg-[#F4F4F0]"
+                required
+              />
+              {binStepFactor && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => adjustPrice('lower_price', 'down')}
+                    className="border border-l-0 border-[#0D0D0D] px-2 hover:bg-[#F4F4F0] transition-colors"
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => adjustPrice('lower_price', 'up')}
+                    className="border border-l-0 border-[#0D0D0D] px-2 hover:bg-[#F4F4F0] transition-colors"
+                  >
+                    <Plus size={14} />
+                  </button>
+                </>
+              )}
+            </div>
           </div>
           <div className="flex flex-col gap-1">
             <label className="uppercase font-bold text-gray-600">Upper Price</label>
-            <input
-              type="number"
-              step="any"
-              name="upper_price"
-              value={formData.upper_price}
-              onChange={handleChange}
-              className="border border-[#0D0D0D] p-1.5 focus:outline-none focus:bg-[#F4F4F0]"
-              required
-            />
+            <div className="flex">
+              <input
+                type="number"
+                step="any"
+                name="upper_price"
+                value={formData.upper_price}
+                onChange={handleChange}
+                className="flex-1 border border-[#0D0D0D] p-1.5 focus:outline-none focus:bg-[#F4F4F0]"
+                required
+              />
+              {binStepFactor && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => adjustPrice('upper_price', 'down')}
+                    className="border border-l-0 border-[#0D0D0D] px-2 hover:bg-[#F4F4F0] transition-colors"
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => adjustPrice('upper_price', 'up')}
+                    className="border border-l-0 border-[#0D0D0D] px-2 hover:bg-[#F4F4F0] transition-colors"
+                  >
+                    <Plus size={14} />
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
+
+        {/* Range info: bin count and percentage */}
+        {rangePct !== null && binCount !== null && (
+          <div className="flex justify-between text-xs text-gray-500 px-1 -mt-2">
+            <span>
+              Range: <strong className="text-[#0D0D0D]">{rangePct.toFixed(2)}%</strong>
+            </span>
+            <span>
+              Bins: <strong className="text-[#0D0D0D]">{binCount}</strong>
+            </span>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1">

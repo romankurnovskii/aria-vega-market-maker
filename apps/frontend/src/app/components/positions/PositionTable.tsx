@@ -3,11 +3,13 @@
 import React from 'react';
 import { ChevronRight } from 'lucide-react';
 import { formatAmount, getTokenSymbol } from '../../utils/format';
+import type { CycleMetrics } from '../../utils/cycleCalculations';
 import type { Position } from '../../types/api';
 
 interface PositionTableProps {
   positions: Position[];
   positionOrchestration: Record<string, { strategyId: string; mode: string }>;
+  cycles?: Map<string, CycleMetrics>;
   selectedPosId: string | null;
   onSelect: (id: string | null) => void;
   onOpenPositionClick?: () => void;
@@ -37,12 +39,15 @@ interface PnLData {
 export const PositionTable = ({
   positions,
   positionOrchestration = {},
+  cycles,
   selectedPosId,
   onSelect,
   onOpenPositionClick,
 }: PositionTableProps) => {
   const openPositions = positions.filter((pos: Position) => pos.state !== 'CLOSED');
-  const closedPositions = positions.filter((pos: Position) => pos.state === 'CLOSED');
+  const closedPositions = positions
+    .filter((pos: Position) => pos.state === 'CLOSED')
+    .sort((a, b) => (b.openedAt ?? 0) - (a.openedAt ?? 0));
 
   const timeAgo = (ts?: number): string => {
     if (!ts) return '';
@@ -98,6 +103,13 @@ export const PositionTable = ({
 
     const inRange = pos.status === 'In Range';
 
+    // Find cycle for this position
+    let cycleForPos: CycleMetrics | undefined;
+    if (cycles) {
+      cycleForPos = Array.from(cycles.values()).find((c) => c.positionsInCycle.some((p) => p.id === pos.id));
+    }
+    const isPartOfCycle = cycleForPos && cycleForPos.positionsInCycle.length > 1;
+
     return (
       <tr
         key={pos.id}
@@ -111,7 +123,8 @@ export const PositionTable = ({
               <span className={`mt-1 block w-2 h-2 rounded-full shrink-0 ${inRange ? 'bg-green-500' : 'bg-[#FF4500]'}`} />
               <div>
                 <div className={`font-mono text-sm ${inRange ? 'text-green-600' : 'text-[#FF4500]'}`}>
-                  ${Number(pos.lowerBoundPrice).toFixed(2)}–${Number(pos.upperBoundPrice).toFixed(2)}
+                  ${pos.lowerBoundPrice !== undefined ? Number(pos.lowerBoundPrice).toFixed(2) : '---'}–$
+                  {pos.upperBoundPrice !== undefined ? Number(pos.upperBoundPrice).toFixed(2) : '---'}
                 </div>
                 <div className="text-[13px] text-gray-400 font-mono">
                   {tokenYSym} per {tokenXSym}
@@ -166,6 +179,14 @@ export const PositionTable = ({
             <div className={`font-mono text-[13px] ${pnlPctChange >= 0 ? 'text-green-600' : 'text-[#FF4500]'}`}>
               {pnlPctChange >= 0 ? '+' : ''}
               {pnlPctChange.toFixed(2)}%
+            </div>
+          )}
+          {isPartOfCycle && cycleForPos && (
+            <div
+              className={`mt-1 font-mono text-[11px] ${cycleForPos.totalPnlUsd >= 0 ? 'text-green-700' : 'text-red-700'} opacity-80`}
+              title="Full Cycle PnL"
+            >
+              ⟳ {cycleForPos.totalPnlUsd >= 0 ? '+' : ''}${Math.abs(cycleForPos.totalPnlUsd).toFixed(4)}
             </div>
           )}
         </td>

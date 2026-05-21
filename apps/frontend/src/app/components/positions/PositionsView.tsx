@@ -18,10 +18,12 @@ import React, { useState, useMemo } from 'react';
 import { PositionTable } from './PositionTable';
 import { PositionDetail } from './PositionDetail';
 import { OpenPositionForm } from './OpenPositionForm';
-import type { Assignment, Strategy, Position, EvalLogEntry } from '../../types/api';
+import { buildPositionCycles } from '../../utils/cycleCalculations';
+import type { Assignment, Strategy, Position, EvalLogEntry, PositionLineageRecord } from '../../types/api';
 
 interface Props {
   positions: Position[];
+  lineage: PositionLineageRecord[];
   assignments: Assignment[];
   strategies: Strategy[];
   onAssign: (positionId: string, strategyId: string, mode: string) => Promise<void>;
@@ -47,6 +49,7 @@ interface Props {
 
 export const PositionsView = ({
   positions,
+  lineage,
   assignments,
   strategies,
   onAssign,
@@ -67,6 +70,8 @@ export const PositionsView = ({
     return map;
   }, [assignments]);
 
+  const cycles = useMemo(() => buildPositionCycles(positions, lineage), [positions, lineage]);
+
   const selectedPos = positions.find((p: Position) => p.id === selectedPosId);
   const selectedOrch = selectedPos ? positionOrchestration[selectedPos.id] : null;
 
@@ -77,6 +82,7 @@ export const PositionsView = ({
       >
         <PositionTable
           positions={positions}
+          cycles={cycles}
           positionOrchestration={positionOrchestration}
           selectedPosId={selectedPosId}
           onSelect={(id) => {
@@ -98,6 +104,7 @@ export const PositionsView = ({
             <PositionDetail
               key={selectedPos.id}
               position={selectedPos}
+              cycle={Array.from(cycles.values()).find((c) => c.positionsInCycle.some((p) => p.id === selectedPos.id))}
               orchestration={selectedOrch}
               strategies={strategies}
               onAssign={onAssign}
@@ -106,6 +113,7 @@ export const PositionsView = ({
               onApplySuggestion={onApplySuggestion}
               evalLogs={evalLogs}
               onClose={() => setSelectedPosId(null)}
+              onSelectPosition={(id) => setSelectedPosId(id)}
             />
           ) : null}
         </div>

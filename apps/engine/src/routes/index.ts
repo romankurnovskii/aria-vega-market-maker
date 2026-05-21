@@ -3,3 +3,4 @@ export { createIntrospectionRouter } from './introspection.js';
 export { handlePositionsRouter } from './positions.js';
 export { createWalletsRouter } from './wallets.js';
 export { createGatewayRouter } from './gateway.js';
+export { createLineageRouter } from './lineage.js';
