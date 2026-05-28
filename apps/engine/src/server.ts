@@ -18,8 +18,17 @@ import YAML from 'yamljs';
 import { fileURLToPath } from 'url';
 import path, { dirname } from 'path';
 
-import { IStore, IOrchestratorRegistry, IExecutor, IPositionProvider, IPositionStore, ILineageStore } from '@lp-system/core';
+import {
+  IStore,
+  IOrchestratorRegistry,
+  IExecutor,
+  IPositionProvider,
+  IPositionStore,
+  ILineageStore,
+  IStrategyStore,
+} from '@lp-system/core';
 import { OrchestratorFactory } from '@lp-system/orchestration';
+import { StepRegistry } from '@lp-system/strategy';
 import { getLogger } from '@lp-system/logger';
 import {
   createAssignmentsRouter,
@@ -55,6 +64,8 @@ export function startHttpServer(
   positionProvider: IPositionProvider,
   walletAddress: string,
   lineageStore: ILineageStore,
+  stepRegistry: StepRegistry,
+  strategyStore: IStrategyStore,
   positionStore?: IPositionStore
 ): express.Application {
   const app = express();
@@ -64,7 +75,7 @@ export function startHttpServer(
   const PORT = process.env.PORT || 3000;
 
   app.use('/assignments', createAssignmentsRouter(store, registry, factory));
-  app.use('/', createIntrospectionRouter(factory));
+  app.use('/', createIntrospectionRouter(factory, stepRegistry, strategyStore));
   app.use('/wallets', createWalletsRouter(positionProvider));
   app.use('/gateway', createGatewayRouter(executor));
   app.use(

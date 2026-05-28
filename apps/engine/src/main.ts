@@ -14,8 +14,21 @@
 
 import { HummingbotProvider } from '@lp-system/providers';
 import { HummingbotExecutor } from '@lp-system/executor';
-import { JsonFileStore, JsonPositionStore, JsonLineageStore } from '@lp-system/persistence';
-import { TrailingUsdcStrategy, ExperimentalRestakeStrategy } from '@lp-system/strategy';
+import { JsonFileStore, JsonPositionStore, JsonLineageStore, JsonStrategyStore } from '@lp-system/persistence';
+import { TrailingUsdcStrategy, ExperimentalRestakeStrategy, StepRegistry, DataDrivenStrategy } from '@lp-system/strategy';
+import {
+  InitializationCheckStep,
+  TrailingRangeCheckStep,
+  RangeCalculatorStep,
+  AmountCalculatorStep,
+  ClmmPricingStep,
+  ExperimentalRestakeStep,
+  FavorableRangeCheckStep,
+  HighFeeCheckStep,
+  ConditionDecisionStep,
+  RsiIndicatorStep,
+  SmaIndicatorStep,
+} from '@lp-system/steps';
 import { OrchestratorRegistry, OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
 import { startHttpServer } from './server.js';
@@ -54,6 +67,33 @@ async function main() {
     env: APP_ENV,
   });
   const lineageStore = new JsonLineageStore('./data', { wallet: walletAddress, env: APP_ENV });
+  const strategyStore = new JsonStrategyStore('./data', { wallet: walletAddress, env: APP_ENV });
+
+  // 3.5 Step Registry initialization
+  const stepRegistry = new StepRegistry();
+  stepRegistry.register(
+    'initialization-check',
+    () => new InitializationCheckStep(),
+    new InitializationCheckStep().descriptor
+  );
+  stepRegistry.register('high-fee-check', () => new HighFeeCheckStep(), new HighFeeCheckStep().descriptor);
+  stepRegistry.register('trailing-range-check', () => new TrailingRangeCheckStep(), new TrailingRangeCheckStep().descriptor);
+  stepRegistry.register('range-calculator', () => new RangeCalculatorStep(), new RangeCalculatorStep().descriptor);
+  stepRegistry.register('amount-calculator', () => new AmountCalculatorStep(), new AmountCalculatorStep().descriptor);
+  stepRegistry.register('clmm-pricing', () => new ClmmPricingStep(), new ClmmPricingStep().descriptor);
+  stepRegistry.register(
+    'experimental-restake',
+    () => new ExperimentalRestakeStep(),
+    new ExperimentalRestakeStep().descriptor
+  );
+  stepRegistry.register(
+    'favorable-range-check',
+    () => new FavorableRangeCheckStep(),
+    new FavorableRangeCheckStep().descriptor
+  );
+  stepRegistry.register('condition-decision', () => new ConditionDecisionStep(), new ConditionDecisionStep().descriptor);
+  stepRegistry.register('rsi-indicator', () => new RsiIndicatorStep(), new RsiIndicatorStep().descriptor);
+  stepRegistry.register('sma-indicator', () => new SmaIndicatorStep(), new SmaIndicatorStep().descriptor);
 
   // 4. Strategy initialization
   const trailingUsdcStrategy = new TrailingUsdcStrategy({ rangePercent: 20 });
@@ -68,6 +108,18 @@ async function main() {
     },
     { rangePercent: 20 }
   );
+
+  // 5.2 Load custom data-driven strategies from store
+  const customStrategies = await strategyStore.getStrategies();
+  for (const def of customStrategies) {
+    try {
+      const customStrategy = new DataDrivenStrategy(def, stepRegistry);
+      factory.registerStrategy(customStrategy);
+      logger.info(`[Engine] Loaded custom strategy: ${def.id}`);
+    } catch (err) {
+      logger.warn(`[Engine] Failed to load custom strategy ${def.id}: ${err}`);
+    }
+  }
 
   // 5.5 Restore persisted assignments → orchestrators
   const assignments = await store.getAssignments();
@@ -106,7 +158,18 @@ async function main() {
 
   // 8. Web Control Plane Activation
 
-  startHttpServer(store, registry, executor, factory, positionProvider, walletAddress, lineageStore, positionStore);
+  startHttpServer(
+    store,
+    registry,
+    executor,
+    factory,
+    positionProvider,
+    walletAddress,
+    lineageStore,
+    stepRegistry,
+    strategyStore,
+    positionStore
+  );
 
   // 9. Graceful Shutdown handlers
   process.on('SIGINT', () => {
