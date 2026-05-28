@@ -19,3 +19,6 @@ export { ExperimentalRestakeStep } from './experimental-restake-step.js';
 export { FavorableRangeCheckStep } from './favorable-range-check-step.js';
 export { ClmmPricingStep } from './clmm-pricing-step.js';
 export { HighFeeCheckStep } from './high-fee-check-step.js';
+export { ConditionDecisionStep } from './condition-decision-step.js';
+export { RsiIndicatorStep } from './rsi-indicator-step.js';
+export { SmaIndicatorStep } from './sma-indicator-step.js';

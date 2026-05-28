@@ -11,7 +11,7 @@
  * @dependencies IStep, StepContext, CalculatedPrices (from @lp-system/core)
  * @sideEffects None — pure check, no mutations beyond signal/reason in context
  */
-import { IStep, StepContext } from '@lp-system/core';
+import { IStep, StepContext, StepDescriptor } from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
 
 const logger = getLogger('favorable-range-check-step');
@@ -32,6 +32,27 @@ const DEFAULT_PARAMS: FavorableRangeParams = {
 
 export class FavorableRangeCheckStep implements IStep {
   public name = 'FavorableRangeCheckStep';
+
+  public readonly descriptor: StepDescriptor = {
+    id: 'favorable-range-check',
+    name: 'Favorable Range Check',
+    description: 'Evaluates if market conditions favor deploying a wider liquidity range.',
+    category: 'analysis',
+    inputs: [
+      { key: 'market', type: 'MarketSnapshot', description: 'Market data including price history and fee rate' },
+      { key: 'signal', type: 'string', description: 'Prior signal (if any)', required: false },
+    ],
+    outputs: [
+      { key: 'signal', type: 'string', description: 'Set to "close+open" or "skip"' },
+      { key: 'reason', type: 'string', description: 'Explanation' },
+    ],
+    params: [
+      { key: 'volatilityThreshold', type: 'number', description: 'Max coefficient of variation' },
+      { key: 'minTrendLength', type: 'number', description: 'Minimum data points for trend check' },
+      { key: 'feeRateMinBps', type: 'number', description: 'Minimum fee rate in bps' },
+      { key: 'priceStabilityWindow', type: 'number', description: 'Maximum price change ratio' },
+    ],
+  };
 
   private params: FavorableRangeParams;
 

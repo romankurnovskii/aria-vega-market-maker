@@ -2,15 +2,21 @@
   "name": "@lp-system/steps",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
     "build": "tsc",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "tsx --test src/**/*.test.ts",
+    "test:coverage": "tsx --test --experimental-test-coverage src/**/*.test.ts"
   },
   "dependencies": {
     "@lp-system/core": "workspace:*",
     "@lp-system/logger": "workspace:*",
     "@lp-system/providers": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.1"
   }
 }

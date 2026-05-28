@@ -11,13 +11,31 @@
  * @dependencies IStep, StepContext (from @lp-system/core)
  * @sideEffects None — pure check, no mutations beyond signal/reason in context
  */
-import { IStep, StepContext } from '@lp-system/core';
+import { IStep, StepContext, StepDescriptor } from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
 
 const logger = getLogger('trailing-range-check-step');
 
 export class TrailingRangeCheckStep implements IStep {
   public name = 'TrailingRangeCheckStep';
+
+  public readonly descriptor: StepDescriptor = {
+    id: 'trailing-range-check',
+    name: 'Trailing Range Check',
+    description: 'Detects if active price bound has drifted outside the position boundaries.',
+    category: 'guard',
+    inputs: [
+      { key: 'position', type: 'Position', description: 'Current LP position bounds' },
+      { key: 'market', type: 'MarketSnapshot', description: 'Current active market bound' },
+      { key: 'signal', type: 'string', description: 'Prior signal (if any)', required: false },
+    ],
+    outputs: [
+      { key: 'signal', type: 'string', description: 'Set to "close+open" or "skip"' },
+      { key: 'reason', type: 'string', description: 'Explanation' },
+      { key: 'isInRange', type: 'boolean', description: 'Whether the active bound is within position boundaries' },
+    ],
+    params: [],
+  };
 
   /**
    * Checks if the current active bound lies within the position's boundary range.
@@ -44,6 +62,7 @@ export class TrailingRangeCheckStep implements IStep {
       );
       return {
         ...context,
+        isInRange: false,
         signal: 'close+open',
         reason: `Active bound ${context.market.activeBound} shifted out of range [${context.position.lowerBound}, ${context.position.upperBound}]`,
       };
@@ -52,6 +71,7 @@ export class TrailingRangeCheckStep implements IStep {
     logger.info(`[${this.name}] Active bound is healthy and within range boundaries.`);
     return {
       ...context,
+      isInRange: true,
       signal: 'skip',
       reason: 'Active bound remains within range',
     };

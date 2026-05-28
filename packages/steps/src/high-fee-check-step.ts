@@ -13,7 +13,7 @@
  * @dependencies IStep, StepContext (from @lp-system/core)
  * @sideEffects None — pure check, no mutations beyond signal/reason in context
  */
-import { IStep, StepContext } from '@lp-system/core';
+import { IStep, StepContext, StepDescriptor } from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
 
 const logger = getLogger('high-fee-check-step');
@@ -30,6 +30,22 @@ const DEFAULT_MIN_FEE_USD = 10;
 
 export class HighFeeCheckStep implements IStep {
   public name = 'HighFeeCheckStep';
+
+  public readonly descriptor: StepDescriptor = {
+    id: 'high-fee-check',
+    name: 'High Fee Check',
+    description: 'Detects positions with accrued fees exceeding a configurable threshold. Emits CLOSE signal.',
+    category: 'guard',
+    inputs: [
+      { key: 'position', type: 'Position', description: 'Position metadata with feeX/feeY' },
+      { key: 'signal', type: 'string', description: 'Prior signal (if any)', required: false },
+    ],
+    outputs: [
+      { key: 'signal', type: 'string', description: 'Set to "close" or "skip"' },
+      { key: 'reason', type: 'string', description: 'Explanation' },
+    ],
+    params: [{ key: 'highFeeCheck', type: 'object', description: 'Parameters for high fee check' }],
+  };
 
   public async execute(context: StepContext): Promise<StepContext> {
     logger.info(`[${this.name}] Checking for high-fee positions on ${context.position.id}`);

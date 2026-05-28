@@ -10,13 +10,26 @@
  * @dependencies IStep, StepContext (from @lp-system/core), rangePercent from strategy params
  * @sideEffects None — pure calculation
  */
-import { IStep, StepContext } from '@lp-system/core';
+import { IStep, StepContext, StepDescriptor } from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
 
 const logger = getLogger('range-calculator-step');
 
 export class RangeCalculatorStep implements IStep {
   public name = 'RangeCalculatorStep';
+
+  public readonly descriptor: StepDescriptor = {
+    id: 'range-calculator',
+    name: 'Range Calculator',
+    description: 'Calculates new symmetric bin boundaries centered on the current active bound.',
+    category: 'range',
+    inputs: [
+      { key: 'signal', type: 'string', description: 'Requires "close+open" to run' },
+      { key: 'market', type: 'MarketSnapshot', description: 'Requires market.activeBound' },
+    ],
+    outputs: [{ key: 'openParams', type: 'OpenParams', description: 'Sets bounds in openParams' }],
+    params: [{ key: 'rangePercent', type: 'number', description: 'Width of the range around active price', default: 20 }],
+  };
 
   /**
    * Calculates new bin boundaries centered on the current active bound.

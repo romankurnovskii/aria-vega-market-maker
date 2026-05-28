@@ -10,13 +10,29 @@
  * @dependencies IStep, StepContext (from @lp-system/core)
  * @sideEffects None — pure calculation
  */
-import { IStep, StepContext } from '@lp-system/core';
+import { IStep, StepContext, StepDescriptor } from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
 
 const logger = getLogger('amount-calculator-step');
 
 export class AmountCalculatorStep implements IStep {
   public name = 'AmountCalculatorStep';
+
+  public readonly descriptor: StepDescriptor = {
+    id: 'amount-calculator',
+    name: 'Amount Calculator',
+    description: 'Calculates token amounts for a new position during rebalance (default: rolls over exact amounts).',
+    category: 'amount',
+    inputs: [
+      { key: 'openParams', type: 'OpenParams', description: 'Requires initialized openParams' },
+      { key: 'position', type: 'Position', description: 'Reads existing token amounts' },
+    ],
+    outputs: [{ key: 'openParams', type: 'OpenParams', description: 'Updates tokenXAmount and tokenYAmount' }],
+    params: [
+      { key: 'tokenXAmount', type: 'string', description: 'Manual override for token X amount' },
+      { key: 'tokenYAmount', type: 'string', description: 'Manual override for token Y amount' },
+    ],
+  };
 
   /**
    * Fills in the token allocation amounts in openParams.

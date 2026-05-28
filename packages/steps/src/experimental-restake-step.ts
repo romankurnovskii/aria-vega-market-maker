@@ -12,7 +12,7 @@
  * @sideEffects None — pure evaluation, no external calls
  */
 
-import { IStep, StepContext } from '@lp-system/core';
+import { IStep, StepContext, StepDescriptor } from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
 import { getBinIdFromPrice, calculateConcentratedLiquidityPrices } from '@lp-system/providers';
 
@@ -20,6 +20,29 @@ const logger = getLogger('experimental-restake-step');
 
 export class ExperimentalRestakeStep implements IStep {
   public name = 'ExperimentalRestakeStep';
+
+  public readonly descriptor: StepDescriptor = {
+    id: 'experimental-restake',
+    name: 'Experimental Restake',
+    description: 'Evaluates active bin relative to position to restake (upward trailing or downward re-average).',
+    category: 'analysis',
+    inputs: [
+      { key: 'position', type: 'Position', description: 'Current LP position state' },
+      { key: 'market', type: 'MarketSnapshot', description: 'Current market state' },
+      { key: 'calculations', type: 'CalculatedPrices', description: 'Pricing metrics', required: false },
+    ],
+    outputs: [
+      { key: 'signal', type: 'string', description: 'Set to "close+open" or "skip"' },
+      { key: 'reason', type: 'string', description: 'Explanation' },
+      { key: 'openParams', type: 'OpenParams', description: 'Generated restake params' },
+      { key: 'calculations', type: 'CalculatedPrices', description: 'Computed if missing' },
+    ],
+    params: [
+      { key: 'binStep', type: 'number', description: 'Pool bin step' },
+      { key: 'restakeAmount', type: 'string', description: 'USDC amount for upward trailing' },
+      { key: 'restakeAmountSol', type: 'string', description: 'SOL amount for downward restaking' },
+    ],
+  };
 
   /**
    * Evaluates the restake rule for the position and market context.

@@ -10,13 +10,26 @@
  * @dependencies IStep, StepContext (from @lp-system/core)
  * @sideEffects None — pure check with no state mutation
  */
-import { IStep, StepContext } from '@lp-system/core';
+import { IStep, StepContext, StepDescriptor } from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
 
 const logger = getLogger('initialization-check-step');
 
 export class InitializationCheckStep implements IStep {
   public name = 'InitializationCheckStep';
+
+  public readonly descriptor: StepDescriptor = {
+    id: 'initialization-check',
+    name: 'Initialization Check',
+    description: 'Validates that the position has non-zero liquidity. Emits CLOSE signal if position is empty.',
+    category: 'guard',
+    inputs: [{ key: 'position', type: 'Position', description: 'Current LP position state' }],
+    outputs: [
+      { key: 'signal', type: 'string', description: 'Set to "close" if zero liquidity' },
+      { key: 'reason', type: 'string', description: 'Explanation of the signal' },
+    ],
+    params: [],
+  };
 
   /**
    * Executes the initialization check.

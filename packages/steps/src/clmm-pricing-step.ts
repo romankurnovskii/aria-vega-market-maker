@@ -11,7 +11,7 @@
  * @dependencies IStep, StepContext (from @lp-system/core), calculateConcentratedLiquidityPrices (from @lp-system/providers)
  * @sideEffects Logs formatted card to terminal; populates context.calculations
  */
-import { IStep, StepContext } from '@lp-system/core';
+import { IStep, StepContext, StepDescriptor } from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
 import { calculateConcentratedLiquidityPrices } from '@lp-system/providers';
 
@@ -19,6 +19,22 @@ const logger = getLogger('clmm-pricing-step');
 
 export class ClmmPricingStep implements IStep {
   public name = 'ClmmPricingStep';
+
+  public readonly descriptor: StepDescriptor = {
+    id: 'clmm-pricing',
+    name: 'CLMM Pricing',
+    description: 'Calculates CLMM average entry, spot accounting, and break-even pricing.',
+    category: 'pricing',
+    inputs: [{ key: 'position', type: 'Position', description: 'Current LP position bounds and token amounts' }],
+    outputs: [
+      {
+        key: 'calculations',
+        type: 'CalculatedPrices',
+        description: 'Pricing computations (geometric average, effective break-even, etc.)',
+      },
+    ],
+    params: [{ key: 'binStep', type: 'number', description: 'Pool bin step override' }],
+  };
 
   /**
    * Performs price and entry calculations, logs the premium card, and saves results to context.
