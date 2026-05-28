@@ -46,7 +46,7 @@ test('JsonFileStore - concurrent saveAssignment updates are atomic and no update
     id: `assign_${i}`,
     strategyId: 'active-restake',
     positionId: `pos_${i}`,
-    walletAddress: 'HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTYUQh',
+    walletAddress: 'HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTMock',
     lowerBound: 100,
     upperBound: 200,
     targetLiquidityX: '1000',

@@ -25,7 +25,7 @@ export interface StoreOptions {
 
 /**
  * Truncates and formats a wallet public key to a compact representation.
- * E.g., HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTYUQh -> HU5H_YUQh
+ * E.g., HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTMock -> HU5H_TMoc
  *
  * @param {string} wallet - Full Solana public key or identifier.
  * @returns {string} Sliced version of the public key.

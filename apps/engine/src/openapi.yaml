@@ -113,7 +113,7 @@ paths:
                 properties:
                   wallet:
                     type: string
-                    example: 'HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTYUQh'
+                    example: 'HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTMock'
                   count:
                     type: integer
                     example: 2
@@ -142,7 +142,7 @@ paths:
                 properties:
                   wallet:
                     type: string
-                    example: 'HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTYUQh'
+                    example: 'HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTMock'
                   count:
                     type: integer
                     example: 5
@@ -171,7 +171,7 @@ paths:
                 properties:
                   wallet:
                     type: string
-                    example: 'HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTYUQh'
+                    example: 'HU5Hqv8VnSQV4EC4yPw2riS2KjDTwFYTsbUyD3XTMock'
                   count:
                     type: integer
                     example: 5
@@ -505,7 +505,7 @@ components:
         id:
           type: string
           description: 'Unique on-chain identifier (e.g., Solana account public key or EVM NFT ID).'
-          example: '77aEZeqjbhYG784TB2foz8rv58bPsqLVCB2mGhNFBGfj'
+          example: '77aEZeqjbhYG784TB2foz8rv58bPsqLVCB2mGhNFMock'
         poolAddress:
           type: string
           description: 'On-chain contract/mint address of the associated CLMM pool.'
