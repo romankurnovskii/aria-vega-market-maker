@@ -9,7 +9,7 @@
  * - IExecutor: Transaction execution handler for on-chain operations
  * - IPositionProvider: External data source abstraction for positions/markets
  * - IRpcProvider: RPC connection abstraction with retry logic
- * - IStore / IPositionStore / ILineageStore: Persistence layer interfaces
+ * - IStore / IPositionStore / ILineageStore / IStrategyStore: Persistence layer interfaces
  * - IOrchestratorRegistry: In-memory orchestrator lifecycle manager
  *
  * @dependencies None — defines contract types only
@@ -26,6 +26,9 @@ import {
   AssignmentMode,
   StepContext,
   PositionLineageRecord,
+  StepDescriptor,
+  PipelineContext,
+  StrategyDefinition,
 } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -33,7 +36,8 @@ export type ConnectionPlaceholder = any;
 
 export interface IStep {
   name: string;
-  execute(context: StepContext): Promise<StepContext>;
+  readonly descriptor: StepDescriptor;
+  execute(context: PipelineContext | StepContext): Promise<PipelineContext | StepContext>;
 }
 
 export interface IStrategy {
@@ -89,6 +93,12 @@ export interface ILineageStore {
   getLineage(): Promise<PositionLineageRecord[]>;
   saveLineageRecord(record: PositionLineageRecord): Promise<void>;
   getLineageForPosition(positionId: string): Promise<PositionLineageRecord[]>;
+}
+
+export interface IStrategyStore {
+  getStrategies(): Promise<StrategyDefinition[]>;
+  saveStrategy(definition: StrategyDefinition): Promise<void>;
+  deleteStrategy(id: string): Promise<void>;
 }
 
 export interface IOrchestratorRegistry {

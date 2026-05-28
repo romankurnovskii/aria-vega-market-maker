@@ -15,3 +15,4 @@ export * from './position';
 export * from './market';
 export * from './strategy';
 export * from './orchestration';
+export * from './pipeline';

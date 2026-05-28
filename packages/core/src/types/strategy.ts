@@ -33,6 +33,7 @@ export interface StepContext {
   openParams?: OpenParams;
   reason?: string;
   calculations?: CalculatedPrices;
+  [key: string]: unknown; // Allow arbitrary custom outputs
 }
 
 export type StrategyResult =

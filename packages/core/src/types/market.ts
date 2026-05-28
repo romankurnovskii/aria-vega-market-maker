@@ -24,7 +24,8 @@ export interface MarketSnapshot {
   protocol: ProtocolType;
   activeBound: number; // Agnostic active boundary (activeBinId or activeTick)
   price: number;
-  priceHistory: PricePoint[]; // last N minutes
+  priceHistory: PricePoint[]; // last N candles
+  priceHistoryTimeframe?: string; // e.g. '1h', '15m', '5m'
   feeRate: number;
   capturedAt: number;
 
