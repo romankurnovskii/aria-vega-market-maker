@@ -194,15 +194,25 @@ async function fetchPoolData(poolAddress: string): Promise<PoolResponse> {
 /**
  * Fetches a market snapshot for a pool via Meteora Datapi.
  * Includes price history from OHLCV endpoint.
+ *
+ * @param {string} poolAddress - The pool address to fetch the snapshot for.
+ * @param {string} [timeframe='1h'] - OHLCV candle resolution (e.g. '1h', '15m', '5m').
+ * @param {number} [lookback=24] - Number of candles to keep in priceHistory.
+ * @returns {Promise<MarketSnapshot>} Market snapshot with price history.
  */
-export async function getMarketSnapshot(poolAddress: string): Promise<MarketSnapshot> {
-  const cached = marketSnapshotCache.get(poolAddress);
+export async function getMarketSnapshot(
+  poolAddress: string,
+  timeframe: string = '1h',
+  lookback: number = 24
+): Promise<MarketSnapshot> {
+  const cacheKey = `${poolAddress}_${timeframe}_${lookback}`;
+  const cached = marketSnapshotCache.get(cacheKey);
   const now = Date.now();
   if (cached && now - cached.timestamp < 10000) {
     return cached.data;
   }
 
-  logger.info(`[MeteoraUtils] Fetching market snapshot for ${poolAddress}`);
+  logger.info(`[MeteoraUtils] Fetching market snapshot for ${poolAddress} (timeframe=${timeframe}, lookback=${lookback})`);
 
   const poolData = await fetchPoolData(poolAddress);
 
@@ -218,7 +228,7 @@ export async function getMarketSnapshot(poolAddress: string): Promise<MarketSnap
   let priceHistory: { price: number; timestamp: number }[] = [];
 
   try {
-    const ohlcvUrl = `${METEORA_DATAPI_URL}/pools/${poolAddress}/ohlcv?timeframe=1h`;
+    const ohlcvUrl = `${METEORA_DATAPI_URL}/pools/${poolAddress}/ohlcv?timeframe=${timeframe}`;
     const ohlcvResponse = await fetch(ohlcvUrl, {
       headers: { Accept: 'application/json', 'User-Agent': 'MeteoraUtils/1.0' },
     });
@@ -231,7 +241,7 @@ export async function getMarketSnapshot(poolAddress: string): Promise<MarketSnap
             price: candle.close,
             timestamp: candle.timestamp * 1000,
           }))
-          .slice(-24);
+          .slice(-lookback);
       }
     }
   } catch (err) {
@@ -250,10 +260,11 @@ export async function getMarketSnapshot(poolAddress: string): Promise<MarketSnap
     activeBinId,
     price: poolData.current_price,
     priceHistory,
+    priceHistoryTimeframe: timeframe,
     feeRate,
     capturedAt: Date.now(),
   };
 
-  marketSnapshotCache.set(poolAddress, { data: snapshot, timestamp: now });
+  marketSnapshotCache.set(cacheKey, { data: snapshot, timestamp: now });
   return snapshot;
 }
