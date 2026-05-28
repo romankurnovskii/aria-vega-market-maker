@@ -11,4 +11,5 @@
 export { JsonFileStore } from './json-file-store.js';
 export { JsonPositionStore } from './json-position-store.js';
 export { JsonLineageStore } from './json-lineage-store.js';
+export { JsonStrategyStore } from './json-strategy-store.js';
 export { fileMutex, AsyncFileMutex } from './mutex.js';
