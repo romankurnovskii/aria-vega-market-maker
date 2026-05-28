@@ -64,6 +64,19 @@ export class OrchestratorFactory {
   }
 
   /**
+   * Registers a new strategy dynamically at runtime.
+   *
+   * @param {IStrategy} strategy - The strategy instance to register.
+   */
+  public registerStrategy(strategy: IStrategy): void {
+    if (this.strategies[strategy.id]) {
+      logger.warn(`[OrchestratorFactory] Overwriting existing strategy registration for ID: ${strategy.id}`);
+    }
+    this.strategies[strategy.id] = strategy;
+    logger.info(`[OrchestratorFactory] Registered strategy: ${strategy.id}`);
+  }
+
+  /**
    * Returns the list of unique strategy IDs registered in the system.
    *
    * @returns {string[]} List of registered strategy IDs.
