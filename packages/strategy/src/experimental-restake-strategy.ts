@@ -12,12 +12,26 @@
  * @sideEffects None — pure composition and evaluation
  */
 
-import { IStrategy, Position, MarketSnapshot, StrategyResult, StepContext } from '@lp-system/core';
+import { IStrategy, Position, MarketSnapshot, StrategyResult, StrategyDefinition } from '@lp-system/core';
 import { InitializationCheckStep, ClmmPricingStep, ExperimentalRestakeStep } from '@lp-system/steps';
 import { getLogger } from '@lp-system/logger';
-import { Workflow } from './workflow.js';
+import { DataDrivenStrategy } from './data-driven-strategy.js';
+import { StepRegistry } from './step-registry.js';
 
 const logger = getLogger('experimental-restake-strategy');
+
+export const experimentalRestakeDefinition: StrategyDefinition = {
+  id: 'experimental-restake',
+  name: 'Experimental Restake',
+  description:
+    'Experimental trailing strategy: reopens with 0.15% (4-bin) USDC-only range when price is above range, and rolls SOL-only down-range maintaining average buy price when price is below range',
+  steps: [
+    { stepId: 'initialization-check', params: {} },
+    { stepId: 'clmm-pricing', params: {} },
+    { stepId: 'experimental-restake', params: {} },
+  ],
+  defaultParams: {},
+};
 
 /**
  * ExperimentalRestakeStrategy
@@ -42,11 +56,20 @@ export class ExperimentalRestakeStrategy implements IStrategy {
   public id = 'experimental-restake';
   public description =
     'Experimental trailing strategy: reopens with 0.15% (4-bin) USDC-only range when price is above range, and rolls SOL-only down-range maintaining average buy price when price is below range';
-  private workflow: Workflow;
+  private dataDrivenStrategy: DataDrivenStrategy;
 
-  constructor(private defaultParams: Record<string, unknown> = {}) {
-    // Construct the sequential pipeline workflow following standard architecture
-    this.workflow = new Workflow([new InitializationCheckStep(), new ClmmPricingStep(), new ExperimentalRestakeStep()]);
+  constructor(defaultParams: Record<string, unknown> = {}) {
+    const registry = new StepRegistry();
+    registry.register('initialization-check', () => new InitializationCheckStep(), new InitializationCheckStep().descriptor);
+    registry.register('clmm-pricing', () => new ClmmPricingStep(), new ClmmPricingStep().descriptor);
+    registry.register('experimental-restake', () => new ExperimentalRestakeStep(), new ExperimentalRestakeStep().descriptor);
+
+    const definition = {
+      ...experimentalRestakeDefinition,
+      defaultParams: { ...experimentalRestakeDefinition.defaultParams, ...defaultParams },
+    };
+
+    this.dataDrivenStrategy = new DataDrivenStrategy(definition, registry);
   }
 
   /**
@@ -62,66 +85,7 @@ export class ExperimentalRestakeStrategy implements IStrategy {
     market: MarketSnapshot,
     params: Record<string, unknown>
   ): Promise<StrategyResult> {
-    logger.info(`[ExperimentalRestakeStrategy] Initiating strategy evaluation for position: ${position.id}`);
-
-    const mergedParams = {
-      ...this.defaultParams,
-      ...params,
-    };
-
-    const initialContext: StepContext = {
-      position,
-      market,
-      params: mergedParams,
-    };
-
-    logger.info(
-      `[ExperimentalRestakeStrategy] Market snapshot - active bound: ${market.activeBound}, position range: [${position.lowerBound}, ${position.upperBound}]`
-    );
-
-    // Run the step-based workflow pipeline
-    const finalContext = await this.workflow.run(initialContext);
-
-    logger.info(
-      `[ExperimentalRestakeStrategy] Workflow evaluation complete. Signal: ${finalContext.signal || 'none'}, Reason: ${finalContext.reason || 'none'}`
-    );
-
-    const resultBase = {
-      signal: finalContext.signal as string,
-      reason: finalContext.reason,
-      metrics: finalContext.calculations,
-    };
-
-    if (finalContext.signal === 'close+open' && finalContext.openParams) {
-      logger.info(`[ExperimentalRestakeStrategy] Decision: close+open with params`);
-      return {
-        action: 'close+open',
-        openParams: finalContext.openParams,
-        ...resultBase,
-      };
-    }
-
-    if (finalContext.signal === 'close') {
-      logger.info(`[ExperimentalRestakeStrategy] Decision: close`);
-      return {
-        action: 'close',
-        ...resultBase,
-      };
-    }
-
-    if (finalContext.signal === 'open' && finalContext.openParams) {
-      logger.info(`[ExperimentalRestakeStrategy] Decision: open with params`);
-      return {
-        action: 'open',
-        openParams: finalContext.openParams,
-        ...resultBase,
-      };
-    }
-
-    logger.info(`[ExperimentalRestakeStrategy] Decision: skip`);
-    return {
-      action: 'skip',
-      ...resultBase,
-    };
+    logger.info(`[ExperimentalRestakeStrategy] Delegating evaluation to DataDrivenStrategy`);
+    return this.dataDrivenStrategy.execute(position, market, params);
   }
 }

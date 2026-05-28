@@ -12,7 +12,7 @@
  * @dependencies IStrategy interface, Workflow (pipeline orchestration), all step classes from @lp-system/steps
  * @sideEffects None — pure computation
  */
-import { IStrategy, Position, MarketSnapshot, StrategyResult, StepContext } from '@lp-system/core';
+import { IStrategy, Position, MarketSnapshot, StrategyResult, StrategyDefinition } from '@lp-system/core';
 import {
   InitializationCheckStep,
   TrailingRangeCheckStep,
@@ -20,10 +20,25 @@ import {
   AmountCalculatorStep,
   HighFeeCheckStep,
 } from '@lp-system/steps';
-import { Workflow } from './workflow.js';
+import { DataDrivenStrategy } from './data-driven-strategy.js';
+import { StepRegistry } from './step-registry.js';
 import { getLogger } from '@lp-system/logger';
 
 const logger = getLogger('trailing-usdc-strategy');
+
+export const trailingUsdcDefinition: StrategyDefinition = {
+  id: 'trailing-usdc',
+  name: 'Trailing USDC',
+  description: 'Dynamic range trailing for USDC pairs using Meteora DLMM',
+  steps: [
+    { stepId: 'initialization-check', params: {} },
+    { stepId: 'high-fee-check', params: {} },
+    { stepId: 'trailing-range-check', params: {} },
+    { stepId: 'range-calculator', params: {} },
+    { stepId: 'amount-calculator', params: {} },
+  ],
+  defaultParams: {},
+};
 
 /**
  * TrailingUsdcStrategy: maintains a CLMM LP position centered on the active price bin.
@@ -32,27 +47,33 @@ const logger = getLogger('trailing-usdc-strategy');
 export class TrailingUsdcStrategy implements IStrategy {
   public id = 'trailing-usdc';
   public description = 'Dynamic range trailing for USDC pairs using Meteora DLMM';
-  private workflow: Workflow;
+  private dataDrivenStrategy: DataDrivenStrategy;
 
   /**
    * Constructs the strategy with default params (e.g., rangePercent: 20).
    *
    * @param {Record<string, unknown>} [defaultParams={}] - Default configuration, including `rangePercent`.
    */
-  constructor(private defaultParams: Record<string, unknown> = {}) {
-    // Set up the static workflow pipeline using reusable steps
-    this.workflow = new Workflow([
-      new InitializationCheckStep(),
-      new HighFeeCheckStep(),
-      new TrailingRangeCheckStep(),
-      new RangeCalculatorStep(),
-      new AmountCalculatorStep(),
-    ]);
+  constructor(defaultParams: Record<string, unknown> = {}) {
+    // Create a local registry for backward compatibility
+    const registry = new StepRegistry();
+    registry.register('initialization-check', () => new InitializationCheckStep(), new InitializationCheckStep().descriptor);
+    registry.register('high-fee-check', () => new HighFeeCheckStep(), new HighFeeCheckStep().descriptor);
+    registry.register('trailing-range-check', () => new TrailingRangeCheckStep(), new TrailingRangeCheckStep().descriptor);
+    registry.register('range-calculator', () => new RangeCalculatorStep(), new RangeCalculatorStep().descriptor);
+    registry.register('amount-calculator', () => new AmountCalculatorStep(), new AmountCalculatorStep().descriptor);
+
+    const definition = {
+      ...trailingUsdcDefinition,
+      defaultParams: { ...trailingUsdcDefinition.defaultParams, ...defaultParams },
+    };
+
+    this.dataDrivenStrategy = new DataDrivenStrategy(definition, registry);
   }
 
   /**
    * Executes the strategy pipeline against a position/market context.
-   * Merges defaultParams with per-call params, runs Workflow, and translates StepContext.signal into StrategyResult.
+   * Delegates to DataDrivenStrategy.
    *
    * @param {Position} position - Current position state.
    * @param {MarketSnapshot} market - Current market snapshot (price, active bin).
@@ -64,65 +85,7 @@ export class TrailingUsdcStrategy implements IStrategy {
     market: MarketSnapshot,
     params: Record<string, unknown>
   ): Promise<StrategyResult> {
-    logger.info(`[TrailingUsdcStrategy] Initiating strategy evaluation for position: ${position.id}`);
-
-    const mergedParams = {
-      ...this.defaultParams,
-      ...params,
-    };
-
-    const initialContext: StepContext = {
-      position,
-      market,
-      params: mergedParams,
-    };
-
-    logger.info(
-      `[TrailingUsdcStrategy] Market snapshot - active bound: ${market.activeBound}, position range: [${position.lowerBound}, ${position.upperBound}]`
-    );
-
-    const finalContext = await this.workflow.run(initialContext);
-
-    logger.info(
-      `[TrailingUsdcStrategy] Finished evaluation. Signal: ${finalContext.signal || 'skip'}. Reason: ${finalContext.reason || 'None'}`
-    );
-
-    const resultBase = {
-      signal: finalContext.signal as string,
-      reason: finalContext.reason,
-      metrics: finalContext.calculations,
-    };
-
-    if (finalContext.signal === 'close+open' && finalContext.openParams) {
-      logger.info(`[TrailingUsdcStrategy] Decision: close+open with params`);
-      return {
-        action: 'close+open',
-        openParams: finalContext.openParams,
-        ...resultBase,
-      };
-    }
-
-    if (finalContext.signal === 'close') {
-      logger.info(`[TrailingUsdcStrategy] Decision: close`);
-      return {
-        action: 'close',
-        ...resultBase,
-      };
-    }
-
-    if (finalContext.signal === 'open' && finalContext.openParams) {
-      logger.info(`[TrailingUsdcStrategy] Decision: open with params`);
-      return {
-        action: 'open',
-        openParams: finalContext.openParams,
-        ...resultBase,
-      };
-    }
-
-    logger.info(`[TrailingUsdcStrategy] Decision: skip`);
-    return {
-      action: 'skip',
-      ...resultBase,
-    };
+    logger.info(`[TrailingUsdcStrategy] Delegating execution to DataDrivenStrategy`);
+    return this.dataDrivenStrategy.execute(position, market, params);
   }
 }
