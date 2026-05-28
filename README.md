@@ -1,41 +1,22 @@
-# Aria Vega — Market Maker
+# 🌌 Aria Vega — Market Maker
 
-A highly structured, stateless-orchestrated automation system for CLMM liquidity provision, using the Hummingbot API.
+A highly structured, stateless-orchestrated automation system for Solana CLMM liquidity provision (Meteora DLMM) integrated via Hummingbot API.
 
-## Purpose
+![Control Panel GUI](docs/assets/gui_screenshot.png)
 
-To manage and automate concentrated liquidity positions efficiently across multiple price ranges using deterministic workflow steps.
+## 🚀 Key Features
 
-## Usage
+- **Stateless Rebalancing Workflows**: Sequential modular steps execute price check, range shift calculations, JIT open/close legs, and transaction safety caps.
+- **Hummingbot Gateway Integration**: Real-time position management, balance sync, and secure on-chain transaction execution on Solana.
+- **Crash-Resilient State Machine**: Write-ahead task recovery and sync handlers guarantee execution tracking across system restarts.
+- **Interactive Control Panel**: Next.js-powered dark-mode UI with active bin monitors, strategy builder, wallet statistics, and event logging.
+
+## 🛠️ Quick Start
 
 ```bash
-# install dependencies
-pnpm install --ignore-scripts
+# Start full development stack (Engine, Frontend, Hummingbot, Gateway)
+docker compose -f docker-compose.dev.yml up -d --build
 
-# compile all packages and apps
-pnpm build
-
-# run the engine tick loop
-pnpm start
-
-# run local development stack with hot reloading
-docker compose -f docker-compose.dev.yml up --build --force-recreate
-
-# run production container build
-docker compose -f docker-compose.prod.yml up -d --build --force-recreate
-
-# run tests across all packages
+# Run tests
 pnpm test
 ```
-
-## Structure
-
-- `packages/core` — Shared domain types and interfaces.
-- `packages/providers` — Meteora Datapi reads + Hummingbot API writes for pool/position data.
-- `packages/steps` — Reusable execution units (calculators, range/limit checks).
-- `packages/strategy` — End-to-end strategy workflows as composite steps.
-- `packages/orchestration` — State coordination, registry, and decision routing.
-- `packages/executor` — Transaction dispatching (via Hummingbot).
-- `packages/persistence` — Safe filesystem state adapters.
-- `apps/engine` — Application daemon and HTTP control plane.
-- `apps/cli` — Command-line interface for manual liquidity duty operations.
