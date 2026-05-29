@@ -29,6 +29,7 @@ import { OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
 import { getMarketSnapshot, enrichOpenParamsForExecution, meteoraProvider } from '@lp-system/providers';
 import { handleReassignStrategy } from './strategy-reassignment.js';
+import { positionGuard } from './position-guard.js';
 
 const logger = getLogger('tick-loop');
 
@@ -122,6 +123,11 @@ export class TickLoopService {
       const knownPositions = await this.positionStore.getKnown();
 
       for (const orchestrator of orchestrators) {
+        if (!positionGuard.tryAcquire(orchestrator.positionId)) {
+          logger.info(`[TickLoopService] Position ${orchestrator.positionId} is locked by another operation. Skipping.`);
+          continue;
+        }
+
         try {
           if (orchestrator.mode === 'pending_open') {
             logger.info(
@@ -374,6 +380,8 @@ export class TickLoopService {
             `[TickLoopService] Failed to process orchestrator ${orchestrator.id} for position ${orchestrator.positionId}:`,
             orchErr
           );
+        } finally {
+          positionGuard.release(orchestrator.positionId);
         }
       }
     } finally {
