@@ -159,11 +159,11 @@ export class ExperimentalRestakeStep implements IStep {
       const lowerBinId = getBinIdFromPrice(lowerBoundPrice, binStep, decimalsX, decimalsY);
 
       // Cap dynamic range to 69 bins to ensure the position fits within Solana's 10,240-byte CPI reallocation limit
-      if (upperBinId - lowerBinId > 69) {
+      if (upperBinId - lowerBinId > 68) {
         logger.warn(
-          `[${this.name}] Calculated bin range (${upperBinId - lowerBinId} bins) exceeds Solana single-instruction reallocation limit (70 bins). Capping upperBinId to ${lowerBinId + 69}.`
+          `[${this.name}] Calculated bin range (${upperBinId - lowerBinId + 1} bins) exceeds Solana single-instruction reallocation limit (69 bins). Capping upperBinId to ${lowerBinId + 68}.`
         );
-        upperBinId = lowerBinId + 69;
+        upperBinId = lowerBinId + 68;
       }
 
       // Amount: get from parameters or default to position's current tokenX.amount

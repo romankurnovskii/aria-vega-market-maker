@@ -18,6 +18,7 @@ import { AssignmentsView } from '../components/assignments/AssignmentsView';
 import { StrategiesView } from '../components/strategies/StrategiesView';
 import { StepsView } from '../components/steps/StepsView';
 import { Footer } from '../components/layout/Footer';
+import { ToastContainer } from '../components/ui/Toast';
 import { API_URL, useAriaVegaApi } from '../hooks/useAriaVegaApi';
 
 export const AriaVegaContainer = () => {
@@ -107,6 +108,7 @@ export const AriaVegaContainer = () => {
       </div>
 
       <Footer apiUrl={API_URL} />
+      <ToastContainer />
     </div>
   );
 };

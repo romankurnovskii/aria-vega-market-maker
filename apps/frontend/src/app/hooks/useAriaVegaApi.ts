@@ -82,6 +82,7 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
   const [evalLogs, setEvalLogs] = useState<EvalLogEntry[]>([]);
   const taskPollTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const taskEventCounts = useRef<Map<string, number>>(new Map());
+  const addToast = useAppStore((state) => state.addToast);
 
   useEffect(() => {
     const timers = taskPollTimers.current;
@@ -93,86 +94,7 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
     };
   }, []);
 
-  const pollTaskStatus = useCallback((taskId: string) => {
-    if (taskPollTimers.current.has(taskId)) return;
-
-    const timer = setInterval(async () => {
-      try {
-        const res = await fetch(`${API_URL}/tasks/${taskId}`);
-        if (!res.ok) {
-          clearInterval(timer);
-          taskPollTimers.current.delete(taskId);
-          return;
-        }
-        const task = await res.json();
-
-        const prevCount = taskEventCounts.current.get(taskId) || 0;
-        const events: Array<{ stage: string; message?: string; txSignature?: string; error?: string; timestamp: number }> =
-          task.events || [];
-        const newEvents = events.slice(prevCount);
-
-        for (const ev of newEvents) {
-          const actionLabel =
-            ev.stage === 'CLOSE_CONFIRMED'
-              ? 'CLOSE_CONFIRMED'
-              : ev.stage === 'CLOSE_BROADCAST'
-                ? 'CLOSE_SUBMITTED'
-                : ev.stage === 'OPEN_CONFIRMED'
-                  ? 'OPEN_CONFIRMED'
-                  : ev.stage === 'OPEN_BROADCAST'
-                    ? 'OPEN_SUBMITTED'
-                    : ev.stage === 'POSITION_CLOSED'
-                      ? 'POSITION_CLOSED'
-                      : ev.stage === 'REBALANCE_COMPLETE'
-                        ? 'REBALANCE_COMPLETE'
-                        : ev.stage === 'TIMEOUT'
-                          ? 'TASK_TIMEOUT'
-                          : ev.stage === 'ERROR'
-                            ? 'TASK_ERROR'
-                            : ev.stage;
-
-          const entry: EvalLogEntry = {
-            id: Date.now() + Math.random(),
-            timestamp: new Date(ev.timestamp || Date.now()).toLocaleTimeString(),
-            action: actionLabel,
-            positionId: task.originalPositionId,
-            strategyId: task.assignmentId === 'manual' ? undefined : task.assignmentId,
-            result: ev.message || actionLabel,
-            transactionSignatures: ev.txSignature ? [ev.txSignature] : undefined,
-            error: ev.error,
-          };
-          setEvalLogs((prev) => [entry, ...prev]);
-        }
-        taskEventCounts.current.set(taskId, events.length);
-
-        if (task.status === 'completed' || task.status === 'failed') {
-          clearInterval(timer);
-          taskPollTimers.current.delete(taskId);
-          taskEventCounts.current.delete(taskId);
-
-          setEvalLogs((prev) => [
-            {
-              id: Date.now(),
-              timestamp: new Date().toLocaleTimeString(),
-              action: task.status === 'completed' ? 'REBALANCE_COMPLETE' : 'REBALANCE_FAILED',
-              positionId: task.originalPositionId,
-              result: `Rebalance ${task.status}`,
-              transactionSignatures: events.filter((e) => e.txSignature).map((e) => e.txSignature!),
-            },
-            ...prev,
-          ]);
-
-          syncState();
-        }
-      } catch {
-        // Ignore polling errors (network flakiness)
-      }
-    }, 2000);
-
-    taskPollTimers.current.set(taskId, timer);
-  }, []);
-
-  const syncState = async (): Promise<void> => {
+  const syncState = useCallback(async (): Promise<void> => {
     try {
       const [healthRes, walletsRes, assignmentsRes, strategiesRes, stepsRes, lineageRes] = await Promise.all([
         fetch(`${API_URL}/health`)
@@ -328,7 +250,89 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const pollTaskStatus = useCallback(
+    (taskId: string) => {
+      if (taskPollTimers.current.has(taskId)) return;
+
+      const timer = setInterval(async () => {
+        try {
+          const res = await fetch(`${API_URL}/tasks/${taskId}`);
+          if (!res.ok) {
+            clearInterval(timer);
+            taskPollTimers.current.delete(taskId);
+            return;
+          }
+          const task = await res.json();
+
+          const prevCount = taskEventCounts.current.get(taskId) || 0;
+          const events: Array<{ stage: string; message?: string; txSignature?: string; error?: string; timestamp: number }> =
+            task.events || [];
+          const newEvents = events.slice(prevCount);
+
+          for (const ev of newEvents) {
+            const actionLabel =
+              ev.stage === 'CLOSE_CONFIRMED'
+                ? 'CLOSE_CONFIRMED'
+                : ev.stage === 'CLOSE_BROADCAST'
+                  ? 'CLOSE_SUBMITTED'
+                  : ev.stage === 'OPEN_CONFIRMED'
+                    ? 'OPEN_CONFIRMED'
+                    : ev.stage === 'OPEN_BROADCAST'
+                      ? 'OPEN_SUBMITTED'
+                      : ev.stage === 'POSITION_CLOSED'
+                        ? 'POSITION_CLOSED'
+                        : ev.stage === 'REBALANCE_COMPLETE'
+                          ? 'REBALANCE_COMPLETE'
+                          : ev.stage === 'TIMEOUT'
+                            ? 'TASK_TIMEOUT'
+                            : ev.stage === 'ERROR'
+                              ? 'TASK_ERROR'
+                              : ev.stage;
+
+            const entry: EvalLogEntry = {
+              id: Date.now() + Math.random(),
+              timestamp: new Date(ev.timestamp || Date.now()).toLocaleTimeString(),
+              action: actionLabel,
+              positionId: task.originalPositionId,
+              strategyId: task.assignmentId === 'manual' ? undefined : task.assignmentId,
+              result: ev.message || actionLabel,
+              transactionSignatures: ev.txSignature ? [ev.txSignature] : undefined,
+              error: ev.error,
+            };
+            setEvalLogs((prev) => [entry, ...prev]);
+          }
+          taskEventCounts.current.set(taskId, events.length);
+
+          if (task.status === 'completed' || task.status === 'failed') {
+            clearInterval(timer);
+            taskPollTimers.current.delete(taskId);
+            taskEventCounts.current.delete(taskId);
+
+            setEvalLogs((prev) => [
+              {
+                id: Date.now(),
+                timestamp: new Date().toLocaleTimeString(),
+                action: task.status === 'completed' ? 'REBALANCE_COMPLETE' : 'REBALANCE_FAILED',
+                positionId: task.originalPositionId,
+                result: `Rebalance ${task.status}`,
+                transactionSignatures: events.filter((e) => e.txSignature).map((e) => e.txSignature!),
+              },
+              ...prev,
+            ]);
+
+            syncState();
+          }
+        } catch {
+          // Ignore polling errors (network flakiness)
+        }
+      }, 2000);
+
+      taskPollTimers.current.set(taskId, timer);
+    },
+    [syncState]
+  );
 
   useApiPolling(syncState, 25000);
 
@@ -363,12 +367,28 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
 
       if (res.ok) {
         await res.json();
+        addToast({
+          type: 'success',
+          title: 'Strategy Assigned',
+          message:
+            strategyId === 'NONE' ? 'Removed strategy successfully.' : `Successfully assigned strategy: ${strategyId}`,
+        });
         syncState();
       } else {
         await res.json().catch(() => ({}));
+        addToast({
+          type: 'error',
+          title: 'Assign Strategy Failed',
+          message: 'Server returned an error while assigning the strategy.',
+        });
       }
     } catch (error) {
       console.error('Assign strategy failed', error);
+      addToast({
+        type: 'error',
+        title: 'Assign Strategy Failed',
+        message: error instanceof Error ? error.message : 'Network error occurred.',
+      });
     }
   };
 
@@ -410,6 +430,12 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
           ...prev.slice(0, 49),
         ]);
 
+        addToast({
+          type: 'success',
+          title: `Action Initiated`,
+          message: `Successfully executed action: ${action}.`,
+        });
+
         if (action === 'applySuggestion') {
           const taskId = result.taskId as string | undefined;
           if (taskId) {
@@ -419,30 +445,44 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
           syncState();
         }
       } else {
+        const errMsg = result.error || result.message || 'Action failed';
         setEvalLogs((prev) => [
           {
             id: Date.now(),
             timestamp: new Date().toLocaleTimeString(),
             action,
-            error: result.error || result.message || 'Action failed',
+            error: errMsg,
             strategyId: body.strategyId as string | undefined,
             positionId,
           } satisfies EvalLogEntry,
           ...prev.slice(0, 49),
         ]);
+
+        addToast({
+          type: 'error',
+          title: 'Action Failed',
+          message: errMsg,
+        });
       }
     } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : 'Network error';
       setEvalLogs((prev) => [
         {
           id: Date.now(),
           timestamp: new Date().toLocaleTimeString(),
           action,
-          error: err instanceof Error ? err.message : 'Network error',
+          error: errMsg,
           strategyId: body.strategyId as string | undefined,
           positionId,
         } satisfies EvalLogEntry,
         ...prev.slice(0, 49),
       ]);
+
+      addToast({
+        type: 'error',
+        title: 'Action Error',
+        message: errMsg,
+      });
     }
   };
 
@@ -512,6 +552,12 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
         ...prev.slice(0, 49),
       ]);
 
+      addToast({
+        type: 'success',
+        title: 'Position Opened',
+        message: `Successfully opened new position. Tx: ${result.transactionSignatures?.join(', ').substring(0, 16)}...`,
+      });
+
       syncState();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Network error';
@@ -524,6 +570,14 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
         },
         ...prev.slice(0, 49),
       ]);
+
+      addToast({
+        type: 'error',
+        title: 'Failed to Open Position',
+        message: msg,
+      });
+
+      throw err;
     }
   };
 

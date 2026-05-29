@@ -76,7 +76,7 @@ export const OpenPositionForm = ({ onOpen, onClose }: OpenPositionFormProps) => 
     const factor = direction === 'up' ? binStepFactor : 1 / binStepFactor;
     setFormData((prev) => ({
       ...prev,
-      [field]: (current * factor).toFixed(2),
+      [field]: (current * factor).toFixed(6),
     }));
   };
 
@@ -113,8 +113,8 @@ export const OpenPositionForm = ({ onOpen, onClose }: OpenPositionFormProps) => 
         if (isFirstLoadRef.current) {
           setFormData((prev) => ({
             ...prev,
-            upper_price: data.market.price.toFixed(2),
-            lower_price: (data.market.price * 0.99).toFixed(2),
+            upper_price: data.market.price.toFixed(6),
+            lower_price: (data.market.price * 0.99).toFixed(6),
           }));
           isFirstLoadRef.current = false;
         }
@@ -176,7 +176,7 @@ export const OpenPositionForm = ({ onOpen, onClose }: OpenPositionFormProps) => 
           {marketPrice !== null && (
             <div className="text-sm text-gray-500 mt-1 flex flex-wrap gap-x-3">
               <span>
-                Market Price: <span className="font-bold text-[#FF4500]">{marketPrice.toFixed(2)}</span>
+                Market Price: <span className="font-bold text-[#FF4500]">{marketPrice.toFixed(6)}</span>
               </span>
               {tokenXSym && tokenYSym && (
                 <span>
@@ -271,13 +271,24 @@ export const OpenPositionForm = ({ onOpen, onClose }: OpenPositionFormProps) => 
 
         {/* Range info: bin count and percentage */}
         {rangePct !== null && binCount !== null && (
-          <div className="flex justify-between text-xs text-gray-500 px-1 -mt-2">
-            <span>
-              Range: <strong className="text-[#0D0D0D]">{rangePct.toFixed(2)}%</strong>
-            </span>
-            <span>
-              Bins: <strong className="text-[#0D0D0D]">{binCount}</strong>
-            </span>
+          <div className="flex flex-col gap-1 -mt-2">
+            <div className="flex justify-between text-xs text-gray-500 px-1">
+              <span>
+                Range: <strong className="text-[#0D0D0D]">{rangePct.toFixed(2)}%</strong>
+              </span>
+              <span>
+                Bins: <strong className={binCount > 69 ? 'text-[#FF3D00]' : 'text-[#0D0D0D]'}>{binCount}</strong>
+              </span>
+            </div>
+            {binCount > 69 && (
+              <div className="px-2 py-1.5 border border-[#FFEA00] bg-yellow-50 flex gap-2 items-start mt-1">
+                <span className="text-[#FFEA00] mt-0.5">⚠️</span>
+                <p className="text-[11px] leading-tight text-[#0D0D0D] font-mono">
+                  <strong>Warning:</strong> Positions wider than 69 bins may fail to open in a single Solana transaction due
+                  to execution limits.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
