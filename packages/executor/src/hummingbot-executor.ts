@@ -5,6 +5,7 @@
  *
  * @features
  * - apply(decision) — executes 'open' or 'close' actions via POST to /gateway/clmm/{open,close}
+ * - getActiveRequestsCount() — returns the number of active, in-flight execution requests
  * - setReEvaluate(callback) — registers a re-evaluation callback for post-execution use
  * - Credentials loaded from HUMMINGBOT_API_USERNAME / HUMMINGBOT_API_PASSWORD env vars
  *
@@ -27,6 +28,7 @@ export class HummingbotExecutor implements IExecutor {
   private walletAddress: string;
   private authHeaders: Record<string, string>;
   private reEvaluateCallback?: (positionId: string) => Promise<StrategyResult>;
+  private activeRequests = 0;
 
   /**
    * @param {string} apiUrl - Hummingbot API base URL (e.g., http://localhost:8000).
@@ -42,6 +44,14 @@ export class HummingbotExecutor implements IExecutor {
     this.authHeaders = { Authorization: `Basic ${encoded}`, 'Content-Type': 'application/json' };
 
     logger.info(`[HummingbotExecutor] Initialized with API URL: ${this.apiUrl} and wallet: ${this.walletAddress}`);
+  }
+
+  /**
+   * Returns the count of active, in-flight execution requests.
+   * @returns {number} The active requests count.
+   */
+  public getActiveRequestsCount(): number {
+    return this.activeRequests;
   }
 
   /**
@@ -61,13 +71,13 @@ export class HummingbotExecutor implements IExecutor {
    * @returns {Promise<ExecutionRecord>} Record of execution outcome.
    */
   public async apply(decision: Decision, market: MarketSnapshot): Promise<ExecutionRecord> {
-    void market;
-    logger.info(`[HummingbotExecutor] Applying decision '${decision.action}' on position ${decision.positionId}`);
-
+    this.activeRequests++;
     const executionId = `exec_hb_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     const txSignatures: string[] = [];
-
     try {
+      void market;
+      logger.info(`[HummingbotExecutor] Applying decision '${decision.action}' on position ${decision.positionId}`);
+
       if (decision.action === 'open') {
         const openParams = decision.openParams;
         if (!openParams) {
@@ -173,6 +183,8 @@ export class HummingbotExecutor implements IExecutor {
         error: err.message || String(error),
         executedAt: Date.now(),
       };
+    } finally {
+      this.activeRequests--;
     }
   }
 }
