@@ -1,22 +1,38 @@
-# 🌌 Aria Vega — Market Maker
+# Aria Vega Market Maker
 
-A highly structured, stateless-orchestrated automation system for Solana CLMM liquidity provision (Meteora DLMM) integrated via Hummingbot API.
+Aria Vega Market Maker is a specialized, automated liquidity provision and trading system. It features a robust backend engine and a modern React-based frontend to monitor, build, and deploy market-making strategies efficiently.
 
-![Control Panel GUI](docs/assets/gui_screenshot.png)
+## Overview
 
-## 🚀 Key Features
+This project is built as a monorepo containing:
 
-- **Stateless Rebalancing Workflows**: Sequential modular steps execute price check, range shift calculations, JIT open/close legs, and transaction safety caps.
-- **Hummingbot Gateway Integration**: Real-time position management, balance sync, and secure on-chain transaction execution on Solana.
-- **Crash-Resilient State Machine**: Write-ahead task recovery and sync handlers guarantee execution tracking across system restarts.
-- **Interactive Control Panel**: Next.js-powered dark-mode UI with active bin monitors, strategy builder, wallet statistics, and event logging.
+- **Engine**: The core market-making daemon that interfaces with exchanges and manages trading logic.
+- **Frontend**: A sleek, user-friendly interface to track active positions, visualize trading pipelines, and view real-time logs.
 
-## 🛠️ Quick Start
+![Aria Vega Market Maker GUI](./docs/assets/gui_screenshot.png)
 
-```bash
-# Start full development stack (Engine, Frontend, Hummingbot, Gateway)
-docker compose -f docker-compose.dev.yml up -d --build
+## Requirements
 
-# Run tests
-pnpm test
-```
+- **Node.js** (v24 or compatible)
+- **pnpm** (Package manager)
+- **Docker & Docker Compose**
+- **Hummingbot**: This system **requires running hummingbot bot services** concurrently for executing trading strategies on crypto exchanges.
+
+## Quick Start
+
+1. **Install dependencies:**
+
+   ```bash
+   pnpm install
+   ```
+
+2. **Start the development environment (Engine + Frontend):**
+
+   ```bash
+   docker compose -f docker-compose.dev.yml up -d
+   ```
+
+3. **Access the Interface:**
+   Navigate to `http://localhost:8442` in your browser.
+
+_Note: For architecture details and documentation, please see [docs/START_HERE.md](./docs/START_HERE.md)._
