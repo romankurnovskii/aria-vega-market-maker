@@ -156,9 +156,7 @@ async function main() {
   );
   tickLoop.start();
 
-  // 8. Web Control Plane Activation
-
-  startHttpServer(
+  const server = startHttpServer(
     store,
     registry,
     executor,
@@ -172,17 +170,68 @@ async function main() {
   );
 
   // 9. Graceful Shutdown handlers
+  let shuttingDown = false;
+  const gracefulShutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+
+    logger.info(`[Engine] Received ${signal} shutdown request. Gracefully closing daemon...`);
+
+    const forceExitTimeout = setTimeout(() => {
+      logger.error('[Engine] Graceful shutdown timed out. Forcing hard termination.');
+      process.exit(1);
+    }, 12000);
+    forceExitTimeout.unref();
+
+    try {
+      // 1. Stop background loops
+      logger.info('[Engine] Stopping background sync and tick loops...');
+      positionSync.stop();
+      tickLoop.stop();
+
+      // 2. Stop HTTP server
+      logger.info('[Engine] Stopping HTTP server...');
+      await new Promise<void>((resolve) => {
+        server.close((err) => {
+          if (err) {
+            logger.warn('[Engine] Error closing HTTP server:', err);
+          } else {
+            logger.info('[Engine] HTTP server closed successfully.');
+          }
+          resolve();
+        });
+      });
+
+      // 3. Wait for in-flight executor requests to finish (max 10s)
+      const startTime = Date.now();
+      const maxWaitMs = 10000;
+      logger.info('[Engine] Checking for active executor requests...');
+
+      while (executor.getActiveRequestsCount() > 0) {
+        const elapsed = Date.now() - startTime;
+        if (elapsed >= maxWaitMs) {
+          logger.warn(`[Engine] In-flight requests did not finish within ${maxWaitMs / 1000}s limit. Exiting anyway.`);
+          break;
+        }
+        logger.info(`[Engine] Waiting for ${executor.getActiveRequestsCount()} active request(s) to finish...`);
+        await new Promise((r) => setTimeout(r, 500));
+      }
+
+      logger.info('[Engine] All active operations completed. Graceful shutdown clean.');
+      clearTimeout(forceExitTimeout);
+      process.exit(0);
+    } catch (err) {
+      logger.error('[Engine] Error during graceful shutdown sequence:', err);
+      clearTimeout(forceExitTimeout);
+      process.exit(1);
+    }
+  };
+
   process.on('SIGINT', () => {
-    logger.info('[Engine] Received SIGINT shutdown request. Gracefully closing daemon...');
-    positionSync.stop();
-    tickLoop.stop();
-    process.exit(0);
+    gracefulShutdown('SIGINT');
   });
   process.on('SIGTERM', () => {
-    logger.info('[Engine] Received SIGTERM shutdown request. Gracefully closing daemon...');
-    positionSync.stop();
-    tickLoop.stop();
-    process.exit(0);
+    gracefulShutdown('SIGTERM');
   });
 }
 

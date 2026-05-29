@@ -13,6 +13,7 @@
  */
 import express from 'express';
 import cors from 'cors';
+import { Server } from 'http';
 import swaggerUi from 'swagger-ui-express';
 import YAML from 'yamljs';
 import { fileURLToPath } from 'url';
@@ -54,7 +55,7 @@ const __dirname = dirname(__filename);
  * @param {IPositionProvider} positionProvider - On-chain data source for ad-hoc evaluation.
  * @param {string} walletAddress - Active wallet address.
  * @param {IPositionStore} [positionStore] - Optional persistent position cache containing active/failed states.
- * @returns {express.Application} Configured Express app instance (also starts listening).
+ * @returns {Server} The active, listening http.Server instance.
  */
 export function startHttpServer(
   store: IStore,
@@ -67,7 +68,7 @@ export function startHttpServer(
   stepRegistry: StepRegistry,
   strategyStore: IStrategyStore,
   positionStore?: IPositionStore
-): express.Application {
+): Server {
   const app = express();
   app.use(cors());
   app.use(express.json());
@@ -91,9 +92,9 @@ export function startHttpServer(
     res.json({ status: 'healthy', timestamp: Date.now() });
   });
 
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     logger.info(`[HTTP Server] Operational and listening on port ${PORT} (loaded: ${executor.constructor.name})`);
   });
 
-  return app;
+  return server;
 }
