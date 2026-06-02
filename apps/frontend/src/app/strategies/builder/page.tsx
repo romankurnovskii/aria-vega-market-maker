@@ -11,6 +11,8 @@ export const metadata: Metadata = {
   description: 'Visual drag-and-drop strategy pipeline builder',
 };
 
+export const dynamic = 'force-dynamic';
+
 export default function StrategyBuilderPage() {
   return <StrategyBuilderContainer />;
 }

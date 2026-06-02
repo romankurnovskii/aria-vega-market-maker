@@ -4,7 +4,8 @@
  *
  * @features
  * - Maintains draft StrategyDefinition (id, name, description, steps)
- * - Actions for adding, removing, reordering, and updating steps
+ * - Exposes actions for adding, removing, inserting, reordering, and updating steps
+ * - Stores mock/live simulation context data for visual variables tracking
  *
  * @dependencies zustand, @lp-system/core
  */
@@ -16,6 +17,10 @@ export interface StrategyBuilderState {
   id: string;
   name: string;
   description: string;
+  simulationConfig?: {
+    poolAddress?: string;
+    positionId?: string;
+  };
 
   // The linear pipeline of steps
   // We use a unique 'instanceId' for the UI so the same step can be added multiple times
@@ -23,7 +28,9 @@ export interface StrategyBuilderState {
 
   // Actions
   setMetadata: (id: string, name: string, description: string) => void;
+  setSimulationConfig: (poolAddress: string, positionId: string) => void;
   addStep: (stepId: string, defaultParams?: Record<string, unknown>) => void;
+  insertStep: (stepId: string, index: number, defaultParams?: Record<string, unknown>) => void;
   removeStep: (instanceId: string) => void;
   moveStep: (oldIndex: number, newIndex: number) => void;
   updateStepParams: (instanceId: string, params: Record<string, unknown>) => void;
@@ -37,9 +44,24 @@ export const useStrategyBuilderStore = create<StrategyBuilderState>((set, get) =
   id: 'custom-strategy-1',
   name: 'Custom Strategy',
   description: 'Built via GUI',
-  steps: [],
+  simulationConfig: { poolAddress: '', positionId: '' },
+  steps: [
+    {
+      instanceId: `context-setup-default`,
+      stepId: 'context-setup',
+      params: {
+        poolAddress: '5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6',
+        tokenXAmount: '0',
+        tokenYAmount: '100',
+        currentPrice: 100,
+        rangeMin: 90,
+        rangeMax: 110,
+      },
+    },
+  ],
 
   setMetadata: (id, name, description) => set({ id, name, description }),
+  setSimulationConfig: (poolAddress, positionId) => set({ simulationConfig: { poolAddress, positionId } }),
 
   addStep: (stepId, defaultParams = {}) =>
     set((state) => ({
@@ -48,6 +70,18 @@ export const useStrategyBuilderStore = create<StrategyBuilderState>((set, get) =
         { instanceId: `${stepId}-${Date.now()}-${Math.floor(Math.random() * 1000)}`, stepId, params: defaultParams },
       ],
     })),
+
+  insertStep: (stepId, index, defaultParams = {}) =>
+    set((state) => {
+      const steps = [...state.steps];
+      const newStep = {
+        instanceId: `${stepId}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+        stepId,
+        params: defaultParams,
+      };
+      steps.splice(index, 0, newStep);
+      return { steps };
+    }),
 
   removeStep: (instanceId) =>
     set((state) => ({
@@ -68,15 +102,35 @@ export const useStrategyBuilderStore = create<StrategyBuilderState>((set, get) =
     })),
 
   getStrategyDefinition: () => {
-    const { id, name, description, steps } = get();
+    const { id, name, description, steps, simulationConfig } = get();
     return {
       id,
       name,
       description,
+      simulationConfig,
       defaultParams: {}, // GUI currently sets params explicitly per step
-      steps: steps.map(({ stepId, params }) => ({ stepId, params })),
+      steps: steps.map((s) => ({ stepId: s.stepId, params: s.params })),
     };
   },
 
-  reset: () => set({ id: 'custom-strategy-1', name: 'Custom Strategy', description: '', steps: [] }),
+  reset: () =>
+    set({
+      id: 'custom-strategy-1',
+      name: 'Custom Strategy',
+      description: '',
+      steps: [
+        {
+          instanceId: `context-setup-default`,
+          stepId: 'context-setup',
+          params: {
+            poolAddress: '5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6',
+            tokenXAmount: '0',
+            tokenYAmount: '100',
+            currentPrice: 100,
+            rangeMin: 90,
+            rangeMax: 110,
+          },
+        },
+      ],
+    }),
 }));

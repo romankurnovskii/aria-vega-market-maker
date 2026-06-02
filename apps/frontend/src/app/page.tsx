@@ -9,6 +9,8 @@
 
 import { AriaVegaContainer } from './containers/AriaVegaContainer';
 
+export const dynamic = 'force-dynamic';
+
 export default function AriaVegaTerminalPage() {
   return <AriaVegaContainer />;
 }

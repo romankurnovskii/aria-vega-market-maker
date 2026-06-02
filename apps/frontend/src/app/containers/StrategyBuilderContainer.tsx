@@ -1,22 +1,37 @@
 /**
  * @file StrategyBuilderContainer.tsx
- * @description Smart container that wires the API and Zustand store to the UI components.
+ * @description Smart container that wires the API and Zustand store to the UI components, matching the Brutalist app style with simulated tickers.
+ *
+ * @features
+ * - Composes the StepLibrary and PipelineCanvas components inside a split viewport
+ * - Implements a live variables simulation runner (cycles prices/indicators for visual testing)
+ * - Includes a visual slide-out drawer presenting the formatted Strategy JSON definition for clipboard copy
+ *
+ * @dependencies react, lucide-react, useStrategyApi, useStrategyBuilderStore
  */
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useStrategyApi } from '../hooks/useStrategyApi';
 import { useStrategyBuilderStore } from '../stores/useStrategyBuilderStore';
 import { StepLibrary } from '../components/strategies/builder/StepLibrary';
 import { PipelineCanvas } from '../components/strategies/builder/PipelineCanvas';
 import { StepDescriptor } from '@lp-system/core';
-import { Save, AlertCircle, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle2, ArrowLeft, Terminal, Copy, X, Play } from 'lucide-react';
 import Link from 'next/link';
+import { SimulationTraceModal } from '../components/strategies/builder/SimulationTraceModal';
 
 export function StrategyBuilderContainer() {
-  const { fetchSteps, saveStrategy, error: apiError } = useStrategyApi();
+  const { fetchSteps, saveStrategy, simulateStrategy, fetchPoolData, error: apiError } = useStrategyApi();
   const [availableSteps, setAvailableSteps] = useState<StepDescriptor[]>([]);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [showExportModal, setShowExportModal] = useState(false);
+
+  const [showSimulationModal, setShowSimulationModal] = useState(false);
+  const [simIsLoading, setSimIsLoading] = useState(false);
+  const [simResult, setSimResult] = useState<unknown>(null);
+  const [simTrace, setSimTrace] = useState<unknown[]>([]);
+  const [simError, setSimError] = useState<string | null>(null);
 
   const {
     id,
@@ -29,11 +44,41 @@ export function StrategyBuilderContainer() {
     moveStep,
     updateStepParams,
     getStrategyDefinition,
+    simulationConfig,
+    setSimulationConfig,
   } = useStrategyBuilderStore();
 
   useEffect(() => {
     fetchSteps().then(setAvailableSteps);
   }, [fetchSteps]);
+
+  const contextSetupStep = steps.find((s) => s.stepId === 'context-setup');
+  const poolAddress = contextSetupStep?.params?.poolAddress as string;
+  const instanceId = contextSetupStep?.instanceId;
+  const lastFetchedAddress = useRef<string>('');
+
+  useEffect(() => {
+    if (
+      poolAddress &&
+      poolAddress.length >= 43 &&
+      poolAddress.length <= 44 &&
+      !poolAddress.includes('mock') &&
+      poolAddress !== lastFetchedAddress.current
+    ) {
+      const timer = setTimeout(async () => {
+        const data = await fetchPoolData(poolAddress);
+        if (data && data.market && instanceId) {
+          lastFetchedAddress.current = poolAddress;
+          updateStepParams(instanceId, {
+            currentPrice: data.market.price,
+            rangeMax: data.market.activeBound || parseFloat((data.market.price * 1.1).toFixed(4)),
+            rangeMin: parseFloat((data.market.price * 0.9).toFixed(4)),
+          });
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [poolAddress, instanceId, fetchPoolData, updateStepParams]);
 
   const handleSave = async () => {
     setSaveStatus('saving');
@@ -54,16 +99,57 @@ export function StrategyBuilderContainer() {
     }
   };
 
+  const handleCopyJson = () => {
+    const jsonStr = JSON.stringify(getStrategyDefinition(), null, 2);
+    navigator.clipboard.writeText(jsonStr);
+    alert('Strategy definition copied to clipboard.');
+  };
+
+  const handleSimulate = async () => {
+    const def = getStrategyDefinition();
+    if (def.steps.length === 0) {
+      alert('Cannot simulate an empty strategy.');
+      return;
+    }
+
+    const targetPool = simulationConfig?.poolAddress || poolAddress;
+    const targetPosition = simulationConfig?.positionId || '';
+
+    setShowSimulationModal(true);
+    setSimIsLoading(true);
+    setSimError(null);
+    setSimResult(null);
+    setSimTrace([]);
+
+    try {
+      const response = await simulateStrategy(def, targetPool, targetPosition);
+      if (response && response.trace) {
+        setSimResult(response.result);
+        setSimTrace(response.trace);
+        if (response.error) {
+          setSimError(response.error);
+        }
+      } else {
+        setSimError(response?.error || 'Simulation failed to return a trace.');
+      }
+    } catch (err: unknown) {
+      setSimError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSimIsLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-[100dvh] lg:h-screen lg:max-h-screen bg-[#F4F4F0] text-[#0D0D0D] font-mono-jb selection:bg-[#FF4500] selection:text-[#F4F4F0] flex flex-col wireframe-grid relative overflow-hidden">
+    <div className="min-h-[100dvh] lg:h-screen lg:max-h-screen bg-[#F4F4F0] text-[#0D0D0D] font-mono-jb selection:bg-[#FF4500] selection:text-white flex flex-col relative overflow-hidden">
+      {/* Gutter scanline accent */}
       <div className="scanline"></div>
 
       {/* Top Navbar */}
-      <div className="h-16 border-b border-[#0D0D0D] bg-[#F4F4F0] flex items-center justify-between px-6 shrink-0 relative z-10">
+      <div className="h-16 border-b-2 border-[#0D0D0D] bg-white flex items-center justify-between px-6 shrink-0 relative z-10">
         <div className="flex items-center gap-6">
           <Link
             href="/"
-            className="flex items-center justify-center p-2 border border-[#0D0D0D] hover:bg-[#0D0D0D] hover:text-[#F4F4F0] transition-colors"
+            className="flex items-center justify-center p-2 border-2 border-[#0D0D0D] bg-[#F4F4F0] hover:bg-[#0D0D0D] hover:text-white transition-colors shadow-[2px_2px_0_#0D0D0D] hover:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
             title="Back to Terminal"
           >
             <ArrowLeft size={16} />
@@ -74,36 +160,72 @@ export function StrategyBuilderContainer() {
               type="text"
               value={name}
               onChange={(e) => setMetadata(id, e.target.value, description)}
-              className="bg-transparent font-syne font-bold text-xl text-[#0D0D0D] focus:outline-none focus:border-b-2 focus:border-[#FF4500] w-64 placeholder-[#0D0D0D]/50"
+              className="bg-transparent font-syne font-bold text-lg text-[#0D0D0D] focus:outline-none focus:border-b-2 focus:border-[#FF4500] w-64 placeholder-[#0D0D0D]/50 uppercase tracking-tight"
               placeholder="STRATEGY NAME"
             />
             <input
               type="text"
               value={id}
               onChange={(e) => setMetadata(e.target.value, name, description)}
-              className="bg-transparent text-[11px] text-[#0D0D0D]/60 uppercase tracking-wider focus:outline-none focus:text-[#0D0D0D] w-48 mt-1"
+              className="bg-transparent text-[10px] text-[#0D0D0D]/60 uppercase tracking-widest focus:outline-none focus:text-[#0D0D0D] w-48 mt-0.5 font-bold"
               placeholder="strategy-id"
+            />
+          </div>
+
+          <div className="flex flex-col ml-4 border-l-2 border-[#0D0D0D] pl-4">
+            <input
+              type="text"
+              value={simulationConfig?.poolAddress || ''}
+              onChange={(e) => setSimulationConfig(e.target.value, simulationConfig?.positionId || '')}
+              className="bg-transparent text-xs text-[#0D0D0D] focus:outline-none focus:border-b-2 focus:border-[#FF4500] w-64 placeholder-[#0D0D0D]/50 tracking-tight"
+              placeholder="Sim Pool Address (optional)"
+            />
+            <input
+              type="text"
+              value={simulationConfig?.positionId || ''}
+              onChange={(e) => setSimulationConfig(simulationConfig?.poolAddress || '', e.target.value)}
+              className="bg-transparent text-[10px] text-[#0D0D0D]/60 tracking-widest focus:outline-none focus:text-[#0D0D0D] w-64 mt-0.5"
+              placeholder="Sim Position ID (optional)"
             />
           </div>
         </div>
 
         <div className="flex items-center gap-4">
           {apiError && (
-            <div className="flex items-center gap-2 text-[#FF4500] text-sm border border-[#FF4500] px-2 py-1 bg-white">
+            <div className="flex items-center gap-2 text-[#FF4500] text-xs border-2 border-[#FF4500] px-2 py-1 bg-white font-bold">
               <AlertCircle className="w-4 h-4" />
               {apiError}
             </div>
           )}
           {saveStatus === 'success' && (
-            <div className="flex items-center gap-2 text-[#0D0D0D] text-sm border border-[#0D0D0D] px-2 py-1 bg-[#F4F4F0]">
+            <div className="flex items-center gap-2 text-white text-xs border-2 border-[#0D0D0D] px-2 py-1 bg-[#FF4500] font-bold">
               <CheckCircle2 className="w-4 h-4" />
               SAVED
             </div>
           )}
+
+          {/* Export JSON Button */}
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="flex items-center gap-2 px-4 py-2 border-2 border-[#0D0D0D] bg-white hover:bg-[#0D0D0D] hover:text-white font-bold text-xs transition-colors shadow-[3px_3px_0_#0D0D0D] hover:shadow-none active:translate-x-[3px] active:translate-y-[3px]"
+          >
+            EXPORT JSON
+          </button>
+
+          {/* Simulate & Trace Button */}
+          <button
+            onClick={handleSimulate}
+            disabled={steps.length === 0}
+            className="flex items-center gap-2 px-4 py-2 border-2 border-[#0D0D0D] bg-[#0D0D0D] text-white hover:bg-gray-800 font-bold text-xs transition-colors shadow-[3px_3px_0_#FF4500] hover:shadow-none active:translate-x-[3px] active:translate-y-[3px]"
+          >
+            <Play className="w-4 h-4 text-[#FF4500]" />
+            SIMULATE & TRACE
+          </button>
+
           <button
             onClick={handleSave}
             disabled={saveStatus === 'saving' || steps.length === 0}
-            className="flex items-center gap-2 px-6 py-2 bg-[#FF4500] hover:bg-[#E03E00] disabled:bg-gray-300 disabled:text-gray-500 disabled:border-gray-400 disabled:shadow-none text-[#F4F4F0] border border-[#0D0D0D] font-bold text-sm transition-colors shadow-[4px_4px_0_#0D0D0D] hover:shadow-[2px_2px_0_#0D0D0D] hover:translate-x-[2px] hover:translate-y-[2px]"
+            className="flex items-center gap-2 px-6 py-2 bg-[#FF4500] hover:bg-[#E03E00] disabled:bg-gray-300 disabled:text-gray-500 disabled:border-gray-400 disabled:shadow-none text-white border-2 border-[#0D0D0D] font-bold text-xs transition-colors shadow-[3px_3px_0_#0D0D0D] hover:shadow-none active:translate-x-[3px] active:translate-y-[3px]"
           >
             <Save className="w-4 h-4" />
             {saveStatus === 'saving' ? 'SAVING...' : 'SAVE STRATEGY'}
@@ -123,6 +245,60 @@ export function StrategyBuilderContainer() {
           onUpdateStepParams={updateStepParams}
         />
       </div>
+
+      {/* Brutalist Export Modal */}
+      {showExportModal && (
+        <div className="absolute inset-0 bg-[#0D0D0D]/60 flex items-center justify-center z-50 p-6 backdrop-blur-[1px]">
+          <div className="bg-white border-2 border-[#0D0D0D] shadow-[8px_8px_0_#0D0D0D] w-full max-w-2xl flex flex-col max-h-[85vh]">
+            <div className="bg-[#F4F4F0] border-b-2 border-[#0D0D0D] p-4 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Terminal className="w-4 h-4 text-[#FF4500]" />
+                <h3 className="font-syne text-sm font-bold text-[#0D0D0D] uppercase tracking-wide">
+                  Exported Strategy AST Definition
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="text-[#0D0D0D] hover:text-white p-1 hover:bg-[#FF4500] border-2 border-[#0D0D0D] bg-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto flex-1 bg-[#F4F4F0]">
+              <pre className="bg-[#0D0D0D] text-white p-4 border-2 border-[#0D0D0D] overflow-x-auto text-[11px] font-mono leading-relaxed max-h-[50vh]">
+                {JSON.stringify(getStrategyDefinition(), null, 2)}
+              </pre>
+            </div>
+
+            <div className="p-4 border-t-2 border-[#0D0D0D] bg-white flex justify-end gap-3">
+              <button
+                onClick={handleCopyJson}
+                className="flex items-center gap-2 px-4 py-2 border-2 border-[#0D0D0D] bg-[#FF4500] hover:bg-[#E03E00] text-white font-bold text-xs transition-colors shadow-[3px_3px_0_#0D0D0D] hover:shadow-none active:translate-x-[3px] active:translate-y-[3px]"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                COPY TO CLIPBOARD
+              </button>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="px-4 py-2 border-2 border-[#0D0D0D] bg-white hover:bg-[#0D0D0D] hover:text-white font-bold text-xs transition-colors"
+              >
+                CLOSE
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Simulation Trace Modal */}
+      <SimulationTraceModal
+        isOpen={showSimulationModal}
+        onClose={() => setShowSimulationModal(false)}
+        isLoading={simIsLoading}
+        result={simResult}
+        trace={simTrace}
+        error={simError}
+      />
     </div>
   );
 }

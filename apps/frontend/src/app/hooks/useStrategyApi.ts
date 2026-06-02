@@ -59,5 +59,49 @@ export function useStrategyApi() {
     }
   }, []);
 
-  return { fetchSteps, saveStrategy, isLoading, error };
+  const simulateStrategy = useCallback(async (definition: StrategyDefinition, poolAddress?: string, positionId?: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/strategies/simulate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ definition, poolAddress, positionId }),
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${res.status}`);
+      }
+      return await res.json();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg);
+      console.error('[useStrategyApi] Failed to simulate strategy:', msg);
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const fetchPoolData = useCallback(async (poolAddress: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/gateway/pool/${poolAddress}`);
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${res.status}`);
+      }
+      return await res.json();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg);
+      console.error('[useStrategyApi] Failed to fetch pool data:', msg);
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return { fetchSteps, saveStrategy, simulateStrategy, fetchPoolData, isLoading, error };
 }
