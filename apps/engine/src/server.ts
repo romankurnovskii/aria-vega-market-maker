@@ -76,7 +76,7 @@ export function startHttpServer(
   const PORT = process.env.PORT || 3000;
 
   app.use('/assignments', createAssignmentsRouter(store, registry, factory));
-  app.use('/', createIntrospectionRouter(factory, stepRegistry, strategyStore));
+  app.use('/', createIntrospectionRouter(factory, stepRegistry, strategyStore, positionProvider));
   app.use('/wallets', createWalletsRouter(positionProvider));
   app.use('/gateway', createGatewayRouter(executor));
   app.use(

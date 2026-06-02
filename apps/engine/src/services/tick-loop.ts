@@ -148,7 +148,10 @@ export class TickLoopService {
             const market = await getMarketSnapshot(poolAddress);
 
             let enrichedOpenParams: OpenParams | undefined;
-            if (oldPosition) {
+            if (legacyOpenParams) {
+              logger.info(`[TickLoopService] Retrying OPEN for pool ${poolAddress}... using cached openParams...`);
+              enrichedOpenParams = legacyOpenParams;
+            } else if (oldPosition) {
               logger.info(`[TickLoopService] Retrying OPEN for pool ${poolAddress}... Re-evaluating strategy...`);
               const retryEval = await orchestrator.tick(oldPosition, market);
               const openParams = 'openParams' in retryEval ? retryEval.openParams : undefined;
@@ -163,9 +166,6 @@ export class TickLoopService {
                 { tokenXDecimals: oldPosition.tokenX.decimals, tokenYDecimals: oldPosition.tokenY.decimals },
                 poolInfo
               );
-            } else if (legacyOpenParams) {
-              logger.info(`[TickLoopService] Retrying OPEN for pool ${poolAddress}... using legacy cached openParams...`);
-              enrichedOpenParams = legacyOpenParams;
             } else {
               logger.error(`[TickLoopService] Missing both oldPosition and openParams in recoveryData. Cannot retry.`);
               continue;
@@ -311,6 +311,7 @@ export class TickLoopService {
                 oldAssignment.recoveryData = {
                   poolAddress: position.poolAddress,
                   oldPosition: position,
+                  openParams: enrichedOpenParams,
                   closeTxSignature: closeRecord.txSignatures?.[0] || 'unknown',
                 };
                 await this.store.saveAssignment(oldAssignment);

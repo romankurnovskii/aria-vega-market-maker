@@ -11,7 +11,15 @@
 
 import { Router, Request, Response } from 'express';
 import { StepRegistry, DataDrivenStrategy } from '@lp-system/strategy';
-import { IStrategyStore, StrategyDefinition } from '@lp-system/core';
+import {
+  IStrategyStore,
+  StrategyDefinition,
+  StrategyDefinitionStep,
+  IPositionProvider,
+  Position,
+  PipelineContext,
+} from '@lp-system/core';
+import { getMarketSnapshot } from '@lp-system/providers';
 
 /**
  * Creates an Express router to expose system metadata and available components.
@@ -25,7 +33,8 @@ export function createIntrospectionRouter(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   factory: any, // type assertion to bypass cross-package import issues
   stepRegistry: StepRegistry,
-  strategyStore: IStrategyStore
+  strategyStore: IStrategyStore,
+  positionProvider?: IPositionProvider
 ): Router {
   const router = Router();
 
@@ -86,6 +95,87 @@ export function createIntrospectionRouter(
       factory.registerStrategy(newStrategy);
 
       res.json({ message: 'Strategy registered successfully', strategyId: definition.id });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: message });
+    }
+  });
+
+  /**
+   * POST /strategies/simulate
+   * Simulates a StrategyDefinition against mock or real position data and returns a step-by-step trace.
+   */
+  router.post('/strategies/simulate', async (req: Request, res: Response) => {
+    try {
+      const { definition, poolAddress, positionId } = req.body;
+      // Validate required pool address for real market data
+      if (!poolAddress) {
+        res.status(400).json({ error: 'poolAddress is required for simulation' });
+        return;
+      }
+      if (!definition || !definition.steps) {
+        res.status(400).json({ error: 'Missing strategy definition' });
+        return;
+      }
+
+      let position: Position;
+      if (positionId && positionProvider) {
+        position = await positionProvider.getPosition(positionId, poolAddress);
+      } else {
+        // Minimal placeholder position; expect ContextSetupStep to populate amounts
+        position = {
+          id: positionId || 'placeholder-position',
+          poolAddress,
+          tokenX: { amount: '0', decimals: 6, tokenAddress: '' },
+          tokenY: { amount: '0', decimals: 6, tokenAddress: '' },
+          state: 'OPEN',
+        } as unknown as Position;
+      }
+
+      // Fetch real market snapshot; propagate errors to caller
+      const market = await getMarketSnapshot(poolAddress);
+
+      const steps = definition.steps.map((s: StrategyDefinitionStep) => stepRegistry.create(s.stepId, s.params));
+
+      let context: PipelineContext = {
+        position,
+        market,
+        params: definition.defaultParams || {},
+      };
+
+      const trace: Record<string, unknown>[] = [];
+
+      for (const step of steps) {
+        const contextBefore = JSON.parse(JSON.stringify(context));
+        try {
+          context = (await step.execute(context)) as PipelineContext;
+        } catch (stepError: unknown) {
+          const errMsg = stepError instanceof Error ? stepError.message : String(stepError);
+          trace.push({
+            stepId: step.descriptor?.id || step.name,
+            stepName: step.descriptor?.name || step.name,
+            contextBefore,
+            error: errMsg,
+          });
+          // Return immediately with the trace so far and the error
+          res.json({ result: context, trace, error: errMsg });
+          return;
+        }
+
+        const contextAfter = JSON.parse(JSON.stringify(context));
+        trace.push({
+          stepId: step.descriptor?.id || step.name,
+          stepName: step.descriptor?.name || step.name,
+          contextBefore,
+          contextAfter,
+        });
+
+        if (context._halted) {
+          break;
+        }
+      }
+
+      res.json({ result: context, trace });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       res.status(500).json({ error: message });

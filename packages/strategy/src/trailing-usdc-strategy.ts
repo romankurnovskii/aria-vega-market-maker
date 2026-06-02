@@ -18,7 +18,6 @@ import {
   TrailingRangeCheckStep,
   RangeCalculatorStep,
   AmountCalculatorStep,
-  HighFeeCheckStep,
 } from '@lp-system/steps';
 import { DataDrivenStrategy } from './data-driven-strategy.js';
 import { StepRegistry } from './step-registry.js';
@@ -32,7 +31,6 @@ export const trailingUsdcDefinition: StrategyDefinition = {
   description: 'Dynamic range trailing for USDC pairs using Meteora DLMM',
   steps: [
     { stepId: 'initialization-check', params: {} },
-    { stepId: 'high-fee-check', params: {} },
     { stepId: 'trailing-range-check', params: {} },
     { stepId: 'range-calculator', params: {} },
     { stepId: 'amount-calculator', params: {} },
@@ -58,7 +56,6 @@ export class TrailingUsdcStrategy implements IStrategy {
     // Create a local registry for backward compatibility
     const registry = new StepRegistry();
     registry.register('initialization-check', () => new InitializationCheckStep(), new InitializationCheckStep().descriptor);
-    registry.register('high-fee-check', () => new HighFeeCheckStep(), new HighFeeCheckStep().descriptor);
     registry.register('trailing-range-check', () => new TrailingRangeCheckStep(), new TrailingRangeCheckStep().descriptor);
     registry.register('range-calculator', () => new RangeCalculatorStep(), new RangeCalculatorStep().descriptor);
     registry.register('amount-calculator', () => new AmountCalculatorStep(), new AmountCalculatorStep().descriptor);

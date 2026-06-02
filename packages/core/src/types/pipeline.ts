@@ -36,6 +36,7 @@ export type StepCategory =
   | 'signal'
   | 'decision'
   | 'indicator'
+  | 'setup'
   | 'custom';
 
 export interface StepPortDescriptor {
@@ -76,6 +77,10 @@ export interface StrategyDefinition {
   description: string;
   steps: StrategyDefinitionStep[];
   defaultParams: Record<string, unknown>;
+  simulationConfig?: {
+    poolAddress?: string;
+    positionId?: string;
+  };
 }
 
 export interface PipelineTraceStep {

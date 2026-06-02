@@ -23,11 +23,10 @@ import {
   AmountCalculatorStep,
   ClmmPricingStep,
   ExperimentalRestakeStep,
-  FavorableRangeCheckStep,
-  HighFeeCheckStep,
   ConditionDecisionStep,
   RsiIndicatorStep,
   SmaIndicatorStep,
+  ContextSetupStep,
 } from '@lp-system/steps';
 import { OrchestratorRegistry, OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
@@ -76,7 +75,6 @@ async function main() {
     () => new InitializationCheckStep(),
     new InitializationCheckStep().descriptor
   );
-  stepRegistry.register('high-fee-check', () => new HighFeeCheckStep(), new HighFeeCheckStep().descriptor);
   stepRegistry.register('trailing-range-check', () => new TrailingRangeCheckStep(), new TrailingRangeCheckStep().descriptor);
   stepRegistry.register('range-calculator', () => new RangeCalculatorStep(), new RangeCalculatorStep().descriptor);
   stepRegistry.register('amount-calculator', () => new AmountCalculatorStep(), new AmountCalculatorStep().descriptor);
@@ -87,13 +85,13 @@ async function main() {
     new ExperimentalRestakeStep().descriptor
   );
   stepRegistry.register(
-    'favorable-range-check',
-    () => new FavorableRangeCheckStep(),
-    new FavorableRangeCheckStep().descriptor
+    'condition-decision',
+    (params) => new ConditionDecisionStep(params),
+    new ConditionDecisionStep().descriptor
   );
-  stepRegistry.register('condition-decision', () => new ConditionDecisionStep(), new ConditionDecisionStep().descriptor);
-  stepRegistry.register('rsi-indicator', () => new RsiIndicatorStep(), new RsiIndicatorStep().descriptor);
-  stepRegistry.register('sma-indicator', () => new SmaIndicatorStep(), new SmaIndicatorStep().descriptor);
+  stepRegistry.register('rsi-indicator', (params) => new RsiIndicatorStep(params), new RsiIndicatorStep().descriptor);
+  stepRegistry.register('sma-indicator', (params) => new SmaIndicatorStep(params), new SmaIndicatorStep().descriptor);
+  stepRegistry.register('context-setup', (params) => new ContextSetupStep(params), new ContextSetupStep().descriptor);
 
   // 4. Strategy initialization
   const trailingUsdcStrategy = new TrailingUsdcStrategy({ rangePercent: 20 });
