@@ -15,17 +15,12 @@
 import { HummingbotProvider } from '@lp-system/providers';
 import { HummingbotExecutor } from '@lp-system/executor';
 import { JsonFileStore, JsonPositionStore, JsonLineageStore, JsonStrategyStore } from '@lp-system/persistence';
-import { TrailingUsdcStrategy, ExperimentalRestakeStrategy, StepRegistry, DataDrivenStrategy } from '@lp-system/strategy';
 import {
-  InitializationCheckStep,
-  TrailingRangeCheckStep,
-  RangeCalculatorStep,
-  AmountCalculatorStep,
-  ClmmPricingStep,
-  ExperimentalRestakeStep,
-  ConditionDecisionStep,
-  ContextSetupStep,
-} from '@lp-system/steps';
+  TrailingUsdcStrategy,
+  ExperimentalRestakeStrategy,
+  DataDrivenStrategy,
+  createDefaultRegistry,
+} from '@lp-system/strategy';
 import { OrchestratorRegistry, OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
 import { startHttpServer } from './server.js';
@@ -67,31 +62,11 @@ async function main() {
   const strategyStore = new JsonStrategyStore('./data', { wallet: walletAddress, env: APP_ENV });
 
   // 3.5 Step Registry initialization
-  const stepRegistry = new StepRegistry();
-  stepRegistry.register(
-    'initialization-check',
-    () => new InitializationCheckStep(),
-    new InitializationCheckStep().descriptor
-  );
-  stepRegistry.register('trailing-range-check', () => new TrailingRangeCheckStep(), new TrailingRangeCheckStep().descriptor);
-  stepRegistry.register('range-calculator', () => new RangeCalculatorStep(), new RangeCalculatorStep().descriptor);
-  stepRegistry.register('amount-calculator', () => new AmountCalculatorStep(), new AmountCalculatorStep().descriptor);
-  stepRegistry.register('clmm-pricing', () => new ClmmPricingStep(), new ClmmPricingStep().descriptor);
-  stepRegistry.register(
-    'experimental-restake',
-    () => new ExperimentalRestakeStep(),
-    new ExperimentalRestakeStep().descriptor
-  );
-  stepRegistry.register(
-    'condition-decision',
-    (params) => new ConditionDecisionStep(params),
-    new ConditionDecisionStep().descriptor
-  );
-  stepRegistry.register('context-setup', (params) => new ContextSetupStep(params), new ContextSetupStep().descriptor);
+  const stepRegistry = createDefaultRegistry();
 
   // 4. Strategy initialization
-  const trailingUsdcStrategy = new TrailingUsdcStrategy({ rangePercent: 20 });
-  const experimentalRestakeStrategy = new ExperimentalRestakeStrategy();
+  const trailingUsdcStrategy = new TrailingUsdcStrategy({ rangePercent: 20 }, stepRegistry);
+  const experimentalRestakeStrategy = new ExperimentalRestakeStrategy({}, stepRegistry);
 
   // 5. Orchestration Layer initialization
   const registry = new OrchestratorRegistry();

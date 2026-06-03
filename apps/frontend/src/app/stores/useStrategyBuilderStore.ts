@@ -6,6 +6,7 @@
  * - Maintains draft StrategyDefinition (id, name, description, steps)
  * - Exposes actions for adding, removing, inserting, reordering, and updating steps
  * - Stores mock/live simulation context data for visual variables tracking
+ * - Supports loadStrategy to hydrate the builder from a saved definition
  *
  * @dependencies zustand, @lp-system/core
  */
@@ -22,6 +23,9 @@ export interface StrategyBuilderState {
     positionId?: string;
   };
 
+  // Whether the builder has unsaved changes since last save or load
+  isDirty: boolean;
+
   // The linear pipeline of steps
   // We use a unique 'instanceId' for the UI so the same step can be added multiple times
   steps: (StrategyDefinitionStep & { instanceId: string })[];
@@ -35,6 +39,9 @@ export interface StrategyBuilderState {
   moveStep: (oldIndex: number, newIndex: number) => void;
   updateStepParams: (instanceId: string, params: Record<string, unknown>) => void;
 
+  // Load a full saved strategy definition into the builder
+  loadStrategy: (definition: StrategyDefinition) => void;
+
   // Utility
   getStrategyDefinition: () => StrategyDefinition;
   reset: () => void;
@@ -45,6 +52,7 @@ export const useStrategyBuilderStore = create<StrategyBuilderState>((set, get) =
   name: 'Custom Strategy',
   description: 'Built via GUI',
   simulationConfig: { poolAddress: '', positionId: '' },
+  isDirty: false,
   steps: [
     {
       instanceId: `context-setup-default`,
@@ -60,8 +68,8 @@ export const useStrategyBuilderStore = create<StrategyBuilderState>((set, get) =
     },
   ],
 
-  setMetadata: (id, name, description) => set({ id, name, description }),
-  setSimulationConfig: (poolAddress, positionId) => set({ simulationConfig: { poolAddress, positionId } }),
+  setMetadata: (id, name, description) => set({ id, name, description, isDirty: true }),
+  setSimulationConfig: (poolAddress, positionId) => set({ simulationConfig: { poolAddress, positionId }, isDirty: true }),
 
   addStep: (stepId, defaultParams = {}) =>
     set((state) => ({
@@ -99,7 +107,21 @@ export const useStrategyBuilderStore = create<StrategyBuilderState>((set, get) =
   updateStepParams: (instanceId, params) =>
     set((state) => ({
       steps: state.steps.map((s) => (s.instanceId === instanceId ? { ...s, params: { ...s.params, ...params } } : s)),
+      isDirty: true,
     })),
+
+  loadStrategy: (definition: StrategyDefinition) =>
+    set({
+      id: definition.id,
+      name: definition.name || 'Untitled Strategy',
+      description: definition.description || '',
+      simulationConfig: definition.simulationConfig || { poolAddress: '', positionId: '' },
+      steps: definition.steps.map((s, idx) => ({
+        ...s,
+        instanceId: `${s.stepId}-${Date.now()}-${idx}`,
+      })),
+      isDirty: false,
+    }),
 
   getStrategyDefinition: () => {
     const { id, name, description, steps, simulationConfig } = get();

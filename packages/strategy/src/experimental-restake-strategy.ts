@@ -13,10 +13,10 @@
  */
 
 import { IStrategy, Position, MarketSnapshot, StrategyResult, StrategyDefinition } from '@lp-system/core';
-import { InitializationCheckStep, ClmmPricingStep, ExperimentalRestakeStep } from '@lp-system/steps';
 import { getLogger } from '@lp-system/logger';
 import { DataDrivenStrategy } from './data-driven-strategy.js';
 import { StepRegistry } from './step-registry.js';
+import { createDefaultRegistry } from './default-registry.js';
 
 const logger = getLogger('experimental-restake-strategy');
 
@@ -58,18 +58,15 @@ export class ExperimentalRestakeStrategy implements IStrategy {
     'Experimental trailing strategy: reopens with 0.15% (4-bin) USDC-only range when price is above range, and rolls SOL-only down-range maintaining average buy price when price is below range';
   private dataDrivenStrategy: DataDrivenStrategy;
 
-  constructor(defaultParams: Record<string, unknown> = {}) {
-    const registry = new StepRegistry();
-    registry.register('initialization-check', () => new InitializationCheckStep(), new InitializationCheckStep().descriptor);
-    registry.register('clmm-pricing', () => new ClmmPricingStep(), new ClmmPricingStep().descriptor);
-    registry.register('experimental-restake', () => new ExperimentalRestakeStep(), new ExperimentalRestakeStep().descriptor);
+  constructor(defaultParams: Record<string, unknown> = {}, registry?: StepRegistry) {
+    const resolvedRegistry = registry ?? createDefaultRegistry();
 
     const definition = {
       ...experimentalRestakeDefinition,
       defaultParams: { ...experimentalRestakeDefinition.defaultParams, ...defaultParams },
     };
 
-    this.dataDrivenStrategy = new DataDrivenStrategy(definition, registry);
+    this.dataDrivenStrategy = new DataDrivenStrategy(definition, resolvedRegistry);
   }
 
   /**

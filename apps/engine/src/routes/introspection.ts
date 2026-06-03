@@ -41,18 +41,55 @@ export function createIntrospectionRouter(
   /**
    * GET /strategies
    * Returns a list of all trading strategies available for assignment in the system.
+   * Pass ?full=true to include the full StrategyDefinition for each custom strategy.
    */
-  router.get('/strategies', (_req, res) => {
+  router.get('/strategies', async (req, res) => {
     try {
       const strategies = factory.getAvailableStrategies();
-      res.json({
-        count: strategies.length,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        strategies: strategies.map((s: any) => ({
-          id: s.id,
-          description: s.description || 'Custom strategy implementation',
-        })),
-      });
+      const full = req.query.full === 'true';
+
+      if (full) {
+        const customStrategies = await strategyStore.getStrategies();
+        const customById = new Map(customStrategies.map((s: StrategyDefinition) => [s.id, s]));
+        res.json({
+          count: strategies.length,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          strategies: strategies.map((s: any) => ({
+            id: s.id,
+            description: s.description || 'Custom strategy implementation',
+            definition: customById.get(s.id) || null,
+          })),
+        });
+      } else {
+        res.json({
+          count: strategies.length,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          strategies: strategies.map((s: any) => ({
+            id: s.id,
+            description: s.description || 'Custom strategy implementation',
+          })),
+        });
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: message });
+    }
+  });
+
+  /**
+   * GET /strategies/:id
+   * Returns the full StrategyDefinition JSON for a specific saved custom strategy.
+   */
+  router.get('/strategies/:id', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const strategies = await strategyStore.getStrategies();
+      const strategy = strategies.find((s: StrategyDefinition) => s.id === id);
+      if (!strategy) {
+        res.status(404).json({ error: `Strategy with ID '${id}' not found.` });
+        return;
+      }
+      res.json(strategy);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       res.status(500).json({ error: message });
