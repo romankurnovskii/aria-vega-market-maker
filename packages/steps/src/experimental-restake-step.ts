@@ -96,18 +96,21 @@ export class ExperimentalRestakeStep implements IStep {
       const upperBinId = getBinIdFromPrice(upperBoundPrice, binStep, decimalsX, decimalsY);
       const lowerBinId = getBinIdFromPrice(lowerBoundPrice, binStep, decimalsX, decimalsY);
 
-      // Amount: get from parameters or default to position's current tokenY.amount
+      // Amount: get from parameters or calculate total agnostic value in Token Y
       let usdcAmount: string;
       if (context.params.restakeAmount !== undefined) {
         const amountNum = Number(context.params.restakeAmount);
         usdcAmount = BigInt(Math.round(amountNum * Math.pow(10, decimalsY))).toString();
         logger.info(
-          `[${this.name}] Using configured restakeAmount from parameters: ${amountNum} USDC (${usdcAmount} micro-units)`
+          `[${this.name}] Using configured restakeAmount from parameters: ${amountNum} Token Y (${usdcAmount} micro-units)`
         );
       } else {
-        usdcAmount = context.position.tokenY.amount;
+        const amountX = Number(context.position.tokenX.amount) / Math.pow(10, decimalsX);
+        const amountY = Number(context.position.tokenY.amount) / Math.pow(10, decimalsY);
+        const totalValueY = amountY + amountX * context.market.price;
+        usdcAmount = BigInt(Math.round(totalValueY * Math.pow(10, decimalsY))).toString();
         logger.info(
-          `[${this.name}] restakeAmount parameter not set. Defaulting to position's current tokenY amount: ${usdcAmount}`
+          `[${this.name}] restakeAmount parameter not set. Calculated total value in Token Y from live price: ${totalValueY} (${usdcAmount} micro-units)`
         );
       }
 
@@ -166,15 +169,20 @@ export class ExperimentalRestakeStep implements IStep {
         upperBinId = lowerBinId + 68;
       }
 
-      // Amount: get from parameters or default to position's current tokenX.amount
+      // Amount: get from parameters or calculate total agnostic value in Token X
       let solAmount: string;
       if (context.params.restakeAmountSol !== undefined) {
         const amountNum = Number(context.params.restakeAmountSol);
         solAmount = BigInt(Math.round(amountNum * Math.pow(10, decimalsX))).toString();
-        logger.info(`[${this.name}] Using configured restakeAmountSol from parameters: ${amountNum} SOL`);
+        logger.info(`[${this.name}] Using configured restakeAmountSol from parameters: ${amountNum} Token X`);
       } else {
-        const rawAmount = BigInt(context.position.tokenX.amount);
-        solAmount = rawAmount.toString();
+        const amountX = Number(context.position.tokenX.amount) / Math.pow(10, decimalsX);
+        const amountY = Number(context.position.tokenY.amount) / Math.pow(10, decimalsY);
+        const totalValueX = amountX + amountY / context.market.price;
+        solAmount = BigInt(Math.round(totalValueX * Math.pow(10, decimalsX))).toString();
+        logger.info(
+          `[${this.name}] restakeAmountSol parameter not set. Calculated total value in Token X from live price: ${totalValueX} (${solAmount} micro-units)`
+        );
       }
 
       const openParams = {
