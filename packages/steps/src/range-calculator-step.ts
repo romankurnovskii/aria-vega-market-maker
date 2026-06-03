@@ -48,31 +48,27 @@ export class RangeCalculatorStep implements IStep {
     // For CLMM, rangePercent maps to a set number of bins (e.g. 100 bins width)
     const binCount = Math.floor(rangePercent * 5); // Simple linear multiplier for demonstration
 
-    let lowerBinId = context.market.activeBound - Math.floor(binCount / 2);
-    let upperBinId = context.market.activeBound + Math.floor(binCount / 2);
+    let lowerBound = context.market.activeBound - Math.floor(binCount / 2);
+    let upperBound = context.market.activeBound + Math.floor(binCount / 2);
 
     // Enforce the Meteora 70-bin limit (69 index difference)
     const MAX_BIN_DIFF = 69;
-    if (upperBinId - lowerBinId > MAX_BIN_DIFF) {
+    if (upperBound - lowerBound > MAX_BIN_DIFF) {
       logger.warn(
-        `[${this.name}] Requested range (${upperBinId - lowerBinId} bins) exceeds Meteora 70-bin limit. Clamping width.`
+        `[${this.name}] Requested range (${upperBound - lowerBound} bins) exceeds Meteora 70-bin limit. Clamping width.`
       );
 
       // Calculate the center point
-      const midBin = Math.floor((upperBinId + lowerBinId) / 2);
+      const midBin = Math.floor((upperBound + lowerBound) / 2);
 
       // Clamp symmetrically around the mid point
       const halfWidth = Math.floor(MAX_BIN_DIFF / 2);
-      lowerBinId = midBin - halfWidth;
-      upperBinId = lowerBinId + MAX_BIN_DIFF;
+      lowerBound = midBin - halfWidth;
+      upperBound = lowerBound + MAX_BIN_DIFF;
     }
 
-    // Set both agnostic bounds and legacy bin IDs for compatibility
-    const lowerBound = lowerBinId;
-    const upperBound = upperBinId;
-
     logger.info(
-      `[${this.name}] Calculated new range bounds: [${lowerBound}, ${upperBound}] (width: ${upperBinId - lowerBinId + 1} bins)`
+      `[${this.name}] Calculated new range bounds: [${lowerBound}, ${upperBound}] (width: ${upperBound - lowerBound + 1} bins)`
     );
 
     return {
@@ -81,8 +77,6 @@ export class RangeCalculatorStep implements IStep {
         poolAddress: context.market.poolAddress,
         lowerBound,
         upperBound,
-        lowerBinId,
-        upperBinId,
         tokenXAmount: '0',
         tokenYAmount: '0',
       },

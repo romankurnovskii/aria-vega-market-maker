@@ -43,7 +43,7 @@ export class AmountCalculatorStep implements IStep {
   /**
    * Fills in the token allocation amounts in openParams.
    *
-   * @param {StepContext} context - Pipeline context with openParams (lowerBinId, upperBinId, poolAddress).
+   * @param {StepContext} context - Pipeline context with openParams (lowerBound, upperBound, poolAddress).
    * @returns {Promise<StepContext>} Updated context with tokenXAmount and tokenYAmount set.
    */
   public async execute(context: StepContext): Promise<StepContext> {
@@ -52,7 +52,7 @@ export class AmountCalculatorStep implements IStep {
     }
 
     logger.info(
-      `[${this.name}] Calculating optimal capital allocation for range: [${context.openParams.lowerBinId}, ${context.openParams.upperBinId}]`
+      `[${this.name}] Calculating optimal capital allocation for range: [${context.openParams.lowerBound}, ${context.openParams.upperBound}]`
     );
 
     // Read directly from the live position state instead of hardcoding.

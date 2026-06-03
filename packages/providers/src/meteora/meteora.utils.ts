@@ -148,8 +148,8 @@ export function enrichOpenParamsForExecution(
   let upperBoundPrice = openParams.upperBoundPrice;
 
   if ((lowerBoundPrice === undefined || upperBoundPrice === undefined) && poolInfo) {
-    const lowerBin = openParams.lowerBinId ?? openParams.lowerBound;
-    const upperBin = openParams.upperBinId ?? openParams.upperBound;
+    const lowerBin = openParams.lowerBound;
+    const upperBin = openParams.upperBound;
     lowerBoundPrice = getPriceFromBinId(lowerBin, poolInfo.binStep, tokenXDecimals, tokenYDecimals);
     upperBoundPrice = getPriceFromBinId(upperBin, poolInfo.binStep, tokenXDecimals, tokenYDecimals);
   }
@@ -257,7 +257,6 @@ export async function getMarketSnapshot(
     chain: 'solana',
     protocol: 'meteora_dlmm' as ProtocolType,
     activeBound: activeBinId,
-    activeBinId,
     price: poolData.current_price,
     priceHistory,
     priceHistoryTimeframe: timeframe,

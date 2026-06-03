@@ -87,7 +87,12 @@ export class DataDrivenStrategy implements IStrategy {
     const openParams = (finalContext._openParams || finalContext.openParams) as OpenParams | undefined;
     const metrics = finalContext.calculations as CalculatedPrices | undefined;
 
-    if (signal === 'close+open' && openParams) {
+    if (signal === 'close+open') {
+      if (!openParams) {
+        const errorMsg = `[DataDrivenStrategy:${this.id}] Critical Error: Signal is 'close+open' but 'openParams' are missing.`;
+        logger.error(errorMsg);
+        throw new Error(errorMsg);
+      }
       return {
         action: 'close+open',
         openParams,
@@ -106,7 +111,12 @@ export class DataDrivenStrategy implements IStrategy {
       };
     }
 
-    if (signal === 'open' && openParams) {
+    if (signal === 'open') {
+      if (!openParams) {
+        const errorMsg = `[DataDrivenStrategy:${this.id}] Critical Error: Signal is 'open' but 'openParams' are missing.`;
+        logger.error(errorMsg);
+        throw new Error(errorMsg);
+      }
       return {
         action: 'open',
         openParams,

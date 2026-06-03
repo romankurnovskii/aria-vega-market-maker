@@ -93,8 +93,8 @@ export class ExperimentalRestakeStep implements IStep {
       const upperBoundPrice = context.market.price;
       const lowerBoundPrice = context.market.price * (1 - 0.0015);
 
-      const upperBinId = getBinIdFromPrice(upperBoundPrice, binStep, decimalsX, decimalsY);
-      const lowerBinId = getBinIdFromPrice(lowerBoundPrice, binStep, decimalsX, decimalsY);
+      const upperBound = getBinIdFromPrice(upperBoundPrice, binStep, decimalsX, decimalsY);
+      const lowerBound = getBinIdFromPrice(lowerBoundPrice, binStep, decimalsX, decimalsY);
 
       // Amount: get from parameters or calculate total agnostic value in Token Y
       let usdcAmount: string;
@@ -116,18 +116,16 @@ export class ExperimentalRestakeStep implements IStep {
 
       const openParams = {
         poolAddress: context.position.poolAddress,
-        lowerBound: lowerBinId,
-        upperBound: upperBinId,
-        lowerBinId,
-        upperBinId,
+        lowerBound,
+        upperBound,
         tokenXAmount: '0', // single direction USDC only
         tokenYAmount: usdcAmount,
       };
 
       logger.info(
         `[${this.name}] Computed rebalance parameters: ` +
-          `LowerBin: ${lowerBinId} (Price: ${lowerBoundPrice.toFixed(6)}), ` +
-          `UpperBin: ${upperBinId} (Price: ${upperBoundPrice.toFixed(6)}), ` +
+          `LowerBound: ${lowerBound} (Price: ${lowerBoundPrice.toFixed(6)}), ` +
+          `UpperBound: ${upperBound} (Price: ${upperBoundPrice.toFixed(6)}), ` +
           `Amounts - Token X: 0, Token Y: ${usdcAmount}`
       );
 
@@ -158,15 +156,15 @@ export class ExperimentalRestakeStep implements IStep {
           `Computed target upper bound price to maintain break-even spot sell: ${upperBoundPrice.toFixed(6)}`
       );
 
-      let upperBinId = getBinIdFromPrice(upperBoundPrice, binStep, decimalsX, decimalsY);
-      const lowerBinId = getBinIdFromPrice(lowerBoundPrice, binStep, decimalsX, decimalsY);
+      let upperBound = getBinIdFromPrice(upperBoundPrice, binStep, decimalsX, decimalsY);
+      const lowerBound = getBinIdFromPrice(lowerBoundPrice, binStep, decimalsX, decimalsY);
 
       // Cap dynamic range to 69 bins to ensure the position fits within Solana's 10,240-byte CPI reallocation limit
-      if (upperBinId - lowerBinId > 68) {
+      if (upperBound - lowerBound > 68) {
         logger.warn(
-          `[${this.name}] Calculated bin range (${upperBinId - lowerBinId + 1} bins) exceeds Solana single-instruction reallocation limit (69 bins). Capping upperBinId to ${lowerBinId + 68}.`
+          `[${this.name}] Calculated bin range (${upperBound - lowerBound + 1} bins) exceeds Solana single-instruction reallocation limit (69 bins). Capping upperBound to ${lowerBound + 68}.`
         );
-        upperBinId = lowerBinId + 68;
+        upperBound = lowerBound + 68;
       }
 
       // Amount: get from parameters or calculate total agnostic value in Token X
@@ -187,18 +185,16 @@ export class ExperimentalRestakeStep implements IStep {
 
       const openParams = {
         poolAddress: context.position.poolAddress,
-        lowerBound: lowerBinId,
-        upperBound: upperBinId,
-        lowerBinId,
-        upperBinId,
+        lowerBound,
+        upperBound,
         tokenXAmount: solAmount,
         tokenYAmount: '0', // single direction base token only
       };
 
       logger.info(
         `[${this.name}] Computed down-range rebalance parameters: ` +
-          `LowerBin: ${lowerBinId} (Price: ${lowerBoundPrice.toFixed(6)}), ` +
-          `UpperBin: ${upperBinId} (Price: ${upperBoundPrice.toFixed(6)}), ` +
+          `LowerBound: ${lowerBound} (Price: ${lowerBoundPrice.toFixed(6)}), ` +
+          `UpperBound: ${upperBound} (Price: ${upperBoundPrice.toFixed(6)}), ` +
           `Amounts - Token X: ${solAmount}, Token Y: 0`
       );
 
