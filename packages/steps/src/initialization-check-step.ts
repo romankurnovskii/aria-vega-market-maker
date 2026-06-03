@@ -40,8 +40,8 @@ export class InitializationCheckStep implements IStep {
   public async execute(context: StepContext): Promise<StepContext> {
     logger.info(`[${this.name}] Checking initialization status for position: ${context.position.id}`);
 
-    const hasLiquidityX = BigInt(context.position.tokenX.amount) > 0n;
-    const hasLiquidityY = BigInt(context.position.tokenY.amount) > 0n;
+    const hasLiquidityX = parseFloat(context.position.tokenX.amount) > 0;
+    const hasLiquidityY = parseFloat(context.position.tokenY.amount) > 0;
 
     if (!hasLiquidityX && !hasLiquidityY) {
       logger.info(`[${this.name}] Position has zero liquidity. Signalling CLOSE.`);
