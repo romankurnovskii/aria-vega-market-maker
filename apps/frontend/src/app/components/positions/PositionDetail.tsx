@@ -26,6 +26,7 @@ import { PnLAndFees } from './PnLAndFees';
 import { OrchestrationControls } from './OrchestrationControls';
 import { EventLog } from '../ui/EventLog';
 import { CycleOverview } from './CycleOverview';
+import { AddLiquidityForm } from './AddLiquidityForm';
 import type { CycleMetrics } from '../../utils/cycleCalculations';
 import type { Position, Strategy, EvalLogEntry } from '../../types/api';
 
@@ -89,6 +90,8 @@ export const PositionDetail = ({
   const [selectedStrategyId, setSelectedStrategyId] = useState<string>(
     orchestration?.strategyId || strategies[0]?.id || 'NONE'
   );
+
+  const [showAddLiquidity, setShowAddLiquidity] = useState(false);
 
   const pnl = (position.pnlData || position.raw || {}) as PnLData;
 
@@ -217,6 +220,24 @@ export const PositionDetail = ({
               onEvaluate={handleEvaluate}
               onApplyStrategy={handleApplyStrategy}
             />
+
+            <button
+              onClick={() => setShowAddLiquidity(!showAddLiquidity)}
+              className="w-full border border-[#0D0D0D] bg-white py-2 px-4 text-sm font-bold uppercase hover:bg-[#FF4500] hover:text-[#0D0D0D] hover:border-[#FF4500] transition-colors"
+            >
+              {showAddLiquidity ? 'Cancel' : '+ Add Liquidity'}
+            </button>
+
+            {showAddLiquidity && (
+              <AddLiquidityForm
+                positionId={position.id}
+                onCancel={() => setShowAddLiquidity(false)}
+                onSuccess={() => {
+                  setShowAddLiquidity(false);
+                  onEvaluate(position.id, selectedStrategyId);
+                }}
+              />
+            )}
           </>
         )}
       </div>
