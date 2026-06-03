@@ -171,10 +171,13 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
         };
       });
 
-      const enrichedSteps = (stepsRes.availableSteps || []).map((stepId: string) => {
-        const meta = STEP_META[stepId] || { type: 'Custom', description: 'Stateless logical workflow execution unit.' };
+      const enrichedSteps = (stepsRes.availableSteps || []).map((descriptor: { id: string; description: string }) => {
+        const meta = STEP_META[descriptor.id] || {
+          type: 'Custom',
+          description: descriptor.description || 'Stateless logical workflow execution unit.',
+        };
         return {
-          id: stepId,
+          id: descriptor.id,
           type: meta.type,
           description: meta.description,
         };
