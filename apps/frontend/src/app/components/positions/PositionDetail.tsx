@@ -231,6 +231,8 @@ export const PositionDetail = ({
             {showAddLiquidity && (
               <AddLiquidityForm
                 positionId={position.id}
+                tokenXSym={tokenXSym}
+                tokenYSym={tokenYSym}
                 onCancel={() => setShowAddLiquidity(false)}
                 onSuccess={() => {
                   setShowAddLiquidity(false);
