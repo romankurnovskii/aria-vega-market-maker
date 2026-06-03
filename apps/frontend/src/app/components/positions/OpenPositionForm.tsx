@@ -294,7 +294,7 @@ export const OpenPositionForm = ({ onOpen, onClose }: OpenPositionFormProps) => 
 
         <div className="grid grid-cols-2 gap-4">
           <div className="flex flex-col gap-1">
-            <label className="uppercase font-bold text-gray-600">Base Token Amount</label>
+            <label className="uppercase font-bold text-gray-600">{tokenXSym || 'Base Token'} Amount</label>
             <input
               type="number"
               step="any"
@@ -306,7 +306,7 @@ export const OpenPositionForm = ({ onOpen, onClose }: OpenPositionFormProps) => 
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="uppercase font-bold text-gray-600">Quote Token Amount</label>
+            <label className="uppercase font-bold text-gray-600">{tokenYSym || 'Quote Token'} Amount</label>
             <input
               type="number"
               step="any"
