@@ -4,7 +4,11 @@
  *
  * @features
  * - fetchSteps: GET /steps to retrieve all available StepDescriptors
+ * - fetchStrategies: GET /strategies to list all saved strategy summaries
+ * - fetchStrategyById: GET /strategies/:id to load a specific strategy definition
  * - saveStrategy: POST /strategies to save a configured StrategyDefinition
+ * - simulateStrategy: POST /strategies/simulate to run a strategy and get a trace
+ * - fetchPoolData: GET /gateway/pool/:address to get live pool market data
  *
  * @dependencies @lp-system/core types
  */
@@ -12,6 +16,12 @@ import { StepDescriptor, StrategyDefinition } from '@lp-system/core';
 import { useCallback, useState } from 'react';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8441';
+
+export interface StrategySummary {
+  id: string;
+  description: string;
+  definition?: StrategyDefinition | null;
+}
 
 export function useStrategyApi() {
   const [isLoading, setIsLoading] = useState(false);
@@ -30,6 +40,44 @@ export function useStrategyApi() {
       setError(msg);
       console.error('[useStrategyApi] Failed to fetch steps:', msg);
       return [];
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const fetchStrategies = useCallback(async (): Promise<StrategySummary[]> => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/strategies`);
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const data = await res.json();
+      return data.strategies || [];
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg);
+      console.error('[useStrategyApi] Failed to fetch strategies:', msg);
+      return [];
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const fetchStrategyById = useCallback(async (id: string): Promise<StrategyDefinition | null> => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/strategies/${encodeURIComponent(id)}`);
+      if (!res.ok) {
+        if (res.status === 404) return null;
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      return await res.json();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg);
+      console.error('[useStrategyApi] Failed to fetch strategy by id:', msg);
+      return null;
     } finally {
       setIsLoading(false);
     }
@@ -103,5 +151,5 @@ export function useStrategyApi() {
     }
   }, []);
 
-  return { fetchSteps, saveStrategy, simulateStrategy, fetchPoolData, isLoading, error };
+  return { fetchSteps, fetchStrategies, fetchStrategyById, saveStrategy, simulateStrategy, fetchPoolData, isLoading, error };
 }

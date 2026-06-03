@@ -6,26 +6,38 @@
  * - Composes the StepLibrary and PipelineCanvas components inside a split viewport
  * - Implements a live variables simulation runner (cycles prices/indicators for visual testing)
  * - Includes a visual slide-out drawer presenting the formatted Strategy JSON definition for clipboard copy
+ * - Strategy selector dropdown to load a saved strategy into the builder canvas
+ * - "New Strategy" reset button to clear the canvas
  *
  * @dependencies react, lucide-react, useStrategyApi, useStrategyBuilderStore
  */
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
-import { useStrategyApi } from '../hooks/useStrategyApi';
+import { useStrategyApi, StrategySummary } from '../hooks/useStrategyApi';
 import { useStrategyBuilderStore } from '../stores/useStrategyBuilderStore';
 import { StepLibrary } from '../components/strategies/builder/StepLibrary';
 import { PipelineCanvas } from '../components/strategies/builder/PipelineCanvas';
 import { StepDescriptor } from '@lp-system/core';
-import { Save, AlertCircle, CheckCircle2, ArrowLeft, Terminal, Copy, X, Play } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle2, ArrowLeft, Terminal, Copy, X, Play, FilePlus, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { SimulationTraceModal } from '../components/strategies/builder/SimulationTraceModal';
 
 export function StrategyBuilderContainer() {
-  const { fetchSteps, saveStrategy, simulateStrategy, fetchPoolData, error: apiError } = useStrategyApi();
+  const {
+    fetchSteps,
+    fetchStrategies,
+    fetchStrategyById,
+    saveStrategy,
+    simulateStrategy,
+    fetchPoolData,
+    error: apiError,
+  } = useStrategyApi();
   const [availableSteps, setAvailableSteps] = useState<StepDescriptor[]>([]);
+  const [savedStrategies, setSavedStrategies] = useState<StrategySummary[]>([]);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [showExportModal, setShowExportModal] = useState(false);
+  const [loadingStrategy, setLoadingStrategy] = useState(false);
 
   const [showSimulationModal, setShowSimulationModal] = useState(false);
   const [simIsLoading, setSimIsLoading] = useState(false);
@@ -38,6 +50,7 @@ export function StrategyBuilderContainer() {
     name,
     description,
     steps,
+    isDirty,
     setMetadata,
     addStep,
     removeStep,
@@ -46,11 +59,14 @@ export function StrategyBuilderContainer() {
     getStrategyDefinition,
     simulationConfig,
     setSimulationConfig,
+    loadStrategy,
+    reset,
   } = useStrategyBuilderStore();
 
   useEffect(() => {
     fetchSteps().then(setAvailableSteps);
-  }, [fetchSteps]);
+    fetchStrategies().then(setSavedStrategies);
+  }, [fetchSteps, fetchStrategies]);
 
   const contextSetupStep = steps.find((s) => s.stepId === 'context-setup');
   const poolAddress = contextSetupStep?.params?.poolAddress as string;
@@ -93,10 +109,29 @@ export function StrategyBuilderContainer() {
     const success = await saveStrategy(def);
     if (success) {
       setSaveStatus('success');
+      // Refresh saved strategies list after save
+      fetchStrategies().then(setSavedStrategies);
       setTimeout(() => setSaveStatus('idle'), 3000);
     } else {
       setSaveStatus('error');
     }
+  };
+
+  const handleLoadStrategy = async (strategyId: string) => {
+    if (isDirty && !confirm('You have unsaved changes. Load this strategy and discard them?')) return;
+    setLoadingStrategy(true);
+    const def = await fetchStrategyById(strategyId);
+    if (def) {
+      loadStrategy(def);
+    } else {
+      alert(`Could not load strategy "${strategyId}". It may be a built-in strategy without an editable definition.`);
+    }
+    setLoadingStrategy(false);
+  };
+
+  const handleNewStrategy = () => {
+    if (isDirty && !confirm('You have unsaved changes. Start a new strategy and discard them?')) return;
+    reset();
   };
 
   const handleCopyJson = () => {
@@ -170,6 +205,42 @@ export function StrategyBuilderContainer() {
               className="bg-transparent text-[10px] text-[#0D0D0D]/60 uppercase tracking-widest focus:outline-none focus:text-[#0D0D0D] w-48 mt-0.5 font-bold"
               placeholder="strategy-id"
             />
+          </div>
+
+          {/* Strategy Loader Dropdown */}
+          <div className="flex items-center gap-2 border-l-2 border-[#0D0D0D] pl-4">
+            <div className="relative">
+              <select
+                id="strategy-loader-select"
+                disabled={loadingStrategy}
+                onChange={(e) => {
+                  if (e.target.value) handleLoadStrategy(e.target.value);
+                  e.target.value = '';
+                }}
+                className="appearance-none bg-[#F4F4F0] border-2 border-[#0D0D0D] px-3 py-1.5 pr-8 text-xs font-bold uppercase text-[#0D0D0D] focus:outline-none focus:border-[#FF4500] cursor-pointer shadow-[2px_2px_0_#0D0D0D] disabled:opacity-50"
+                defaultValue=""
+                title="Load a saved strategy"
+              >
+                <option value="" disabled>
+                  LOAD STRATEGY…
+                </option>
+                {savedStrategies.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.id}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 pointer-events-none" />
+            </div>
+            <button
+              id="new-strategy-btn"
+              onClick={handleNewStrategy}
+              title="New strategy (clears canvas)"
+              className="flex items-center gap-1.5 px-3 py-1.5 border-2 border-[#0D0D0D] bg-white hover:bg-[#0D0D0D] hover:text-white font-bold text-xs transition-colors shadow-[2px_2px_0_#0D0D0D] hover:shadow-none active:translate-x-[2px] active:translate-y-[2px]"
+            >
+              <FilePlus size={13} />
+              NEW
+            </button>
           </div>
 
           <div className="flex flex-col ml-4 border-l-2 border-[#0D0D0D] pl-4">
