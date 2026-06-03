@@ -773,6 +773,134 @@ export function handlePositionsRouter(
             return;
           }
 
+          if (action === 'openLiquidity') {
+            const { tokenXAmount, tokenYAmount, slippageTolerance } = req.body;
+
+            if (!tokenXAmount || !tokenYAmount) {
+              res
+                .status(400)
+                .json({ error: 'Missing tokenXAmount or tokenYAmount in request body for openLiquidity action' });
+              return;
+            }
+
+            const tokenX = parseFloat(tokenXAmount);
+            const tokenY = parseFloat(tokenYAmount);
+            if (isNaN(tokenX) || tokenX <= 0 || isNaN(tokenY) || tokenY <= 0) {
+              res.status(400).json({ error: 'tokenXAmount and tokenYAmount must be positive numbers' });
+              return;
+            }
+
+            const position = await positionProvider.getPosition(positionId);
+            if (!position) {
+              res.status(404).json({ error: 'Position not found' });
+              return;
+            }
+
+            const market = await getMarketSnapshot(position.poolAddress);
+            const openParams: OpenParams = {
+              poolAddress: position.poolAddress,
+              lowerBound: position.lowerBound,
+              upperBound: position.upperBound,
+              tokenXAmount,
+              tokenYAmount,
+              metadata: { slippageTolerance: slippageTolerance ?? 50, isAddLiquidity: true },
+            };
+
+            logger.info(`[HTTP Server] Executing openLiquidity for position ${positionId}`);
+
+            const record = await executor.apply(
+              {
+                positionId,
+                action: 'open',
+                sourceAssignmentId: 'manual_liquidity',
+                evaluatedAt: Date.now(),
+                openParams,
+              },
+              market
+            );
+
+            if (record.status === 'failed') {
+              res.status(500).json({ error: record.error || 'Add liquidity failed' });
+              return;
+            }
+
+            res.json({
+              status: 'success',
+              action: 'openLiquidity',
+              transactionSignatures: record.txSignatures || [],
+              result: {
+                tokenXAmount,
+                tokenYAmount,
+                newPositionId: record.newPositionId,
+              },
+            });
+            return;
+          }
+
+          if (action === 'removeLiquidity') {
+            const { percentage } = req.body;
+
+            if (percentage === undefined || percentage === null) {
+              res.status(400).json({ error: 'Missing percentage in request body for removeLiquidity action' });
+              return;
+            }
+
+            const pct = Number(percentage);
+            if (isNaN(pct) || pct < 1 || pct > 100) {
+              res.status(400).json({ error: 'percentage must be a number between 1 and 100' });
+              return;
+            }
+
+            const position = await positionProvider.getPosition(positionId);
+            if (!position) {
+              res.status(404).json({ error: 'Position not found' });
+              return;
+            }
+
+            // Full removal (100%) maps to close via executor
+            if (pct === 100) {
+              const market = await getMarketSnapshot(position.poolAddress);
+
+              logger.info(`[HTTP Server] Executing removeLiquidity (100%) for position ${positionId}`);
+
+              const record = await executor.apply(
+                {
+                  positionId,
+                  action: 'close',
+                  sourceAssignmentId: 'manual_liquidity',
+                  evaluatedAt: Date.now(),
+                },
+                market
+              );
+
+              if (record.status === 'failed') {
+                res.status(500).json({ error: record.error || 'Remove liquidity failed' });
+                return;
+              }
+
+              // Archive the closed position
+              await handleArchiveAndCleanup(positionId, position.poolAddress, record, positionProvider, positionStore);
+
+              res.json({
+                status: 'success',
+                action: 'removeLiquidity',
+                transactionSignatures: record.txSignatures || [],
+                claimedFees: {
+                  tokenX: record.metrics?.baseFeeCollected || '0',
+                  tokenY: record.metrics?.quoteFeeCollected || '0',
+                },
+                positionClosed: true,
+              });
+              return;
+            }
+
+            // Partial removal (<100%) not yet supported by the gateway
+            res.status(400).json({
+              error: `Partial removal (${pct}%) is not yet supported. Use percentage: 100 for full position close.`,
+            });
+            return;
+          }
+
           res.status(400).json({ error: `Unsupported action: ${action}` });
         }),
       ]);
