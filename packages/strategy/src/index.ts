@@ -16,3 +16,4 @@ export { TrailingUsdcStrategy } from './trailing-usdc-strategy.js';
 export { ExperimentalRestakeStrategy } from './experimental-restake-strategy.js';
 export { StepRegistry, StepFactory } from './step-registry.js';
 export { DataDrivenStrategy } from './data-driven-strategy.js';
+export { createDefaultRegistry } from './default-registry.js';

@@ -13,14 +13,9 @@
  * @sideEffects None — pure computation
  */
 import { IStrategy, Position, MarketSnapshot, StrategyResult, StrategyDefinition } from '@lp-system/core';
-import {
-  InitializationCheckStep,
-  TrailingRangeCheckStep,
-  RangeCalculatorStep,
-  AmountCalculatorStep,
-} from '@lp-system/steps';
 import { DataDrivenStrategy } from './data-driven-strategy.js';
 import { StepRegistry } from './step-registry.js';
+import { createDefaultRegistry } from './default-registry.js';
 import { getLogger } from '@lp-system/logger';
 
 const logger = getLogger('trailing-usdc-strategy');
@@ -51,21 +46,17 @@ export class TrailingUsdcStrategy implements IStrategy {
    * Constructs the strategy with default params (e.g., rangePercent: 20).
    *
    * @param {Record<string, unknown>} [defaultParams={}] - Default configuration, including `rangePercent`.
+   * @param {StepRegistry} [registry] - Optional shared registry. Falls back to the default singleton.
    */
-  constructor(defaultParams: Record<string, unknown> = {}) {
-    // Create a local registry for backward compatibility
-    const registry = new StepRegistry();
-    registry.register('initialization-check', () => new InitializationCheckStep(), new InitializationCheckStep().descriptor);
-    registry.register('trailing-range-check', () => new TrailingRangeCheckStep(), new TrailingRangeCheckStep().descriptor);
-    registry.register('range-calculator', () => new RangeCalculatorStep(), new RangeCalculatorStep().descriptor);
-    registry.register('amount-calculator', () => new AmountCalculatorStep(), new AmountCalculatorStep().descriptor);
+  constructor(defaultParams: Record<string, unknown> = {}, registry?: StepRegistry) {
+    const resolvedRegistry = registry ?? createDefaultRegistry();
 
     const definition = {
       ...trailingUsdcDefinition,
       defaultParams: { ...trailingUsdcDefinition.defaultParams, ...defaultParams },
     };
 
-    this.dataDrivenStrategy = new DataDrivenStrategy(definition, registry);
+    this.dataDrivenStrategy = new DataDrivenStrategy(definition, resolvedRegistry);
   }
 
   /**
