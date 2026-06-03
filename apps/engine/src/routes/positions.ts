@@ -223,8 +223,8 @@ export function handlePositionsRouter(
             if (openParams) {
               try {
                 const poolInfo = await meteoraProvider.getPoolInfo(position.poolAddress);
-                const lower = openParams.lowerBinId ?? openParams.lowerBound;
-                const upper = openParams.upperBinId ?? openParams.upperBound;
+                const lower = openParams.lowerBound;
+                const upper = openParams.upperBound;
                 if (lower !== undefined && upper !== undefined) {
                   const lowerBoundPrice = getPriceFromBinId(
                     lower,

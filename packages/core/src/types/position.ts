@@ -22,15 +22,6 @@ export interface OpenParams {
   tokenYAmount: string;
   metadata?: Record<string, unknown>;
 
-  /**
-   * @deprecated Use `lowerBound` instead. Kept for legacy Solana/Meteora support.
-   */
-  lowerBinId?: number;
-  /**
-   * @deprecated Use `upperBound` instead. Kept for legacy Solana/Meteora support.
-   */
-  upperBinId?: number;
-
   lowerBoundPrice?: number;
   upperBoundPrice?: number;
   binCount?: number;
@@ -66,13 +57,4 @@ export interface Position {
   binCount?: number;
   rangePercent?: number;
   pnlData?: unknown;
-
-  /**
-   * @deprecated Use `lowerBound` instead. Kept for legacy Solana/Meteora support.
-   */
-  lowerBinId?: number;
-  /**
-   * @deprecated Use `upperBound` instead. Kept for legacy Solana/Meteora support.
-   */
-  upperBinId?: number;
 }

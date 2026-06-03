@@ -67,6 +67,24 @@ export class ContextSetupStep implements IStep {
     const rangeMin = Number(this.params.rangeMin);
     const rangeMax = Number(this.params.rangeMax);
 
+    if (isNaN(rangeMin) || isNaN(rangeMax)) {
+      throw new Error(`[${this.name}] Invalid range values: rangeMin and rangeMax must be valid numbers.`);
+    }
+
+    if (rangeMin > rangeMax) {
+      throw new Error(
+        `[${this.name}] Inverted range: rangeMin (${rangeMin}) cannot be greater than rangeMax (${rangeMax}).`
+      );
+    }
+
+    if (rangeMin < 0 || rangeMax < 0) {
+      throw new Error(`[${this.name}] Invalid range: range boundaries cannot be negative.`);
+    }
+
+    if (isNaN(Number(tokenXAmount)) || isNaN(Number(tokenYAmount))) {
+      throw new Error(`[${this.name}] Invalid token amounts: must be valid numeric strings.`);
+    }
+
     // Determine the price to use – prefer existing market price when available
     let price: number | undefined = undefined;
     if (context.market?.price !== undefined) {

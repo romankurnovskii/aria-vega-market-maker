@@ -28,11 +28,6 @@ export interface MarketSnapshot {
   priceHistoryTimeframe?: string; // e.g. '1h', '15m', '5m'
   feeRate: number;
   capturedAt: number;
-
-  /**
-   * @deprecated Use `activeBound` instead. Kept for legacy Solana/Meteora support.
-   */
-  activeBinId?: number;
 }
 
 export interface PoolInfo {
@@ -45,9 +40,6 @@ export interface PoolInfo {
   tokenXAddress: string;
   tokenYAddress: string;
   binStep: number;
-  activeBinId?: number;
-  tokenXMint?: string;
-  tokenYMint?: string;
   tokenXDecimals?: number;
   tokenYDecimals?: number;
 }

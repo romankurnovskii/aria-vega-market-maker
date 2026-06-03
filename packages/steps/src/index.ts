@@ -18,6 +18,5 @@ export { AmountCalculatorStep } from './amount-calculator-step.js';
 export { ExperimentalRestakeStep } from './experimental-restake-step.js';
 export { ClmmPricingStep } from './clmm-pricing-step.js';
 export { ConditionDecisionStep } from './condition-decision-step.js';
-export { RsiIndicatorStep } from './rsi-indicator-step.js';
-export { SmaIndicatorStep } from './sma-indicator-step.js';
+
 export { ContextSetupStep } from './context-setup-step.js';

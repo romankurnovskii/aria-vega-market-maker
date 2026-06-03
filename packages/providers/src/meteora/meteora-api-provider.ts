@@ -258,18 +258,16 @@ export class MeteoraApiProvider implements IPositionProvider {
                 protocol: 'meteora_dlmm',
                 lowerBound: lowerBinId,
                 upperBound: upperBinId,
-                lowerBinId,
-                upperBinId,
                 tokenX: {
                   amount: amtX,
                   decimals: decimalsX,
-                  mint: tokenXMint,
+
                   tokenAddress: tokenXMint,
                 },
                 tokenY: {
                   amount: amtY,
                   decimals: decimalsY,
-                  mint: tokenYMint,
+
                   tokenAddress: tokenYMint,
                 },
                 isInRange,
@@ -377,9 +375,6 @@ export class MeteoraApiProvider implements IPositionProvider {
       tokenXAddress: data.token_x.address,
       tokenYAddress: data.token_y.address,
       binStep: data.pool_config.bin_step,
-      activeBinId,
-      tokenXMint: data.token_x.address,
-      tokenYMint: data.token_y.address,
       tokenXDecimals: data.token_x.decimals,
       tokenYDecimals: data.token_y.decimals,
     };

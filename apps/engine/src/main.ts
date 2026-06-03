@@ -24,8 +24,6 @@ import {
   ClmmPricingStep,
   ExperimentalRestakeStep,
   ConditionDecisionStep,
-  RsiIndicatorStep,
-  SmaIndicatorStep,
   ContextSetupStep,
 } from '@lp-system/steps';
 import { OrchestratorRegistry, OrchestratorFactory } from '@lp-system/orchestration';
@@ -89,8 +87,6 @@ async function main() {
     (params) => new ConditionDecisionStep(params),
     new ConditionDecisionStep().descriptor
   );
-  stepRegistry.register('rsi-indicator', (params) => new RsiIndicatorStep(params), new RsiIndicatorStep().descriptor);
-  stepRegistry.register('sma-indicator', (params) => new SmaIndicatorStep(params), new SmaIndicatorStep().descriptor);
   stepRegistry.register('context-setup', (params) => new ContextSetupStep(params), new ContextSetupStep().descriptor);
 
   // 4. Strategy initialization
