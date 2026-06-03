@@ -34,6 +34,12 @@ export class AmountCalculatorStep implements IStep {
     ],
   };
 
+  private params: Record<string, unknown>;
+
+  constructor(params: Record<string, unknown> = {}) {
+    this.params = params;
+  }
+
   /**
    * Fills in the token allocation amounts in openParams.
    *
@@ -52,8 +58,8 @@ export class AmountCalculatorStep implements IStep {
     // Read directly from the live position state instead of hardcoding.
     // If you pass manual overrides in the strategy params, it uses those.
     // Otherwise, it perfectly rolls over the exact amounts currently in the position.
-    const tokenXAmount = (context.params.tokenXAmount as string) || context.position.tokenX.amount;
-    const tokenYAmount = (context.params.tokenYAmount as string) || context.position.tokenY.amount;
+    const tokenXAmount = (this.params.tokenXAmount as string) || context.position.tokenX.amount;
+    const tokenYAmount = (this.params.tokenYAmount as string) || context.position.tokenY.amount;
 
     logger.info(`[${this.name}] Allocating ${tokenXAmount} base token and ${tokenYAmount} quote token (rollover).`);
 

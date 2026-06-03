@@ -14,6 +14,10 @@ Start here. Every doc in this directory is listed below.
 - [METEORA_SDK_BUG.md](METEORA_SDK_BUG.md) — Meteora DLMM SDK feeInfos bug: root cause, all affected versions, and Gateway patch.
 - [references/liquidity_management_apis.md](references/liquidity_management_apis.md) — Architecture for manual add/remove liquidity REST APIs.
 
+## Feature Requests
+
+- [requests/strategy_gui_load_edit.md](requests/strategy_gui_load_edit.md) — Feature request to enable loading and editing saved strategies in the GUI.
+
 ## Q&A
 
 - [QA.md](QA.md) — answered architecture questions (auto-maintained by agents)

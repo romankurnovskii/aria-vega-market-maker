@@ -65,7 +65,6 @@ export class ClmmPricingStep implements IStep {
     );
 
     // Save calculations to context for downstream steps
-    context.calculations = calculations;
 
     // Structured one-line log for grep parsing
     logger.info(
@@ -97,6 +96,6 @@ export class ClmmPricingStep implements IStep {
         `└────────────────────────────────────────────────────────┘`
     );
 
-    return context;
+    return { ...context, calculations };
   }
 }

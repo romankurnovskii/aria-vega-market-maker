@@ -12,6 +12,7 @@
  */
 import { IStep, StepContext, StepDescriptor, Position, MarketSnapshot } from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
+import { getBinIdFromPrice } from '@lp-system/providers';
 
 const logger = getLogger('context-setup-step');
 
@@ -90,6 +91,10 @@ export class ContextSetupStep implements IStep {
       updatedContext.position = {
         ...updatedContext.position,
         poolAddress: poolAddress,
+        lowerBound: updatedContext.position.lowerBound ?? 0,
+        upperBound: updatedContext.position.upperBound ?? 0,
+        chain: updatedContext.position.chain ?? 'solana',
+        protocol: updatedContext.position.protocol ?? 'meteora_dlmm',
         tokenX: { ...updatedContext.position.tokenX, amount: tokenXAmount },
         tokenY: { ...updatedContext.position.tokenY, amount: tokenYAmount },
       };
@@ -110,20 +115,22 @@ export class ContextSetupStep implements IStep {
       } as Position;
     }
 
+    const activeBinId = getBinIdFromPrice(price, 4, 6, 6);
+
     if (updatedContext.market) {
       updatedContext.market = {
         ...updatedContext.market,
         poolAddress: poolAddress,
         price: price,
         // Override activeBound only if not already set
-        activeBound: updatedContext.market.activeBound !== undefined ? updatedContext.market.activeBound : rangeMax,
+        activeBound: updatedContext.market.activeBound !== undefined ? updatedContext.market.activeBound : activeBinId,
       };
     } else {
       updatedContext.market = {
         poolAddress: poolAddress,
         chain: 'solana',
         protocol: 'meteora_dlmm',
-        activeBound: rangeMax,
+        activeBound: activeBinId,
         price: price,
         priceHistory: [],
         feeRate: 0.01,
