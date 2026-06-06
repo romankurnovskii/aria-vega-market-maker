@@ -59,6 +59,7 @@ export function StrategyBuilderContainer({ initialStrategyId }: { initialStrateg
     removeStep,
     moveStep,
     updateStepParams,
+    updateStepRunIf,
     getStrategyDefinition,
     simulationConfig,
     setSimulationConfig,
@@ -343,6 +344,7 @@ export function StrategyBuilderContainer({ initialStrategyId }: { initialStrateg
           onMoveStep={moveStep}
           onRemoveStep={removeStep}
           onUpdateStepParams={updateStepParams}
+          onUpdateStepRunIf={updateStepRunIf}
           tokenXSym={tokenXSym}
           tokenYSym={tokenYSym}
         />

@@ -59,7 +59,11 @@ export class DataDrivenStrategy implements IStrategy {
       // Merge step-level default params from definition with runtime global params if needed,
       // though typically steps read from context.params or their own initialized params.
       // We pass the step's specific definition params directly to its factory.
-      return this.stepRegistry.create(s.stepId, s.params);
+      const step = this.stepRegistry.create(s.stepId, s.params);
+      if (s.runIf) {
+        step.runIf = s.runIf;
+      }
+      return step;
     });
 
     const workflow = new Workflow(steps);

@@ -23,7 +23,7 @@ import {
   DragEndEvent,
 } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { StepDescriptor } from '@lp-system/core';
+import { StepDescriptor, StrategyDefinitionStep } from '@lp-system/core';
 import { PipelineStepCard } from './PipelineStepCard';
 import { Plus } from 'lucide-react';
 import { useStrategyBuilderStore } from '../../../stores/useStrategyBuilderStore';
@@ -32,6 +32,7 @@ interface StepInstance {
   instanceId: string;
   stepId: string;
   params: Record<string, unknown>;
+  runIf?: StrategyDefinitionStep['runIf'];
 }
 
 interface Props {
@@ -40,6 +41,7 @@ interface Props {
   onMoveStep: (oldIndex: number, newIndex: number) => void;
   onRemoveStep: (instanceId: string) => void;
   onUpdateStepParams: (instanceId: string, params: Record<string, unknown>) => void;
+  onUpdateStepRunIf: (instanceId: string, runIf: StrategyDefinitionStep['runIf'] | undefined) => void;
   tokenXSym?: string;
   tokenYSym?: string;
 }
@@ -50,6 +52,7 @@ export function PipelineCanvas({
   onMoveStep,
   onRemoveStep,
   onUpdateStepParams,
+  onUpdateStepRunIf,
   tokenXSym,
   tokenYSym,
 }: Props) {
@@ -213,8 +216,10 @@ export function PipelineCanvas({
                             instanceId={step.instanceId}
                             descriptor={descriptor}
                             params={step.params}
+                            runIf={step.runIf}
                             onRemove={() => onRemoveStep(step.instanceId)}
                             onUpdateParams={(p) => onUpdateStepParams(step.instanceId, p)}
+                            onUpdateRunIf={(cond) => onUpdateStepRunIf(step.instanceId, cond)}
                             variables={precedingVariables}
                             tokenXSym={tokenXSym}
                             tokenYSym={tokenYSym}

@@ -16,6 +16,44 @@ import { getLogger } from '@lp-system/logger';
 
 const logger = getLogger('workflow');
 
+function evaluateStepCondition(
+  context: Record<string, unknown>,
+  cond: { field: string; operator: string; value: unknown }
+): boolean {
+  const contextVal = context[cond.field];
+  const numContext = Number(contextVal);
+  const numCond = Number(cond.value);
+  const isNum = !isNaN(numContext) && !isNaN(numCond);
+
+  switch (cond.operator) {
+    case 'truthy':
+      return Boolean(contextVal);
+    case 'falsy':
+      return !contextVal;
+    case 'gt':
+    case '>':
+      return isNum ? numContext > numCond : false;
+    case 'lt':
+    case '<':
+      return isNum ? numContext < numCond : false;
+    case 'eq':
+    case '==':
+    case '===':
+      return contextVal === cond.value || String(contextVal) === String(cond.value);
+    case '!=':
+    case '!==':
+      return contextVal !== cond.value && String(contextVal) !== String(cond.value);
+    case 'gte':
+    case '>=':
+      return isNum ? numContext >= numCond : false;
+    case 'lte':
+    case '<=':
+      return isNum ? numContext <= numCond : false;
+    default:
+      return false;
+  }
+}
+
 export class Workflow {
   /**
    * Constructs a workflow with the configured step chain.
@@ -34,6 +72,16 @@ export class Workflow {
   public async run(initialContext: PipelineContext | StepContext): Promise<PipelineContext | StepContext> {
     let context = { ...initialContext } as unknown as PipelineContext | StepContext;
     for (const step of this.steps) {
+      if (step.runIf) {
+        const isMet = evaluateStepCondition(context as unknown as Record<string, unknown>, step.runIf);
+        if (!isMet) {
+          logger.info(
+            `[Workflow] Skipping step: ${step.descriptor?.name || step.name} because runIf condition [${step.runIf.field} ${step.runIf.operator} ${step.runIf.value}] is not met`
+          );
+          continue;
+        }
+      }
+
       logger.info(
         `[Workflow] Running step: ${step.descriptor?.name || step.name} [positionId=${initialContext.position.id}]`
       );

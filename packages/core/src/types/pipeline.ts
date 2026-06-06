@@ -66,9 +66,16 @@ export interface StepDescriptor {
   params: StepParamDescriptor[]; // configurable parameters
 }
 
+export interface StepCondition {
+  field: string;
+  operator: string;
+  value: unknown;
+}
+
 export interface StrategyDefinitionStep {
   stepId: string;
   params: Record<string, unknown>;
+  runIf?: StepCondition;
 }
 
 export interface StrategyDefinition {

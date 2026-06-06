@@ -29,6 +29,7 @@ import {
   StepDescriptor,
   PipelineContext,
   StrategyDefinition,
+  StepCondition,
 } from './types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -38,6 +39,7 @@ export interface IStep {
   name: string;
   readonly descriptor: StepDescriptor;
   execute(context: PipelineContext | StepContext): Promise<PipelineContext | StepContext>;
+  runIf?: StepCondition;
 }
 
 export interface IStrategy {

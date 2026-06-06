@@ -15,7 +15,7 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { StepDescriptor } from '@lp-system/core';
+import { StepDescriptor, StrategyDefinitionStep } from '@lp-system/core';
 import { GripVertical, X, Activity, AlertTriangle, Cpu } from 'lucide-react';
 import React from 'react';
 import { ConditionBuilder } from './ConditionBuilder';
@@ -24,8 +24,10 @@ interface Props {
   instanceId: string;
   descriptor: StepDescriptor;
   params: Record<string, unknown>;
+  runIf?: StrategyDefinitionStep['runIf'];
   onRemove: () => void;
   onUpdateParams: (params: Record<string, unknown>) => void;
+  onUpdateRunIf: (runIf: StrategyDefinitionStep['runIf'] | undefined) => void;
   variables?: { value: string; label: string }[];
   tokenXSym?: string;
   tokenYSym?: string;
@@ -35,8 +37,10 @@ export function PipelineStepCard({
   instanceId,
   descriptor,
   params,
+  runIf,
   onRemove,
   onUpdateParams,
+  onUpdateRunIf,
   variables,
   tokenXSym,
   tokenYSym,
@@ -192,100 +196,200 @@ export function PipelineStepCard({
           )}
         </div>
 
-        {/* Right: Params Form */}
-        {descriptor.params.length > 0 && (
-          <div className="flex-1 bg-[#F4F4F0] p-4 border-2 border-[#0D0D0D] shadow-[3px_3px_0_#0D0D0D] font-mono-jb">
-            <div className="text-[11px] font-bold text-[#0D0D0D] mb-3 uppercase border-b-2 border-[#0D0D0D] pb-1">
-              Block Configuration
-            </div>
-            <div className="space-y-4">
-              {descriptor.params.map((p) => {
-                const value = params[p.key] ?? p.default ?? '';
-                return (
-                  <div key={p.key} className="flex flex-col gap-1.5">
-                    <label className="text-[11px] text-[#0D0D0D] font-bold uppercase">
-                      {p.key === 'tokenXAmount'
-                        ? `Token X Amount ${tokenXSym ? `(${tokenXSym})` : ''}`
-                        : p.key === 'tokenYAmount'
-                          ? `Token Y Amount ${tokenYSym ? `(${tokenYSym})` : ''}`
-                          : p.key}
-                    </label>
-                    {p.type === 'number' ? (
-                      <input
-                        type="number"
-                        value={value as number}
-                        onChange={(e) => handleParamChange(p.key, parseFloat(e.target.value))}
-                        className="bg-white border-2 border-[#0D0D0D] px-2 py-1.5 text-xs text-[#0D0D0D] font-bold focus:outline-none focus:bg-white"
-                        placeholder={String(p.default ?? '')}
-                      />
-                    ) : p.type === 'string' ? (
-                      <input
-                        type="text"
-                        value={value as string}
-                        onChange={(e) => handleParamChange(p.key, e.target.value)}
-                        className="bg-white border-2 border-[#0D0D0D] px-2 py-1.5 text-xs text-[#0D0D0D] font-bold focus:outline-none focus:bg-white"
-                        placeholder={String(p.default ?? '')}
-                      />
-                    ) : p.type === 'boolean' ? (
-                      <div className="flex items-center gap-2">
+        {/* Right: Params Form & Conditional Execution */}
+        <div className="flex-1 bg-[#F4F4F0] p-4 border-2 border-[#0D0D0D] shadow-[3px_3px_0_#0D0D0D] font-mono-jb flex flex-col gap-4">
+          {descriptor.params.length > 0 ? (
+            <div>
+              <div className="text-[11px] font-bold text-[#0D0D0D] mb-3 uppercase border-b-2 border-[#0D0D0D] pb-1">
+                Block Configuration
+              </div>
+              <div className="space-y-4">
+                {descriptor.params.map((p) => {
+                  const value = params[p.key] ?? p.default ?? '';
+                  return (
+                    <div key={p.key} className="flex flex-col gap-1.5">
+                      <label className="text-[11px] text-[#0D0D0D] font-bold uppercase">
+                        {p.key === 'tokenXAmount'
+                          ? `Token X Amount ${tokenXSym ? `(${tokenXSym})` : ''}`
+                          : p.key === 'tokenYAmount'
+                            ? `Token Y Amount ${tokenYSym ? `(${tokenYSym})` : ''}`
+                            : p.key}
+                      </label>
+                      {p.type === 'number' ? (
                         <input
-                          type="checkbox"
-                          checked={value as boolean}
-                          onChange={(e) => handleParamChange(p.key, e.target.checked)}
-                          className="w-4 h-4 border-2 border-[#0D0D0D] accent-[#FF4500] bg-white cursor-pointer"
+                          type="number"
+                          value={value as number}
+                          onChange={(e) => handleParamChange(p.key, parseFloat(e.target.value))}
+                          className="bg-white border-2 border-[#0D0D0D] px-2 py-1.5 text-xs text-[#0D0D0D] font-bold focus:outline-none focus:bg-white"
+                          placeholder={String(p.default ?? '')}
                         />
-                        <span className="text-[11px] text-[#0D0D0D]/60 uppercase">Enabled</span>
-                      </div>
-                    ) : p.type === 'select' ? (
-                      <div className="relative">
-                        <select
+                      ) : p.type === 'string' ? (
+                        <input
+                          type="text"
                           value={value as string}
                           onChange={(e) => handleParamChange(p.key, e.target.value)}
-                          className="w-full bg-white border-2 border-[#0D0D0D] px-2 py-1.5 text-xs text-[#0D0D0D] font-bold focus:outline-none cursor-pointer appearance-none uppercase"
-                        >
-                          {(p.options || []).map((opt) => (
-                            <option key={opt} value={opt}>
-                              {opt}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#0D0D0D]">
-                          ▼
+                          className="bg-white border-2 border-[#0D0D0D] px-2 py-1.5 text-xs text-[#0D0D0D] font-bold focus:outline-none focus:bg-white"
+                          placeholder={String(p.default ?? '')}
+                        />
+                      ) : p.type === 'boolean' ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={value as boolean}
+                            onChange={(e) => handleParamChange(p.key, e.target.checked)}
+                            className="w-4 h-4 border-2 border-[#0D0D0D] accent-[#FF4500] bg-white cursor-pointer"
+                          />
+                          <span className="text-[11px] text-[#0D0D0D]/60 uppercase">Enabled</span>
                         </div>
+                      ) : p.type === 'select' ? (
+                        <div className="relative">
+                          <select
+                            value={value as string}
+                            onChange={(e) => handleParamChange(p.key, e.target.value)}
+                            className="w-full bg-white border-2 border-[#0D0D0D] px-2 py-1.5 text-xs text-[#0D0D0D] font-bold focus:outline-none cursor-pointer appearance-none uppercase"
+                          >
+                            {(p.options || []).map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#0D0D0D]">
+                            ▼
+                          </div>
+                        </div>
+                      ) : p.type === 'textarea' ? (
+                        <textarea
+                          value={value as string}
+                          onChange={(e) => handleParamChange(p.key, e.target.value)}
+                          rows={4}
+                          className="bg-white border-2 border-[#0D0D0D] px-2 py-1.5 text-xs text-[#0D0D0D] font-bold focus:outline-none resize-y"
+                          placeholder={String(p.default ?? '')}
+                        />
+                      ) : p.type === 'condition-builder' ? (
+                        <ConditionBuilder
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          value={value as any}
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          onChange={(val) => handleParamChange(p.key, val as any)}
+                          variables={variables}
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={value as string}
+                          onChange={(e) => handleParamChange(p.key, e.target.value)}
+                          className="bg-white border-2 border-[#0D0D0D] px-2 py-1.5 text-xs text-[#0D0D0D] font-bold focus:outline-none"
+                        />
+                      )}
+                      <div className="text-[9px] text-[#0D0D0D]/50 uppercase tracking-tight leading-tight">
+                        {p.description}
                       </div>
-                    ) : p.type === 'textarea' ? (
-                      <textarea
-                        value={value as string}
-                        onChange={(e) => handleParamChange(p.key, e.target.value)}
-                        rows={4}
-                        className="bg-white border-2 border-[#0D0D0D] px-2 py-1.5 text-xs text-[#0D0D0D] font-bold focus:outline-none resize-y"
-                        placeholder={String(p.default ?? '')}
-                      />
-                    ) : p.type === 'condition-builder' ? (
-                      <ConditionBuilder
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        value={value as any}
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        onChange={(val) => handleParamChange(p.key, val as any)}
-                        variables={variables}
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        value={value as string}
-                        onChange={(e) => handleParamChange(p.key, e.target.value)}
-                        className="bg-white border-2 border-[#0D0D0D] px-2 py-1.5 text-xs text-[#0D0D0D] font-bold focus:outline-none"
-                      />
-                    )}
-                    <div className="text-[9px] text-[#0D0D0D]/50 uppercase tracking-tight leading-tight">
-                      {p.description}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="text-[11px] text-[#0D0D0D]/60 italic font-bold uppercase tracking-tight border-b-2 border-[#0D0D0D] pb-1">
+              No parameters required
+            </div>
+          )}
+
+          {/* Conditional Execution (runIf) */}
+          <div className="border-t-2 border-[#0D0D0D] pt-3 mt-1 flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-[#0D0D0D] uppercase">Run Condition (runIf)</span>
+              <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!runIf}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      const firstVar = variables?.[0]?.value || 'Price_SOL';
+                      onUpdateRunIf({ field: firstVar, operator: 'eq', value: '' });
+                    } else {
+                      onUpdateRunIf(undefined);
+                    }
+                  }}
+                  className="w-3.5 h-3.5 border-2 border-[#0D0D0D] accent-[#FF4500] bg-white cursor-pointer"
+                />
+                <span className="text-[9px] font-bold text-[#0D0D0D] uppercase">Enabled</span>
+              </label>
+            </div>
+
+            {runIf && (
+              <div className="bg-white border-2 border-[#0D0D0D] p-2.5 flex flex-col gap-2 shadow-[2px_2px_0_#0D0D0D]">
+                <div className="flex flex-col gap-1">
+                  <span className="text-[9px] font-bold text-[#0D0D0D]/60 uppercase">Field name:</span>
+                  <div className="relative">
+                    <select
+                      value={runIf.field}
+                      onChange={(e) => onUpdateRunIf({ ...runIf, field: e.target.value })}
+                      className="w-full bg-[#F4F4F0] border border-[#0D0D0D] px-2 py-1 text-[10px] font-bold text-[#0D0D0D] focus:outline-none appearance-none cursor-pointer uppercase"
+                    >
+                      {(variables || []).map((v) => (
+                        <option key={v.value} value={v.value}>
+                          {v.label}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1.5 text-[#0D0D0D] text-[9px]">
+                      ▼
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 flex flex-col gap-1">
+                    <span className="text-[9px] font-bold text-[#0D0D0D]/60 uppercase">Operator:</span>
+                    <div className="relative">
+                      <select
+                        value={runIf.operator}
+                        onChange={(e) => onUpdateRunIf({ ...runIf, operator: e.target.value })}
+                        className="w-full bg-white border border-[#0D0D0D] px-2 py-1 text-[10px] font-bold text-[#0D0D0D] focus:outline-none appearance-none cursor-pointer"
+                      >
+                        {[
+                          { value: 'eq', label: 'EQUALS (==)' },
+                          { value: 'gt', label: 'GREATER THAN (>)' },
+                          { value: 'lt', label: 'LESS THAN (<)' },
+                          { value: 'gte', label: 'GREATER OR EQUAL (>=)' },
+                          { value: 'lte', label: 'LESS OR EQUAL (<=)' },
+                          { value: 'truthy', label: 'IS TRUTHY' },
+                          { value: 'falsy', label: 'IS FALSY' },
+                        ].map((op) => (
+                          <option key={op.value} value={op.value}>
+                            {op.label}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-1.5 text-[#0D0D0D] text-[9px]">
+                        ▼
+                      </div>
+                    </div>
+                  </div>
+
+                  {runIf.operator !== 'truthy' && runIf.operator !== 'falsy' && (
+                    <div className="w-24 flex flex-col gap-1">
+                      <span className="text-[9px] font-bold text-[#0D0D0D]/60 uppercase">Value:</span>
+                      <input
+                        type="text"
+                        placeholder="VAL"
+                        value={String(runIf.value ?? '')}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const parsed = !isNaN(Number(val)) && val !== '' ? Number(val) : val;
+                          onUpdateRunIf({ ...runIf, value: parsed });
+                        }}
+                        className="bg-white border border-[#0D0D0D] px-2 py-1 text-[10px] font-bold text-[#0D0D0D] focus:outline-none w-full uppercase"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

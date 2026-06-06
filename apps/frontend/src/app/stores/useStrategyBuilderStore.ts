@@ -38,6 +38,7 @@ export interface StrategyBuilderState {
   removeStep: (instanceId: string) => void;
   moveStep: (oldIndex: number, newIndex: number) => void;
   updateStepParams: (instanceId: string, params: Record<string, unknown>) => void;
+  updateStepRunIf: (instanceId: string, runIf: StrategyDefinitionStep['runIf'] | undefined) => void;
 
   // Load a full saved strategy definition into the builder
   loadStrategy: (definition: StrategyDefinition) => void;
@@ -110,6 +111,12 @@ export const useStrategyBuilderStore = create<StrategyBuilderState>((set, get) =
       isDirty: true,
     })),
 
+  updateStepRunIf: (instanceId, runIf) =>
+    set((state) => ({
+      steps: state.steps.map((s) => (s.instanceId === instanceId ? { ...s, runIf } : s)),
+      isDirty: true,
+    })),
+
   loadStrategy: (definition: StrategyDefinition) =>
     set({
       id: definition.id,
@@ -117,7 +124,9 @@ export const useStrategyBuilderStore = create<StrategyBuilderState>((set, get) =
       description: definition.description || '',
       simulationConfig: definition.simulationConfig || { poolAddress: '', positionId: '' },
       steps: definition.steps.map((s, idx) => ({
-        ...s,
+        stepId: s.stepId,
+        params: s.params,
+        runIf: s.runIf,
         instanceId: `${s.stepId}-${Date.now()}-${idx}`,
       })),
       isDirty: false,
@@ -131,7 +140,7 @@ export const useStrategyBuilderStore = create<StrategyBuilderState>((set, get) =
       description,
       simulationConfig,
       defaultParams: {}, // GUI currently sets params explicitly per step
-      steps: steps.map((s) => ({ stepId: s.stepId, params: s.params })),
+      steps: steps.map((s) => ({ stepId: s.stepId, params: s.params, runIf: s.runIf })),
     };
   },
 

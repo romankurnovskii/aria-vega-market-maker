@@ -11,6 +11,11 @@
   },
   "scripts": {
     "build": "tsc",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "tsx --test src/**/*.test.ts",
+    "test:coverage": "tsx --test --experimental-test-coverage src/**/*.test.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.1"
   }
 }
