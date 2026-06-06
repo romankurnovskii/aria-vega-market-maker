@@ -776,10 +776,12 @@ export function handlePositionsRouter(
           if (action === 'openLiquidity') {
             const { tokenXAmount, tokenYAmount, slippageTolerance } = req.body;
 
-            if (!tokenXAmount || !tokenYAmount) {
-              res
-                .status(400)
-                .json({ error: 'Missing tokenXAmount or tokenYAmount in request body for openLiquidity action' });
+            if (!tokenXAmount) {
+              res.status(400).json({ error: 'Missing tokenXAmount in request body for openLiquidity action' });
+              return;
+            }
+            if (!tokenYAmount) {
+              res.status(400).json({ error: 'Missing tokenYAmount in request body for openLiquidity action' });
               return;
             }
 
