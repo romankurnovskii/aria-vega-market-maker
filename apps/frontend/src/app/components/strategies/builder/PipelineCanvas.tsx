@@ -40,9 +40,19 @@ interface Props {
   onMoveStep: (oldIndex: number, newIndex: number) => void;
   onRemoveStep: (instanceId: string) => void;
   onUpdateStepParams: (instanceId: string, params: Record<string, unknown>) => void;
+  tokenXSym?: string;
+  tokenYSym?: string;
 }
 
-export function PipelineCanvas({ steps, availableDescriptors, onMoveStep, onRemoveStep, onUpdateStepParams }: Props) {
+export function PipelineCanvas({
+  steps,
+  availableDescriptors,
+  onMoveStep,
+  onRemoveStep,
+  onUpdateStepParams,
+  tokenXSym,
+  tokenYSym,
+}: Props) {
   const [quickAddMenuIndex, setQuickAddMenuIndex] = useState<number | null>(null);
 
   const insertStep = useStrategyBuilderStore((s) => s.insertStep);
@@ -186,6 +196,8 @@ export function PipelineCanvas({ steps, availableDescriptors, onMoveStep, onRemo
                             onRemove={() => onRemoveStep(step.instanceId)}
                             onUpdateParams={(p) => onUpdateStepParams(step.instanceId, p)}
                             variables={dynamicVariables}
+                            tokenXSym={tokenXSym}
+                            tokenYSym={tokenYSym}
                           />
 
                           {/* Inline Quick Add Divider between cards */}

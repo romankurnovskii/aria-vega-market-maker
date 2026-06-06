@@ -22,8 +22,9 @@ import { StepDescriptor } from '@lp-system/core';
 import { Save, AlertCircle, CheckCircle2, ArrowLeft, Terminal, Copy, X, Play, FilePlus, ChevronDown } from 'lucide-react';
 import Link from 'next/link';
 import { SimulationTraceModal } from '../components/strategies/builder/SimulationTraceModal';
+import { getTokenSymbol } from '../utils/format';
 
-export function StrategyBuilderContainer() {
+export function StrategyBuilderContainer({ initialStrategyId }: { initialStrategyId?: string }) {
   const {
     fetchSteps,
     fetchStrategies,
@@ -39,6 +40,8 @@ export function StrategyBuilderContainer() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [loadingStrategy, setLoadingStrategy] = useState(false);
 
+  const [tokenXSym, setTokenXSym] = useState<string>('Base');
+  const [tokenYSym, setTokenYSym] = useState<string>('Quote');
   const [showSimulationModal, setShowSimulationModal] = useState(false);
   const [simIsLoading, setSimIsLoading] = useState(false);
   const [simResult, setSimResult] = useState<unknown>(null);
@@ -68,6 +71,26 @@ export function StrategyBuilderContainer() {
     fetchStrategies().then(setSavedStrategies);
   }, [fetchSteps, fetchStrategies]);
 
+  // Auto-load strategy from ?id=... search param when landing on the builder
+  const loadedInitialRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (initialStrategyId && initialStrategyId !== loadedInitialRef.current) {
+      loadedInitialRef.current = initialStrategyId;
+      setLoadingStrategy(true);
+      fetchStrategyById(initialStrategyId)
+        .then((def) => {
+          if (def) {
+            loadStrategy(def);
+          } else {
+            console.warn(
+              `[StrategyBuilder] Strategy "${initialStrategyId}" not found via API.`
+            );
+          }
+        })
+        .finally(() => setLoadingStrategy(false));
+    }
+  }, [initialStrategyId, fetchStrategyById, loadStrategy]);
+
   const contextSetupStep = steps.find((s) => s.stepId === 'context-setup');
   const poolAddress = contextSetupStep?.params?.poolAddress as string;
   const instanceId = contextSetupStep?.instanceId;
@@ -85,6 +108,10 @@ export function StrategyBuilderContainer() {
         const data = await fetchPoolData(poolAddress);
         if (data && data.market && instanceId) {
           lastFetchedAddress.current = poolAddress;
+          const symX = getTokenSymbol({ mint: data.poolInfo?.tokenXMint });
+          const symY = getTokenSymbol({ mint: data.poolInfo?.tokenYMint });
+          setTokenXSym(symX);
+          setTokenYSym(symY);
           updateStepParams(instanceId, {
             currentPrice: data.market.price,
             rangeMax: data.market.activeBound || parseFloat((data.market.price * 1.1).toFixed(4)),
@@ -314,6 +341,8 @@ export function StrategyBuilderContainer() {
           onMoveStep={moveStep}
           onRemoveStep={removeStep}
           onUpdateStepParams={updateStepParams}
+          tokenXSym={tokenXSym}
+          tokenYSym={tokenYSym}
         />
       </div>
 
