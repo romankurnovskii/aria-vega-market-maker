@@ -5,6 +5,7 @@
  * @features
  * - Displays each strategy as a card with name, description, risk badge, and ID
  * - Color-codes risk badges (High/red, Medium/black, Low/default)
+ * - Each card is clickable and navigates to /strategies/builder?id={strategy.id}
  * - Empty state when no strategies are registered
  *
  * @sideEffects None
@@ -35,9 +36,10 @@ export const StrategiesView = ({ strategies }: StrategiesViewProps) => {
       ) : (
         <div className="flex-1 overflow-auto pr-2 grid grid-cols-1 md:grid-cols-2 gap-4 content-start pb-4">
           {strategies.map((strat: Strategy) => (
-            <div
+            <Link
               key={strat.id}
-              className="flex flex-col justify-between border border-[#0D0D0D] bg-white p-4 shadow-[4px_4px_0_#0D0D0D]"
+              href={`/strategies/builder?id=${encodeURIComponent(strat.id)}`}
+              className="flex flex-col justify-between border border-[#0D0D0D] bg-white p-4 shadow-[4px_4px_0_#0D0D0D] hover:shadow-[2px_2px_0_#0D0D0D] hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
             >
               <div>
                 <div className="flex items-start justify-between mb-2 gap-2">
@@ -51,7 +53,7 @@ export const StrategiesView = ({ strategies }: StrategiesViewProps) => {
                 <p className="text-sm text-gray-600 leading-relaxed">{strat.description}</p>
               </div>
               <div className="text-[13px] mt-4 pt-2 border-t border-gray-200 text-gray-400 font-mono-jb">ID: {strat.id}</div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

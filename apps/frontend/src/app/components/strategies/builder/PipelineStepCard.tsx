@@ -27,9 +27,20 @@ interface Props {
   onRemove: () => void;
   onUpdateParams: (params: Record<string, unknown>) => void;
   variables?: { value: string; label: string }[];
+  tokenXSym?: string;
+  tokenYSym?: string;
 }
 
-export function PipelineStepCard({ instanceId, descriptor, params, onRemove, onUpdateParams, variables }: Props) {
+export function PipelineStepCard({
+  instanceId,
+  descriptor,
+  params,
+  onRemove,
+  onUpdateParams,
+  variables,
+  tokenXSym,
+  tokenYSym,
+}: Props) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: instanceId });
 
   const style = {
@@ -192,7 +203,13 @@ export function PipelineStepCard({ instanceId, descriptor, params, onRemove, onU
                 const value = params[p.key] ?? p.default ?? '';
                 return (
                   <div key={p.key} className="flex flex-col gap-1.5">
-                    <label className="text-[11px] text-[#0D0D0D] font-bold uppercase">{p.key}</label>
+                    <label className="text-[11px] text-[#0D0D0D] font-bold uppercase">
+                      {p.key === 'tokenXAmount'
+                        ? `${tokenXSym || 'Base'} Amount`
+                        : p.key === 'tokenYAmount'
+                          ? `${tokenYSym || 'Quote'} Amount`
+                          : p.key}
+                    </label>
                     {p.type === 'number' ? (
                       <input
                         type="number"
