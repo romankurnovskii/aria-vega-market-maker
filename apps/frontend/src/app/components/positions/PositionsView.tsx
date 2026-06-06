@@ -19,13 +19,14 @@ import { PositionTable } from './PositionTable';
 import { PositionDetail } from './PositionDetail';
 import { OpenPositionForm } from './OpenPositionForm';
 import { buildPositionCycles } from '../../utils/cycleCalculations';
-import type { Assignment, Strategy, Position, EvalLogEntry, PositionLineageRecord } from '../../types/api';
+import type { Assignment, Strategy, Position, Wallet, EvalLogEntry, PositionLineageRecord } from '../../types/api';
 
 interface Props {
   positions: Position[];
   lineage: PositionLineageRecord[];
   assignments: Assignment[];
   strategies: Strategy[];
+  wallets: Wallet[];
   onAssign: (positionId: string, strategyId: string, mode: string) => Promise<void>;
   onEvaluate: (positionId: string, strategyId: string) => Promise<void>;
   onApplyStrategy: (positionId: string, strategyId: string) => Promise<void>;
@@ -52,6 +53,7 @@ export const PositionsView = ({
   lineage,
   assignments,
   strategies,
+  wallets,
   onAssign,
   onEvaluate,
   onApplyStrategy,
@@ -99,7 +101,7 @@ export const PositionsView = ({
       {(selectedPos || isOpeningPosition) && (
         <div className="flex flex-1 gap-2 min-w-0 animate-in slide-in-from-bottom-4 lg:slide-in-from-right-4 duration-300">
           {isOpeningPosition ? (
-            <OpenPositionForm onOpen={onOpenPosition} onClose={() => setIsOpeningPosition(false)} />
+            <OpenPositionForm wallets={wallets} onOpen={onOpenPosition} onClose={() => setIsOpeningPosition(false)} />
           ) : selectedPos ? (
             <PositionDetail
               key={selectedPos.id}

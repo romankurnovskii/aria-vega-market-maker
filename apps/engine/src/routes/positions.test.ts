@@ -367,3 +367,516 @@ describe('Positions Router - applyStrategy Action', () => {
     assert.deepStrictEqual(applyCalls, []); // No execution dispatched
   });
 });
+
+describe('Positions Router - openLiquidity Action', () => {
+  let app: express.Application;
+  let originalFetch: typeof fetch;
+
+  let lastOpenDecision: any = null;
+  let applyCalls: string[] = [];
+  let openStatus: 'success' | 'failed' = 'success';
+
+  let knownPositions: any[] = [];
+  let archivedPositions: any[] = [];
+
+  const mockPositionStore = {
+    getKnown: async () => knownPositions,
+    saveKnown: async (positions: any[]) => {
+      knownPositions = positions;
+    },
+    getArchived: async () => archivedPositions,
+    archivePosition: async (position: any) => {
+      archivedPositions.push(position);
+    },
+  } as any;
+
+  before(() => {
+    originalFetch = globalThis.fetch;
+
+    globalThis.fetch = (async (url: string | URL | Request, _init?: RequestInit) => {
+      const urlStr = String(url);
+      if (urlStr.includes('/pools/pool_123/ohlcv')) {
+        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+      }
+      if (urlStr.includes('/pools/pool_123')) {
+        return new Response(
+          JSON.stringify({
+            address: 'pool_123',
+            current_price: 1.0,
+            dynamic_fee_pct: 0,
+            pool_config: { bin_step: 100, base_fee_pct: 100 },
+            token_x: { address: 'tokenX_mint', decimals: 6 },
+            token_y: { address: 'tokenY_mint', decimals: 6 },
+          }),
+          { status: 200 }
+        );
+      }
+      return new Response(JSON.stringify({}), { status: 200 });
+    }) as any;
+
+    const mockPosition = {
+      id: 'pos_123',
+      poolAddress: 'pool_123',
+      chain: 'solana',
+      protocol: 'meteora_dlmm',
+      lowerBound: 100,
+      upperBound: 200,
+      tokenX: { amount: '1000', decimals: 6, mint: 'tokenX_mint', tokenAddress: 'tokenX_mint' },
+      tokenY: { amount: '2000', decimals: 6, mint: 'tokenY_mint', tokenAddress: 'tokenY_mint' },
+      isInRange: true,
+      openedAt: Date.now(),
+      metadata: {},
+    };
+
+    const mockPositionProvider = {
+      getPosition: async (id: string) => {
+        if (id === 'nonexistent') throw new Error('Position not found');
+        return mockPosition;
+      },
+      getPositions: async () => [mockPosition],
+      getPoolInfo: async () => ({ binStep: 100, feeRate: 0.01 }),
+      getWalletBalances: async () => ({ amountX: '0', amountY: '0' }),
+      getWalletAddress: async () => 'wallet_123',
+      listWallets: async () => [],
+    } as any;
+
+    const mockExecutor = {
+      apply: async (decision: any, _market: any) => {
+        applyCalls.push(decision.action);
+        if (decision.action === 'open') {
+          lastOpenDecision = decision;
+          return {
+            id: 'exec_open_liquidity',
+            decision,
+            txSignatures: ['sig_add_liquidity'],
+            status: openStatus,
+            executedAt: Date.now(),
+            newPositionId: 'new_pos_456',
+          };
+        }
+        return { id: 'unknown', decision, txSignatures: [], status: 'failed', executedAt: Date.now() };
+      },
+      setReEvaluate: () => {},
+    } as any;
+
+    const mockOrchestrator = { tick: async () => ({ action: 'skip' }) } as any;
+
+    const mockRegistry = {
+      getForPosition: () => [mockOrchestrator],
+      register: () => {},
+      deregisterByAssignmentId: () => {},
+    } as any;
+
+    const mockFactory = { create: () => mockOrchestrator } as any;
+
+    const mockStore = {
+      getAssignments: async () => [],
+      saveAssignment: async () => {},
+      deleteAssignment: async () => {},
+      getExecutionRecords: async () => [],
+      saveExecutionRecord: async () => {},
+    } as any;
+
+    const mockLineageStore = {
+      getLineage: async () => [],
+      saveLineageRecord: async () => {},
+      getLineageForPosition: async () => [],
+    } as any;
+
+    app = express();
+    app.use(express.json());
+    app.use(
+      '/positions',
+      handlePositionsRouter(
+        mockPositionProvider,
+        mockExecutor,
+        mockRegistry,
+        mockFactory,
+        mockStore,
+        mockLineageStore,
+        mockPositionStore,
+        'wallet_123'
+      )
+    );
+  });
+
+  after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const runRequest = async (body: any) => {
+    return new Promise<any>((resolve) => {
+      const req = {
+        method: 'POST',
+        url: '/positions/pos_123/actions',
+        headers: { 'content-type': 'application/json' },
+        body,
+      };
+
+      const mockRes: any = {
+        statusCode: 200,
+        setHeader: () => {},
+        getHeader: () => {},
+        removeHeader: () => {},
+        status: (code: number) => {
+          mockRes.statusCode = code;
+          return mockRes;
+        },
+        json: (data: any) => {
+          resolve({ status: mockRes.statusCode, body: data });
+        },
+      };
+
+      (app as any).handle(req, mockRes);
+    });
+  };
+
+  test('should handle openLiquidity successfully', async () => {
+    lastOpenDecision = null;
+    applyCalls = [];
+    openStatus = 'success';
+    knownPositions = [];
+    archivedPositions = [];
+
+    const res = await runRequest({
+      action: 'openLiquidity',
+      tokenXAmount: '500000',
+      tokenYAmount: '1000000',
+    });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.status, 'success');
+    assert.strictEqual(res.body.action, 'openLiquidity');
+    assert.deepStrictEqual(applyCalls, ['open']);
+    assert.ok(lastOpenDecision);
+    assert.strictEqual(lastOpenDecision.action, 'open');
+    assert.strictEqual(lastOpenDecision.openParams.tokenXAmount, '500000');
+    assert.strictEqual(lastOpenDecision.openParams.tokenYAmount, '1000000');
+    assert.strictEqual(lastOpenDecision.openParams.lowerBound, 100);
+    assert.strictEqual(lastOpenDecision.openParams.upperBound, 200);
+    assert.deepStrictEqual(res.body.transactionSignatures, ['sig_add_liquidity']);
+  });
+
+  test('should reject openLiquidity with missing tokenXAmount', async () => {
+    const res = await runRequest({
+      action: 'openLiquidity',
+      tokenYAmount: '1000000',
+    });
+
+    assert.strictEqual(res.status, 400);
+    assert.ok(res.body.error.includes('Missing tokenXAmount'));
+  });
+
+  test('should reject openLiquidity with missing tokenYAmount', async () => {
+    const res = await runRequest({
+      action: 'openLiquidity',
+      tokenXAmount: '500000',
+    });
+
+    assert.strictEqual(res.status, 400);
+    assert.ok(res.body.error.includes('Missing tokenYAmount'));
+  });
+
+  test('should reject openLiquidity with zero amount', async () => {
+    const res = await runRequest({
+      action: 'openLiquidity',
+      tokenXAmount: '0',
+      tokenYAmount: '1000000',
+    });
+
+    assert.strictEqual(res.status, 400);
+    assert.ok(res.body.error.includes('must be positive numbers'));
+  });
+
+  test('should reject openLiquidity with negative amount', async () => {
+    const res = await runRequest({
+      action: 'openLiquidity',
+      tokenXAmount: '-100',
+      tokenYAmount: '1000000',
+    });
+
+    assert.strictEqual(res.status, 400);
+    assert.ok(res.body.error.includes('must be positive numbers'));
+  });
+
+  test('should handle openLiquidity executor failure', async () => {
+    applyCalls = [];
+    openStatus = 'failed';
+
+    const res = await runRequest({
+      action: 'openLiquidity',
+      tokenXAmount: '500000',
+      tokenYAmount: '1000000',
+    });
+
+    assert.strictEqual(res.status, 500);
+    assert.deepStrictEqual(applyCalls, ['open']);
+  });
+});
+
+describe('Positions Router - removeLiquidity Action', () => {
+  let app: express.Application;
+  let originalFetch: typeof fetch;
+
+  let lastCloseDecision: any = null;
+  let applyCalls: string[] = [];
+  let closeStatus: 'success' | 'failed' = 'success';
+  let knownPositions: any[] = [];
+  let archivedPositions: any[] = [];
+
+  const mockPositionStore = {
+    getKnown: async () => knownPositions,
+    saveKnown: async (positions: any[]) => {
+      knownPositions = positions;
+    },
+    getArchived: async () => archivedPositions,
+    archivePosition: async (position: any) => {
+      archivedPositions.push(position);
+    },
+  } as any;
+
+  before(() => {
+    originalFetch = globalThis.fetch;
+
+    globalThis.fetch = (async (url: string | URL | Request, _init?: RequestInit) => {
+      const urlStr = String(url);
+      if (urlStr.includes('/pools/pool_123/ohlcv')) {
+        return new Response(JSON.stringify({ data: [] }), { status: 200 });
+      }
+      if (urlStr.includes('/pools/pool_123')) {
+        return new Response(
+          JSON.stringify({
+            address: 'pool_123',
+            current_price: 1.0,
+            dynamic_fee_pct: 0,
+            pool_config: { bin_step: 100, base_fee_pct: 100 },
+            token_x: { address: 'tokenX_mint', decimals: 6 },
+            token_y: { address: 'tokenY_mint', decimals: 6 },
+          }),
+          { status: 200 }
+        );
+      }
+      return new Response(JSON.stringify({}), { status: 200 });
+    }) as any;
+
+    const mockPosition = {
+      id: 'pos_123',
+      poolAddress: 'pool_123',
+      chain: 'solana',
+      protocol: 'meteora_dlmm',
+      lowerBound: 100,
+      upperBound: 200,
+      tokenX: { amount: '1000', decimals: 6, mint: 'tokenX_mint', tokenAddress: 'tokenX_mint' },
+      tokenY: { amount: '2000', decimals: 6, mint: 'tokenY_mint', tokenAddress: 'tokenY_mint' },
+      isInRange: true,
+      openedAt: Date.now(),
+      metadata: {},
+    };
+
+    const mockPositionProvider = {
+      getPosition: async (id: string) => {
+        if (id === 'nonexistent') throw new Error('Position not found');
+        return mockPosition;
+      },
+      getPositions: async () => [mockPosition],
+      getPoolInfo: async () => ({ binStep: 100, feeRate: 0.01 }),
+      getWalletBalances: async () => ({ amountX: '0', amountY: '0' }),
+      getWalletAddress: async () => 'wallet_123',
+      listWallets: async () => [],
+    } as any;
+
+    const mockExecutor = {
+      apply: async (decision: any, _market: any) => {
+        applyCalls.push(decision.action);
+        if (decision.action === 'close') {
+          lastCloseDecision = decision;
+          return {
+            id: 'exec_close',
+            decision,
+            txSignatures: ['sig_remove_liquidity'],
+            status: closeStatus,
+            executedAt: Date.now(),
+            metrics: {
+              baseFeeCollected: '1.25',
+              quoteFeeCollected: '2.50',
+            },
+          };
+        }
+        return { id: 'unknown', decision, txSignatures: [], status: 'failed', executedAt: Date.now() };
+      },
+      setReEvaluate: () => {},
+    } as any;
+
+    const mockOrchestrator = { tick: async () => ({ action: 'skip' }) } as any;
+
+    const mockRegistry = {
+      getForPosition: () => [mockOrchestrator],
+      register: () => {},
+      deregisterByAssignmentId: () => {},
+    } as any;
+
+    const mockFactory = { create: () => mockOrchestrator } as any;
+
+    const mockStore = {
+      getAssignments: async () => [],
+      saveAssignment: async () => {},
+      deleteAssignment: async () => {},
+      getExecutionRecords: async () => [],
+      saveExecutionRecord: async () => {},
+    } as any;
+
+    const mockLineageStore = {
+      getLineage: async () => [],
+      saveLineageRecord: async () => {},
+      getLineageForPosition: async () => [],
+    } as any;
+
+    app = express();
+    app.use(express.json());
+    app.use(
+      '/positions',
+      handlePositionsRouter(
+        mockPositionProvider,
+        mockExecutor,
+        mockRegistry,
+        mockFactory,
+        mockStore,
+        mockLineageStore,
+        mockPositionStore,
+        'wallet_123'
+      )
+    );
+  });
+
+  after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const runRequest = async (body: any) => {
+    return new Promise<any>((resolve) => {
+      const req = {
+        method: 'POST',
+        url: '/positions/pos_123/actions',
+        headers: { 'content-type': 'application/json' },
+        body,
+      };
+
+      const mockRes: any = {
+        statusCode: 200,
+        setHeader: () => {},
+        getHeader: () => {},
+        removeHeader: () => {},
+        status: (code: number) => {
+          mockRes.statusCode = code;
+          return mockRes;
+        },
+        json: (data: any) => {
+          resolve({ status: mockRes.statusCode, body: data });
+        },
+      };
+
+      (app as any).handle(req, mockRes);
+    });
+  };
+
+  test('should handle removeLiquidity at 100% successfully', async () => {
+    lastCloseDecision = null;
+    applyCalls = [];
+    closeStatus = 'success';
+    knownPositions = [
+      {
+        id: 'pos_123',
+        poolAddress: 'pool_123',
+        chain: 'solana',
+        protocol: 'meteora_dlmm',
+        lowerBound: 100,
+        upperBound: 200,
+        tokenX: { amount: '1000', decimals: 6, mint: 'tokenX_mint', tokenAddress: 'tokenX_mint' },
+        tokenY: { amount: '2000', decimals: 6, mint: 'tokenY_mint', tokenAddress: 'tokenY_mint' },
+        isInRange: true,
+        openedAt: Date.now(),
+        metadata: {},
+      },
+    ];
+    archivedPositions = [];
+
+    const res = await runRequest({
+      action: 'removeLiquidity',
+      percentage: 100,
+    });
+
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.status, 'success');
+    assert.strictEqual(res.body.action, 'removeLiquidity');
+    assert.deepStrictEqual(applyCalls, ['close']);
+    assert.ok(lastCloseDecision);
+    assert.strictEqual(res.body.positionClosed, true);
+    assert.deepStrictEqual(res.body.claimedFees, { tokenX: '1.25', tokenY: '2.50' });
+    assert.deepStrictEqual(res.body.transactionSignatures, ['sig_remove_liquidity']);
+
+    // Verify position was archived
+    assert.strictEqual(archivedPositions.length, 1);
+    assert.strictEqual(archivedPositions[0].id, 'pos_123');
+  });
+
+  test('should reject partial removeLiquidity (< 100%)', async () => {
+    const res = await runRequest({
+      action: 'removeLiquidity',
+      percentage: 50,
+    });
+
+    assert.strictEqual(res.status, 400);
+    assert.ok(res.body.error.includes('Partial removal'));
+    assert.ok(res.body.error.includes('100'));
+  });
+
+  test('should reject removeLiquidity with missing percentage', async () => {
+    const res = await runRequest({ action: 'removeLiquidity' });
+
+    assert.strictEqual(res.status, 400);
+    assert.ok(res.body.error.includes('Missing percentage'));
+  });
+
+  test('should reject removeLiquidity with percentage < 1', async () => {
+    const res = await runRequest({
+      action: 'removeLiquidity',
+      percentage: 0,
+    });
+
+    assert.strictEqual(res.status, 400);
+    assert.ok(res.body.error.includes('must be a number between 1 and 100'));
+  });
+
+  test('should reject removeLiquidity with percentage > 100', async () => {
+    const res = await runRequest({
+      action: 'removeLiquidity',
+      percentage: 200,
+    });
+
+    assert.strictEqual(res.status, 400);
+    assert.ok(res.body.error.includes('must be a number between 1 and 100'));
+  });
+
+  test('should handle removeLiquidity executor failure', async () => {
+    applyCalls = [];
+    closeStatus = 'failed';
+
+    const res = await runRequest({
+      action: 'removeLiquidity',
+      percentage: 100,
+    });
+
+    assert.strictEqual(res.status, 500);
+    assert.deepStrictEqual(applyCalls, ['close']);
+  });
+
+  test('should reject removeLiquidity with invalid percentage type', async () => {
+    const res = await runRequest({
+      action: 'removeLiquidity',
+      percentage: 'not-a-number',
+    });
+
+    assert.strictEqual(res.status, 400);
+    assert.ok(res.body.error.includes('must be a number'));
+  });
+});

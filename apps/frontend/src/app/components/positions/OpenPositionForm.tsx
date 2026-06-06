@@ -16,11 +16,13 @@
 
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { X, Plus, Minus } from 'lucide-react';
 import { getTokenSymbol } from '../../utils/format';
+import type { Wallet } from '../../types/api';
 
 interface OpenPositionFormProps {
+  wallets: Wallet[];
   onOpen: (params: {
     pool_address: string;
     lower_price: number;
@@ -34,7 +36,7 @@ interface OpenPositionFormProps {
   onClose: () => void;
 }
 
-export const OpenPositionForm = ({ onOpen, onClose }: OpenPositionFormProps) => {
+export const OpenPositionForm = ({ wallets, onOpen, onClose }: OpenPositionFormProps) => {
   const [formData, setFormData] = useState({
     pool_address: '5rCf1DM8LjKTw4YqhnoLcngyZYeNnQqztScTogYHAS6', // Default from example
     lower_price: '84',
@@ -42,18 +44,29 @@ export const OpenPositionForm = ({ onOpen, onClose }: OpenPositionFormProps) => 
     base_token_amount: '0',
     quote_token_amount: '1',
     slippage_pct: '0.1',
-    wallet_address: 'Fdno6tMRL5tyvhX629T27zJjBAvQkBxWY2BdHnGbQEpL', // Default from example
+    wallet_address: wallets[0]?.address || 'Fdno6tMRL5tyvhX629T27zJjBAvQkBxWY2BdHnGbQEpL', // Default from example
   });
 
   const [marketPrice, setMarketPrice] = useState<number | null>(null);
   const [binStep, setBinStep] = useState<number | null>(null);
   const [tokenXSym, setTokenXSym] = useState<string | null>(null);
   const [tokenYSym, setTokenYSym] = useState<string | null>(null);
+  const [tokenXMint, setTokenXMint] = useState<string | null>(null);
+  const [tokenYMint, setTokenYMint] = useState<string | null>(null);
   const isFirstLoadRef = useRef(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const binStepFactor = binStep ? 1 + binStep / 10000 : null;
+
+  // Extract token balances from the selected wallet's portfolio
+  const tokenXBalance = useMemo(() => {
+    return findBalanceInPortfolio(wallets, formData.wallet_address, tokenXMint);
+  }, [wallets, formData.wallet_address, tokenXMint]);
+
+  const tokenYBalance = useMemo(() => {
+    return findBalanceInPortfolio(wallets, formData.wallet_address, tokenYMint);
+  }, [wallets, formData.wallet_address, tokenYMint]);
 
   // Compute range info from current prices (re-renders on formData change)
   let rangePct: number | null = null;
@@ -105,16 +118,27 @@ export const OpenPositionForm = ({ onOpen, onClose }: OpenPositionFormProps) => 
         if (!res.ok) throw new Error('Failed to fetch pool info');
         const data = await res.json();
 
+        const xMint: string | undefined = data.poolInfo?.tokenXMint;
+        const yMint: string | undefined = data.poolInfo?.tokenYMint;
+
         setMarketPrice(data.market.price);
         setBinStep(data.poolInfo?.binStep ?? null);
-        setTokenXSym(getTokenSymbol({ mint: data.poolInfo?.tokenXMint }));
-        setTokenYSym(getTokenSymbol({ mint: data.poolInfo?.tokenYMint }));
+        setTokenXSym(getTokenSymbol({ mint: xMint }));
+        setTokenYSym(getTokenSymbol({ mint: yMint }));
+        setTokenXMint(xMint ?? null);
+        setTokenYMint(yMint ?? null);
 
         if (isFirstLoadRef.current) {
+          // Suggest default amounts from wallet balances if available
+          const defaultBaseAmount = suggestDefaultAmount(wallets, formData.wallet_address, xMint);
+          const defaultQuoteAmount = suggestDefaultAmount(wallets, formData.wallet_address, yMint);
+
           setFormData((prev) => ({
             ...prev,
             upper_price: data.market.price.toFixed(6),
             lower_price: (data.market.price * 0.99).toFixed(6),
+            base_token_amount: defaultBaseAmount !== null ? String(defaultBaseAmount) : prev.base_token_amount,
+            quote_token_amount: defaultQuoteAmount !== null ? String(defaultQuoteAmount) : prev.quote_token_amount,
           }));
           isFirstLoadRef.current = false;
         }
@@ -304,6 +328,11 @@ export const OpenPositionForm = ({ onOpen, onClose }: OpenPositionFormProps) => 
               className="border border-[#0D0D0D] p-1.5 focus:outline-none focus:bg-[#F4F4F0]"
               required
             />
+            {tokenXBalance !== null && tokenXSym && (
+              <div className="text-[11px] text-gray-500">
+                Balance: <span className="font-medium text-[#0D0D0D]">{tokenXBalance.toLocaleString()}</span> {tokenXSym}
+              </div>
+            )}
           </div>
           <div className="flex flex-col gap-1">
             <label className="uppercase font-bold text-gray-600">{tokenYSym || 'Quote Token'} Amount</label>
@@ -316,6 +345,11 @@ export const OpenPositionForm = ({ onOpen, onClose }: OpenPositionFormProps) => 
               className="border border-[#0D0D0D] p-1.5 focus:outline-none focus:bg-[#F4F4F0]"
               required
             />
+            {tokenYBalance !== null && tokenYSym && (
+              <div className="text-[11px] text-gray-500">
+                Balance: <span className="font-medium text-[#0D0D0D]">{tokenYBalance.toLocaleString()}</span> {tokenYSym}
+              </div>
+            )}
           </div>
         </div>
 
@@ -347,3 +381,66 @@ export const OpenPositionForm = ({ onOpen, onClose }: OpenPositionFormProps) => 
     </div>
   );
 };
+
+/**
+ * Looks up a token balance for a specific mint in the selected wallet's portfolio.
+ * The portfolio data from the wallets endpoint may have varying structures — handles
+ * common patterns (tokens array, flat balances, etc.).
+ */
+function findBalanceInPortfolio(wallets: Wallet[], walletAddress: string, mint: string | null): number | null {
+  if (!mint || !walletAddress) return null;
+
+  const wallet = wallets.find((w) => w.address === walletAddress);
+  if (!wallet?.portfolio) return null;
+
+  const portfolio = wallet.portfolio;
+
+  // Pattern 1: tokens array with mint/amount fields (Meteora Datapi format)
+  const tokens = (portfolio as Record<string, unknown>).tokens as
+    | Array<{ mint?: string; amount?: string; decimals?: number; uiAmount?: number }>
+    | undefined;
+  if (Array.isArray(tokens)) {
+    const token = tokens.find((t) => t.mint?.toLowerCase() === mint.toLowerCase());
+    if (token) {
+      const amount = token.uiAmount ?? (token.amount ? parseFloat(token.amount) : null);
+      if (amount !== null && !isNaN(amount) && amount > 0) return amount;
+    }
+  }
+
+  // Pattern 2: flat object with mint addresses as keys
+  const flatBalance = (portfolio as Record<string, unknown>)[mint] as
+    | string
+    | number
+    | { amount?: string; uiAmount?: number }
+    | undefined;
+  if (flatBalance !== undefined) {
+    if (typeof flatBalance === 'number' && flatBalance > 0) return flatBalance;
+    if (typeof flatBalance === 'string') {
+      const parsed = parseFloat(flatBalance);
+      if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+    if (typeof flatBalance === 'object' && flatBalance !== null) {
+      const objFlat = flatBalance as { amount?: string; uiAmount?: number };
+      const amt = objFlat.uiAmount ?? (objFlat.amount ? parseFloat(objFlat.amount) : null);
+      if (amt !== null && !isNaN(amt) && amt > 0) return amt;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Suggests a small default amount (10% of wallet balance, minimum 1 unit)
+ * for a given mint from wallet portfolio data.
+ * Returns null if no balance data is available.
+ */
+function suggestDefaultAmount(wallets: Wallet[], walletAddress: string, mint: string | null | undefined): number | null {
+  if (!mint) return null;
+
+  const balance = findBalanceInPortfolio(wallets, walletAddress, mint);
+  if (balance === null) return null;
+
+  // Suggest 10% of balance, minimum 1 unit
+  const suggested = Math.max(1, Math.floor(balance * 0.1));
+  return suggested;
+}

@@ -84,6 +84,7 @@ export const AriaVegaContainer = () => {
                 lineage={data.lineage}
                 assignments={data.assignments}
                 strategies={data.strategies}
+                wallets={data.wallets}
                 onAssign={handleAssignStrategy}
                 onEvaluate={handleEvaluateStrategy}
                 onApplyStrategy={handleApplyStrategy}
