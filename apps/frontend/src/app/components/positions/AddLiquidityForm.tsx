@@ -5,6 +5,7 @@
  *
  * @features
  * - Dual input fields for token X and token Y amounts
+ * - Labels show real token symbols when available (via tokenXSym/tokenYSym props)
  * - Submit button triggers onAdd callback with position ID and amounts
  * - Inline layout designed to sit inside a position detail pane
  *
@@ -17,11 +18,13 @@ import React, { useState } from 'react';
 
 interface AddLiquidityFormProps {
   positionId: string;
+  tokenXSym?: string;
+  tokenYSym?: string;
   onSuccess?: () => void;
   onCancel?: () => void;
 }
 
-export const AddLiquidityForm = ({ positionId, onSuccess, onCancel }: AddLiquidityFormProps) => {
+export const AddLiquidityForm = ({ positionId, tokenXSym, tokenYSym, onSuccess, onCancel }: AddLiquidityFormProps) => {
   const [tokenXAmount, setTokenXAmount] = useState('');
   const [tokenYAmount, setTokenYAmount] = useState('');
   const [loading, setLoading] = useState(false);
@@ -65,24 +68,28 @@ export const AddLiquidityForm = ({ positionId, onSuccess, onCancel }: AddLiquidi
       {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4 text-sm">{error}</div>}
       <form onSubmit={handleSubmit} className="space-y-3">
         <div>
-          <label className="block text-[12px] uppercase tracking-widest font-bold mb-1">Token X Amount</label>
+          <label className="block text-[12px] uppercase tracking-widest font-bold mb-1">
+            {tokenXSym || 'Token X'} Amount
+          </label>
           <input
             type="text"
             value={tokenXAmount}
             onChange={(e) => setTokenXAmount(e.target.value)}
             className="w-full border border-[#0D0D0D] p-2 text-sm outline-none focus:border-[#FF4500] transition-colors"
-            placeholder="e.g. 1000000"
+            placeholder={tokenXSym ? `e.g. 1000000 ${tokenXSym}` : 'e.g. 1000000'}
             required
           />
         </div>
         <div>
-          <label className="block text-[12px] uppercase tracking-widest font-bold mb-1">Token Y Amount</label>
+          <label className="block text-[12px] uppercase tracking-widest font-bold mb-1">
+            {tokenYSym || 'Token Y'} Amount
+          </label>
           <input
             type="text"
             value={tokenYAmount}
             onChange={(e) => setTokenYAmount(e.target.value)}
             className="w-full border border-[#0D0D0D] p-2 text-sm outline-none focus:border-[#FF4500] transition-colors"
-            placeholder="e.g. 1000000"
+            placeholder={tokenYSym ? `e.g. 1000000 ${tokenYSym}` : 'e.g. 1000000'}
             required
           />
         </div>
