@@ -89,8 +89,7 @@ paths:
                     example:
                       - 'InitializationCheckStep'
                       - 'TrailingRangeCheckStep'
-                      - 'RangeCalculatorStep'
-                      - 'AmountCalculatorStep'
+                      - 'ConditionDecisionStep'
                   documentation:
                     type: string
                     example: 'Steps are atomic logical units combined to form strategy workflows.'

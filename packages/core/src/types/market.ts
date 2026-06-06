@@ -42,4 +42,6 @@ export interface PoolInfo {
   binStep: number;
   tokenXDecimals?: number;
   tokenYDecimals?: number;
+  tokenXSymbol?: string;
+  tokenYSymbol?: string;
 }

@@ -21,8 +21,6 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8441';
 
 /** Enrichment metadata for known built-in strategies. */
 const STRATEGY_META: Record<string, { name: string; risk: string }> = {
-  'trailing-usdc': { name: 'Trailing USDC', risk: 'Low' },
-  'experimental-restake': { name: 'Experimental Restake', risk: 'High' },
   'spot-balanced': { name: 'Spot Balanced', risk: 'Medium' },
 };
 
@@ -34,23 +32,21 @@ export default function StrategiesPage() {
     fetch(`${API_URL}/strategies`)
       .then((r) => r.json())
       .then((data) => {
-        const enriched = (data.strategies || []).map(
-          (s: { id: string; description?: string }) => {
-            const meta = STRATEGY_META[s.id] || {
-              name: s.id
-                .split('-')
-                .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
-                .join(' '),
-              risk: 'Medium',
-            };
-            return {
-              id: s.id,
-              name: meta.name,
-              description: s.description || 'Custom strategy implementation',
-              risk: meta.risk,
-            };
-          }
-        );
+        const enriched = (data.strategies || []).map((s: { id: string; description?: string }) => {
+          const meta = STRATEGY_META[s.id] || {
+            name: s.id
+              .split('-')
+              .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+              .join(' '),
+            risk: 'Medium',
+          };
+          return {
+            id: s.id,
+            name: meta.name,
+            description: s.description || 'Custom strategy implementation',
+            risk: meta.risk,
+          };
+        });
         setStrategies(enriched);
       })
       .catch(() => setStrategies([]))
@@ -68,10 +64,7 @@ export default function StrategiesPage() {
       ) : (
         <div className="p-4 max-w-4xl mx-auto flex flex-col min-h-screen">
           <div className="mb-4">
-            <Link
-              href="/"
-              className="text-sm uppercase tracking-widest font-bold hover:text-[#FF4500] transition-colors"
-            >
+            <Link href="/" className="text-sm uppercase tracking-widest font-bold hover:text-[#FF4500] transition-colors">
               ← Back to Dashboard
             </Link>
           </div>

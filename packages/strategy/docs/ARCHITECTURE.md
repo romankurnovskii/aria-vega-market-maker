@@ -5,5 +5,5 @@ The `strategy` package implements high-level workflow runners that coordinate co
 ## Core Elements
 
 - **`Workflow`**: Runs an ordered list of `IStep` elements sequentially, maintaining the context state.
-- **`TrailingUsdcStrategy`**: Implements the `IStrategy` interface. Leverages `Workflow` with a structured list of steps:
-  `InitializationCheckStep` → `TrailingRangeCheckStep` → `RangeCalculatorStep` → `AmountCalculatorStep`.
+- **`StepRegistry`**: Stores descriptors and factory builders for step classes to build dynamic execution pipelines.
+- **`DataDrivenStrategy`**: Generic strategy class that dynamically executes workflows defined by JSON strategy configurations.

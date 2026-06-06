@@ -4,13 +4,10 @@ The `steps` package holds granular, reusable step modules implementing the `ISte
 
 ## Components
 
-- **`InitializationCheckStep`**: Confirms that a position is alive and holds valid assets.
-- **`TrailingRangeCheckStep`**: Monitors whether the CLMM pool's active bin has moved out of bounds. Also writes `isInRange: boolean` to context.
-- **`RangeCalculatorStep`**: Computes a new, balanced bin range surrounding the current active bin.
-- **`AmountCalculatorStep`**: Identifies asset allocations needed to establish the new position.
+- **`InitializationCheckStep`**: Confirms whether a position has non-zero liquidity and sets the `isEmpty: boolean` field in the context.
+- **`TrailingRangeCheckStep`**: Monitors whether the CLMM pool's active bin has moved out of bounds. Writes `isInRange: boolean` to context.
 - **`ConditionDecisionStep`**: Generic block evaluating dynamic context fields against numeric thresholds or truthiness to emit signals (`_signal`, `_reason`).
-- **`RsiIndicatorStep`**: Computes Relative Strength Index (RSI) using Wilder smoothing over a configurable period.
-- **`SmaIndicatorStep`**: Computes Simple Moving Average (SMA) and determines if the current price is above/below it.
+- **`ContextSetupStep`**: Wires position metadata, pool info, and market price snapshots into the evaluation context.
 
 ## Design
 

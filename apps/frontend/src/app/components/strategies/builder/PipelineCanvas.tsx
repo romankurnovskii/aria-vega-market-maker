@@ -57,28 +57,6 @@ export function PipelineCanvas({
 
   const insertStep = useStrategyBuilderStore((s) => s.insertStep);
 
-  // Dynamically compute all variables available in the context based on active steps
-  const dynamicVariables = [
-    { value: 'Price_SOL', label: 'SOL RATE (Price_SOL)' },
-    { value: 'UserBalanceUSDC', label: 'USDC BALANCE (UserBalanceUSDC)' },
-    { value: 'UserBalanceETH', label: 'ETH BALANCE (UserBalanceETH)' },
-    { value: 'MeteoraStatus', label: 'METEORA POOL STATUS (MeteoraStatus)' },
-    { value: 'Signal', label: 'CROSSOVER SIGNAL (Signal)' },
-  ];
-
-  steps.forEach((step) => {
-    const outputKey = step.params?.outputKey as string;
-    if (outputKey && outputKey.trim() !== '') {
-      if (!dynamicVariables.some((v) => v.value === outputKey)) {
-        const stepName = step.stepId.replace('-indicator', '').replace('-calculator', '').toUpperCase();
-        dynamicVariables.push({
-          value: outputKey,
-          label: `${outputKey} (${stepName})`,
-        });
-      }
-    }
-  });
-
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -187,6 +165,48 @@ export function PipelineCanvas({
                     {steps.map((step, idx) => {
                       const descriptor = availableDescriptors.find((d) => d.id === step.stepId);
                       if (!descriptor) return null;
+
+                      // Dynamically compute variables available up to this point in execution sequence
+                      const precedingVariables = [
+                        { value: 'Price_SOL', label: 'SOL RATE (Price_SOL)' },
+                        { value: 'UserBalanceUSDC', label: 'USDC BALANCE (UserBalanceUSDC)' },
+                        { value: 'UserBalanceETH', label: 'ETH BALANCE (UserBalanceETH)' },
+                        { value: 'MeteoraStatus', label: 'METEORA POOL STATUS (MeteoraStatus)' },
+                        { value: 'Signal', label: 'CROSSOVER SIGNAL (Signal)' },
+                      ];
+
+                      for (let i = 0; i < idx; i++) {
+                        const prevStep = steps[i];
+                        const prevDesc = availableDescriptors.find((d) => d.id === prevStep.stepId);
+
+                        // 1. Add static outputs declared in the step's descriptor
+                        if (prevDesc?.outputs) {
+                          prevDesc.outputs.forEach((out) => {
+                            if (!precedingVariables.some((v) => v.value === out.key)) {
+                              precedingVariables.push({
+                                value: out.key,
+                                label: `${out.key} (${prevDesc.name})`,
+                              });
+                            }
+                          });
+                        }
+
+                        // 2. Add custom outputs (outputKey parameter) if specified
+                        const outputKey = prevStep.params?.outputKey as string;
+                        if (outputKey && outputKey.trim() !== '') {
+                          if (!precedingVariables.some((v) => v.value === outputKey)) {
+                            const stepName = prevStep.stepId
+                              .replace('-indicator', '')
+                              .replace('-calculator', '')
+                              .toUpperCase();
+                            precedingVariables.push({
+                              value: outputKey,
+                              label: `${outputKey} (${stepName})`,
+                            });
+                          }
+                        }
+                      }
+
                       return (
                         <React.Fragment key={step.instanceId}>
                           <PipelineStepCard
@@ -195,7 +215,7 @@ export function PipelineCanvas({
                             params={step.params}
                             onRemove={() => onRemoveStep(step.instanceId)}
                             onUpdateParams={(p) => onUpdateStepParams(step.instanceId, p)}
-                            variables={dynamicVariables}
+                            variables={precedingVariables}
                             tokenXSym={tokenXSym}
                             tokenYSym={tokenYSym}
                           />

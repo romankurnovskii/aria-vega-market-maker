@@ -377,6 +377,8 @@ export class MeteoraApiProvider implements IPositionProvider {
       binStep: data.pool_config.bin_step,
       tokenXDecimals: data.token_x.decimals,
       tokenYDecimals: data.token_y.decimals,
+      tokenXSymbol: data.token_x.symbol,
+      tokenYSymbol: data.token_y.symbol,
     };
 
     this.poolInfoCache.set(poolAddress, { data: poolInfo, timestamp: now });

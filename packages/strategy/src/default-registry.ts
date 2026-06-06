@@ -9,16 +9,7 @@
  *
  * @dependencies @lp-system/steps, StepRegistry
  */
-import {
-  InitializationCheckStep,
-  TrailingRangeCheckStep,
-  RangeCalculatorStep,
-  AmountCalculatorStep,
-  ClmmPricingStep,
-  ExperimentalRestakeStep,
-  ConditionDecisionStep,
-  ContextSetupStep,
-} from '@lp-system/steps';
+import { InitializationCheckStep, TrailingRangeCheckStep, ConditionDecisionStep, ContextSetupStep } from '@lp-system/steps';
 import { StepRegistry } from './step-registry.js';
 
 /**
@@ -32,14 +23,6 @@ export function createDefaultRegistry(): StepRegistry {
 
   registry.register('initialization-check', () => new InitializationCheckStep(), new InitializationCheckStep().descriptor);
   registry.register('trailing-range-check', () => new TrailingRangeCheckStep(), new TrailingRangeCheckStep().descriptor);
-  registry.register('range-calculator', () => new RangeCalculatorStep(), new RangeCalculatorStep().descriptor);
-  registry.register(
-    'amount-calculator',
-    (params) => new AmountCalculatorStep(params),
-    new AmountCalculatorStep().descriptor
-  );
-  registry.register('clmm-pricing', () => new ClmmPricingStep(), new ClmmPricingStep().descriptor);
-  registry.register('experimental-restake', () => new ExperimentalRestakeStep(), new ExperimentalRestakeStep().descriptor);
   registry.register(
     'condition-decision',
     (params) => new ConditionDecisionStep(params),

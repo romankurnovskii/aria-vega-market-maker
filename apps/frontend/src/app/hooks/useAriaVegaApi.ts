@@ -35,16 +35,12 @@ const INITIAL_DATA: AriaVegaData = {
 };
 
 const STRATEGY_META: Record<string, { name: string; risk: string }> = {
-  'trailing-usdc': { name: 'Trailing USDC', risk: 'Low' },
-  'experimental-restake': { name: 'Experimental Restake', risk: 'High' },
   'spot-balanced': { name: 'Spot Balanced', risk: 'Medium' },
 };
 
 const STEP_META: Record<string, { type: string; description: string }> = {
   InitializationCheckStep: { type: 'Validation', description: 'Confirms position alive & holds valid assets.' },
   TrailingRangeCheckStep: { type: 'Monitor', description: 'Monitors if active bin moved out of bounds.' },
-  RangeCalculatorStep: { type: 'Compute', description: 'Computes new balanced bin range.' },
-  AmountCalculatorStep: { type: 'Compute', description: 'Identifies asset allocations needed.' },
 };
 
 export interface UseAriaVegaApiReturn {

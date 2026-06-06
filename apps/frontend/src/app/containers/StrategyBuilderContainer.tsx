@@ -82,9 +82,7 @@ export function StrategyBuilderContainer({ initialStrategyId }: { initialStrateg
           if (def) {
             loadStrategy(def);
           } else {
-            console.warn(
-              `[StrategyBuilder] Strategy "${initialStrategyId}" not found via API.`
-            );
+            console.warn(`[StrategyBuilder] Strategy "${initialStrategyId}" not found via API.`);
           }
         })
         .finally(() => setLoadingStrategy(false));
@@ -108,13 +106,17 @@ export function StrategyBuilderContainer({ initialStrategyId }: { initialStrateg
         const data = await fetchPoolData(poolAddress);
         if (data && data.market && instanceId) {
           lastFetchedAddress.current = poolAddress;
-          const symX = getTokenSymbol({ mint: data.poolInfo?.tokenXMint });
-          const symY = getTokenSymbol({ mint: data.poolInfo?.tokenYMint });
+          const symX =
+            data.poolInfo?.tokenXSymbol ||
+            getTokenSymbol({ mint: data.poolInfo?.tokenXAddress || data.poolInfo?.tokenXMint });
+          const symY =
+            data.poolInfo?.tokenYSymbol ||
+            getTokenSymbol({ mint: data.poolInfo?.tokenYAddress || data.poolInfo?.tokenYMint });
           setTokenXSym(symX);
           setTokenYSym(symY);
           updateStepParams(instanceId, {
             currentPrice: data.market.price,
-            rangeMax: data.market.activeBound || parseFloat((data.market.price * 1.1).toFixed(4)),
+            rangeMax: parseFloat((data.market.price * 1.1).toFixed(4)),
             rangeMin: parseFloat((data.market.price * 0.9).toFixed(4)),
           });
         }

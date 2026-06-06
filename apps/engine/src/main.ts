@@ -15,12 +15,7 @@
 import { HummingbotProvider } from '@lp-system/providers';
 import { HummingbotExecutor } from '@lp-system/executor';
 import { JsonFileStore, JsonPositionStore, JsonLineageStore, JsonStrategyStore } from '@lp-system/persistence';
-import {
-  TrailingUsdcStrategy,
-  ExperimentalRestakeStrategy,
-  DataDrivenStrategy,
-  createDefaultRegistry,
-} from '@lp-system/strategy';
+import { DataDrivenStrategy, createDefaultRegistry } from '@lp-system/strategy';
 import { OrchestratorRegistry, OrchestratorFactory } from '@lp-system/orchestration';
 import { getLogger } from '@lp-system/logger';
 import { startHttpServer } from './server.js';
@@ -64,19 +59,9 @@ async function main() {
   // 3.5 Step Registry initialization
   const stepRegistry = createDefaultRegistry();
 
-  // 4. Strategy initialization
-  const trailingUsdcStrategy = new TrailingUsdcStrategy({ rangePercent: 20 }, stepRegistry);
-  const experimentalRestakeStrategy = new ExperimentalRestakeStrategy({}, stepRegistry);
-
   // 5. Orchestration Layer initialization
   const registry = new OrchestratorRegistry();
-  const factory = new OrchestratorFactory(
-    {
-      'trailing-usdc': trailingUsdcStrategy,
-      'experimental-restake': experimentalRestakeStrategy,
-    },
-    { rangePercent: 20 }
-  );
+  const factory = new OrchestratorFactory({}, { rangePercent: 20 });
 
   // 5.2 Load custom data-driven strategies from store
   const customStrategies = await strategyStore.getStrategies();

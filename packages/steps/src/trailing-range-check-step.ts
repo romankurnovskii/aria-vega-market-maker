@@ -4,12 +4,10 @@
  *
  * @features
  * - Compares market.activeBound against position.lowerBound and upperBound
- * - Emits 'close+open' signal when active bound exits range (triggers rebalance)
- * - Emits 'skip' when price is within bounds (position remains in-range)
- * - Respects prior signals: if a previous step already set a signal, this step passes through
+ * - Sets 'isInRange' to true if active bound is within position bounds, false otherwise
  *
  * @dependencies IStep, StepContext (from @lp-system/core)
- * @sideEffects None — pure check, no mutations beyond signal/reason in context
+ * @sideEffects None — pure check, updates context with isInRange boolean
  */
 import { IStep, StepContext, StepDescriptor } from '@lp-system/core';
 import { getLogger } from '@lp-system/logger';
@@ -27,13 +25,8 @@ export class TrailingRangeCheckStep implements IStep {
     inputs: [
       { key: 'position', type: 'Position', description: 'Current LP position bounds' },
       { key: 'market', type: 'MarketSnapshot', description: 'Current active market bound' },
-      { key: 'signal', type: 'string', description: 'Prior signal (if any)', required: false },
     ],
-    outputs: [
-      { key: 'signal', type: 'string', description: 'Set to "close+open" or "skip"' },
-      { key: 'reason', type: 'string', description: 'Explanation' },
-      { key: 'isInRange', type: 'boolean', description: 'Whether the active bound is within position boundaries' },
-    ],
+    outputs: [{ key: 'isInRange', type: 'boolean', description: 'Whether the active bound is within position boundaries' }],
     params: [],
   };
 
@@ -41,39 +34,19 @@ export class TrailingRangeCheckStep implements IStep {
    * Checks if the current active bound lies within the position's boundary range.
    *
    * @param {StepContext} context - Pipeline context with position and market data.
-   * @returns {Promise<StepContext>} Updated context with signal and reason set if out of range.
+   * @returns {Promise<StepContext>} Updated context with isInRange set.
    */
   public async execute(context: StepContext): Promise<StepContext> {
     logger.info(
       `[${this.name}] Checking range alignment. Position range: [${context.position.lowerBound}, ${context.position.upperBound}]. Active bound: ${context.market.activeBound}`
     );
 
-    // If a previous step already set a signal, we respect it and skip.
-    if (context.signal) {
-      return context;
-    }
-
     const isActiveBoundInRange =
       context.market.activeBound >= context.position.lowerBound && context.market.activeBound <= context.position.upperBound;
 
-    if (!isActiveBoundInRange) {
-      logger.warn(
-        `[${this.name}] Active bound ${context.market.activeBound} is OUT of position range. Triggering close+open rebalance.`
-      );
-      return {
-        ...context,
-        isInRange: false,
-        signal: 'close+open',
-        reason: `Active bound ${context.market.activeBound} shifted out of range [${context.position.lowerBound}, ${context.position.upperBound}]`,
-      };
-    }
-
-    logger.info(`[${this.name}] Active bound is healthy and within range boundaries.`);
     return {
       ...context,
-      isInRange: true,
-      signal: 'skip',
-      reason: 'Active bound remains within range',
+      isInRange: isActiveBoundInRange,
     };
   }
 }

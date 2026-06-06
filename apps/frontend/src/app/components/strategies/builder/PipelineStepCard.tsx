@@ -205,9 +205,9 @@ export function PipelineStepCard({
                   <div key={p.key} className="flex flex-col gap-1.5">
                     <label className="text-[11px] text-[#0D0D0D] font-bold uppercase">
                       {p.key === 'tokenXAmount'
-                        ? `${tokenXSym || 'Base'} Amount`
+                        ? `Token X Amount ${tokenXSym ? `(${tokenXSym})` : ''}`
                         : p.key === 'tokenYAmount'
-                          ? `${tokenYSym || 'Quote'} Amount`
+                          ? `Token Y Amount ${tokenYSym ? `(${tokenYSym})` : ''}`
                           : p.key}
                     </label>
                     {p.type === 'number' ? (
