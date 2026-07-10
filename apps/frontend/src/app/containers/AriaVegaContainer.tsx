@@ -35,6 +35,7 @@ export const AriaVegaContainer = () => {
     handleApplyStrategy,
     handleApplySuggestion,
     handleDeleteAssignment,
+    handlePauseAssignment,
     handleOpenPosition,
   } = useAriaVegaApi();
 
@@ -98,6 +99,7 @@ export const AriaVegaContainer = () => {
               <AssignmentsView
                 assignments={data.assignments}
                 onDelete={handleDeleteAssignment}
+                onPause={handlePauseAssignment}
                 evalLogs={evalLogs}
                 onApplySuggestion={handleApplySuggestion}
               />

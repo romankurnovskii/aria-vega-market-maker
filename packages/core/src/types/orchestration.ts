@@ -22,6 +22,8 @@ export interface Assignment {
   positionId: string;
   mode: AssignmentMode;
   createdAt: number;
+  /** When true, the tick loop skips automated evaluation for this assignment. */
+  paused?: boolean;
   recoveryData?: {
     poolAddress: string;
     oldPosition?: Position;

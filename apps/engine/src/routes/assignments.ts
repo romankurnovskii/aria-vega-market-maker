@@ -62,6 +62,37 @@ export function createAssignmentsRouter(
     }
   });
 
+  router.patch('/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { paused } = req.body;
+
+      if (typeof paused !== 'boolean') {
+        res.status(400).json({ error: 'Missing or invalid "paused" boolean in request body.' });
+        return;
+      }
+
+      const assignments = await store.getAssignments();
+      const assignment = assignments.find((a) => a.id === id);
+
+      if (!assignment) {
+        res.status(404).json({ error: `Assignment with ID ${id} not found.` });
+        return;
+      }
+
+      assignment.paused = paused;
+      await store.saveAssignment(assignment);
+
+      res.json({
+        message: `Assignment ${id} ${paused ? 'paused' : 'resumed'} successfully`,
+        assignment,
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      res.status(500).json({ error: message });
+    }
+  });
+
   router.delete('/:id', async (req, res) => {
     try {
       const { id } = req.params;
