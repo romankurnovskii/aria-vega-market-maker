@@ -49,6 +49,7 @@ export interface Assignment {
   positionId: string;
   strategyId: string;
   mode: string;
+  paused?: boolean;
 }
 
 export interface Strategy {

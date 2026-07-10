@@ -59,6 +59,7 @@ export interface UseAriaVegaApiReturn {
   handleEvaluateStrategy: (positionId: string, strategyId: string) => Promise<void>;
   handleApplyStrategy: (positionId: string, strategyId: string) => Promise<void>;
   handleDeleteAssignment: (id: string) => Promise<void>;
+  handlePauseAssignment: (id: string, paused: boolean) => Promise<void>;
   handleOpenPosition: (params: {
     pool_address: string;
     lower_price: number;
@@ -518,6 +519,39 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
     }
   };
 
+  const handlePauseAssignment = async (id: string, paused: boolean): Promise<void> => {
+    try {
+      const res = await fetch(`${API_URL}/assignments/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paused }),
+      });
+
+      if (res.ok) {
+        addToast({
+          type: 'success',
+          title: paused ? 'Evaluation Paused' : 'Evaluation Resumed',
+          message: `Strategy evaluation for assignment ${id} ${paused ? 'paused' : 'resumed'}.`,
+        });
+        syncState();
+      } else {
+        const result = await res.json().catch(() => ({}));
+        addToast({
+          type: 'error',
+          title: 'Pause Assignment Failed',
+          message: result.error || 'Server returned an error while updating the assignment.',
+        });
+      }
+    } catch (error) {
+      console.error('Pause assignment failed', error);
+      addToast({
+        type: 'error',
+        title: 'Pause Assignment Failed',
+        message: error instanceof Error ? error.message : 'Network error occurred.',
+      });
+    }
+  };
+
   const handleOpenPosition = async (params: {
     pool_address: string;
     lower_price: number;
@@ -592,6 +626,7 @@ export const useAriaVegaApi = (): UseAriaVegaApiReturn => {
     handleEvaluateStrategy,
     handleApplyStrategy,
     handleDeleteAssignment,
+    handlePauseAssignment,
     handleOpenPosition,
   };
 };

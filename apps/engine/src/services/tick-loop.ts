@@ -122,7 +122,18 @@ export class TickLoopService {
       // Read current active positions from local cache store to prevent redundant RPC lookups
       const knownPositions = await this.positionStore.getKnown();
 
+      // Resolve pause state per assignment so paused assignments are skipped without deregistering
+      const assignments = await this.store.getAssignments();
+      const pausedAssignmentIds = new Set(assignments.filter((a) => a.paused).map((a) => a.id));
+
       for (const orchestrator of orchestrators) {
+        if (pausedAssignmentIds.has(orchestrator.assignmentId)) {
+          logger.info(
+            `[TickLoopService] Assignment ${orchestrator.assignmentId} is paused. Skipping evaluation for position ${orchestrator.positionId}.`
+          );
+          continue;
+        }
+
         if (!positionGuard.tryAcquire(orchestrator.positionId)) {
           logger.info(`[TickLoopService] Position ${orchestrator.positionId} is locked by another operation. Skipping.`);
           continue;
@@ -133,7 +144,6 @@ export class TickLoopService {
             logger.info(
               `[TickLoopService] Orchestrator ${orchestrator.id} is in pending_open mode. Retrying open execution...`
             );
-            const assignments = await this.store.getAssignments();
             const assignment = assignments.find((a) => a.id === orchestrator.assignmentId);
 
             if (!assignment || !assignment.recoveryData) {

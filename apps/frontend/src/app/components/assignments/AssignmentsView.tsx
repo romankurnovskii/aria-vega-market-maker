@@ -12,13 +12,14 @@
  * @sideEffects None
  */
 
-import { Trash2 } from 'lucide-react';
+import { Trash2, Pause, Play } from 'lucide-react';
 import { EventLog } from '../ui/EventLog';
 import type { Assignment, EvalLogEntry } from '../../types/api';
 
 interface AssignmentsViewProps {
   assignments: Assignment[];
   onDelete: (id: string) => Promise<void>;
+  onPause: (id: string, paused: boolean) => Promise<void>;
   evalLogs?: EvalLogEntry[];
   onApplySuggestion?: (
     positionId: string,
@@ -27,7 +28,13 @@ interface AssignmentsViewProps {
   ) => void;
 }
 
-export const AssignmentsView = ({ assignments, onDelete, evalLogs = [], onApplySuggestion }: AssignmentsViewProps) => {
+export const AssignmentsView = ({
+  assignments,
+  onDelete,
+  onPause,
+  evalLogs = [],
+  onApplySuggestion,
+}: AssignmentsViewProps) => {
   if (assignments.length === 0 && evalLogs.length === 0)
     return <div className="text-gray-500 italic text-sm">No active assignments found. Use positions pane to create.</div>;
 
@@ -46,6 +53,9 @@ export const AssignmentsView = ({ assignments, onDelete, evalLogs = [], onApplyS
                 </th>
                 <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D]">Strategy</th>
                 <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D] text-right">
+                  Pause
+                </th>
+                <th className="py-2 px-3 font-normal uppercase tracking-widest border-b border-[#0D0D0D] text-right">
                   Revoke
                 </th>
               </tr>
@@ -62,6 +72,20 @@ export const AssignmentsView = ({ assignments, onDelete, evalLogs = [], onApplyS
                   </td>
                   <td className="py-2 px-3 border-r border-gray-200">
                     <span className="bg-[#0D0D0D] text-[#F4F4F0] px-1.5 py-0.5 text-[13px] font-mono">{asg.strategyId}</span>
+                    {asg.paused && (
+                      <span className="ml-1.5 bg-[#FF4500] text-[#0D0D0D] px-1 py-0.5 text-[11px] font-bold uppercase tracking-wider">
+                        Paused
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-1 px-3 text-right">
+                    <button
+                      onClick={() => onPause(asg.id, !asg.paused)}
+                      className="text-gray-400 hover:text-[#FF4500] transition-colors p-1"
+                      title={asg.paused ? 'Resume Evaluation' : 'Pause Evaluation'}
+                    >
+                      {asg.paused ? <Play size={14} /> : <Pause size={14} />}
+                    </button>
                   </td>
                   <td className="py-1 px-3 text-right">
                     <button
